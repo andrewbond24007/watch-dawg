@@ -146,7 +146,7 @@ async function trepp() {
   });
   const merge = (live, seed) => { const m = new Map(seed); live.forEach(([d, v]) => m.set(d, v)); return [...m.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1)); };
   if (!office.length && !overall.length) throw new Error('Trepp: no readings found');
-  return { office: merge(office, TREPP_SEED.office), matured: merge(matured, TREPP_SEED.matured), overall: merge(overall, []), live: office.length };
+  return { office: merge(office, TREPP_SEED.office), matured: matured.length ? merge(matured, TREPP_SEED.matured) : null, overall: merge(overall, []), live: office.length };
 }
 // Kastle weekly office occupancy (10 big US cities, share of pre-pandemic attendance).
 async function kastle() {
