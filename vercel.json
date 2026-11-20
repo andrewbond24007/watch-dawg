@@ -1,0 +1,9 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "rewrites": [
+    { "source": "/.netlify/functions/:name", "destination": "/api/:name" }
+  ],
+  "functions": {
+    "api/*.mjs": { "maxDuration": 30 }
+  }
+}
