@@ -23,10 +23,21 @@ export const GET = async () => {
     } catch (e) { out[topic] = 'ERR ' + e; }
   }
   try {
-    const h = await fetch('https://www.greenstreet.com/insights/CPPI', { headers: UA, signal: T(10000) }).then((r) => r.text());
-    const pdfs = [...new Set([...h.matchAll(/https?:\/\/[^"' ]+\.pdf/g)].map((m) => m[0]))].slice(0, 6); out.gsPdfs = pdfs;
-    const u = pdfs.find((p) => /CPPI/i.test(p)) || pdfs[0];
-    if (u) { const b = Buffer.from(await fetch(u, { headers: UA, signal: T(12000) }).then((r) => r.arrayBuffer())); const t = pdfText(b); out.gsLen = t.length; out.gsOffice = [...t.matchAll(/.{0,120}Office.{0,160}/g)].slice(0, 6).map((m) => m[0]); out.gsHead = t.slice(0, 600); }
+    const h = txt(await fetch('https://www.greenstreet.com/insights/CPPI', { headers: UA, signal: T(10000) }).then((r) => r.text()));
+    const m = /Newport Beach, CA, (\w+) (\d+), (\d{4})/.exec(h); out.gsDate = m && m[0];
+    const MON = { January: 1, February: 2, March: 3, April: 4, May: 5, June: 6, July: 7, August: 8, September: 9, October: 10, November: 11, December: 12 };
+    const ds = m ? `${m[3]}${String(MON[m[1]]).padStart(2, '0')}${String(m[2]).padStart(2, '0')}` : '';
+    out.gsTry = {};
+    for (const u of [`https://insights.greenstreet.com/hubfs/GSCPPI-${ds}.pdf`, `https://insights.greenstreet.com/hubfs/GSCPPI${ds}.pdf`]) {
+      const r = await fetch(u, { headers: UA, signal: T(12000) });
+      if (r.status !== 200) { out.gsTry[u] = r.status; continue; }
+      const t = pdfText(Buffer.from(await r.arrayBuffer())); out.gsTry[u] = 'ok ' + t.length;
+      out.gsOffice = [...t.matchAll(/.{0,100}Office.{0,140}/g)].slice(0, 6).map((x) => x[0]); out.gsHead = t.slice(0, 500); break;
+    }
   } catch (e) { out.gs = 'ERR ' + e; }
+  try {
+    const t = txt(await fetch('https://www.trepp.com/trepptalk/cmbs-delinquency-rate-drops-15-basis-points-in-october-2026', { headers: UA, signal: T(10000) }).then((r) => r.text()));
+    const i = t.indexOf('delinquency rate'); out.treppBody = t.slice(Math.max(0, t.search(/The Trepp CMBS Delinquency Rate/i)), Math.max(0, t.search(/The Trepp CMBS Delinquency Rate/i)) + 2200);
+  } catch (e) { out.trepp = 'ERR ' + e; }
   return Response.json(out, { headers: { 'cache-control': 'no-store' } });
 };
