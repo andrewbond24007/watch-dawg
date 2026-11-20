@@ -114,6 +114,50 @@ async function ecbBackup(countries) {
   }
   return out;
 }
+// ---------- offices ----------
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const plain = (h) => h.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/g, '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;|&#160;/g, ' ').replace(/&amp;/g, '&').replace(/&#39;|&rsquo;/g, "'").replace(/\s+/g, ' ');
+// Published Trepp readings (office CMBS delinquency, and the all-property rate including performing matured
+// loans), used only for months the live reports no longer list. Sources: Trepp via Connect CRE, Scotsman Guide, CRE Daily.
+const TREPP_SEED = { office: [['2025-09-01', 11.13], ['2025-10-01', 11.76], ['2026-01-01', 12.34], ['2026-09-01', 12.16]], matured: [['2026-08-01', 9.81]] };
+async function trepp() {
+  const h = await fetch('https://www.trepp.com/trepptalk/topic/cmbs-delinquencies', { headers: UA, signal: T(8000) }).then((r) => r.text());
+  const links = [...new Set([...h.matchAll(/href="(https:\/\/www\.trepp\.com\/trepptalk\/[a-z0-9-]+)"/g)].map((m) => m[1]))]
+    .filter((l) => /delinquency-(rate|report)|cmbs-delinquenc/.test(l)).slice(0, 4);
+  const posts = await Promise.all(links.map((l) => fetch(l, { headers: UA, signal: T(8000) }).then((r) => r.text()).then(plain).catch(() => '')));
+  const office = [], matured = [], overall = [];
+  posts.forEach((t, i) => {
+    const start = t.search(/The Trepp (commercial mortgage-backed securities \(CMBS\) |CMBS )?delinquency rate/i);
+    if (start < 0) return;
+    const b = t.slice(start, start + 6000);
+    const mo = new RegExp(`in (${MONTHS.join('|')}) (\\d{4})`).exec(b);
+    if (!mo) return;
+    const d = `${mo[2]}-${String(MONTHS.indexOf(mo[1]) + 1).padStart(2, '0')}-01`;
+    const all = /delinquency rate[^%]{0,90}?(\d{1,2}\.\d{1,2})%/i.exec(b);
+    if (all) overall.push([d, +all[1]]);
+    // the office reading: "office ... to 12.33%", "the office delinquency rate ... 12.33%"
+    for (const m of b.matchAll(/\boffice\b([^%]{0,110}?)(\d{1,2}\.\d{1,2})%/gi)) {
+      if (/retail|multifamily|lodging|hotel|industrial|mixed-use|overall/i.test(m[1])) continue;
+      if (/loan|tower|portfolio|building|propert/i.test(m[1]) && !/rate|basis points|bps/i.test(m[1])) continue;
+      const v = +m[2]; if (v >= 4 && v <= 30) { office.push([d, v]); break; }
+    }
+    const mb = /matured balloon[^%]{0,220}?(\d{1,2}\.\d{1,2})%/i.exec(b);
+    if (mb) matured.push([d, +mb[1]]);
+  });
+  const merge = (live, seed) => { const m = new Map(seed); live.forEach(([d, v]) => m.set(d, v)); return [...m.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1)); };
+  if (!office.length && !overall.length) throw new Error('Trepp: no readings found');
+  return { office: merge(office, TREPP_SEED.office), matured: merge(matured, TREPP_SEED.matured), overall: merge(overall, []), live: office.length };
+}
+// Kastle weekly office occupancy (10 big US cities, share of pre-pandemic attendance).
+async function kastle() {
+  const t = plain(await fetch('https://www.kastle.com/safety-wellness/getting-america-back-to-work/', { headers: UA, signal: T(8000) }).then((r) => r.text()));
+  const m = /national average occupancy of (\d{2}\.\d)%(?:,? (up|down) (\d+(?:\.\d)?) points?)?/i.exec(t);
+  if (!m) throw new Error('Kastle: figure not found');
+  const v = +m[1], ch = m[3] ? (m[2].toLowerCase() === 'up' ? 1 : -1) * +m[3] : null;
+  const peak = /peak day nationally[^%]{0,120}?(\d{2}\.\d)%/i.exec(t);
+  const wk = new Date(); wk.setUTCDate(wk.getUTCDate() - ((wk.getUTCDay() + 6) % 7) - 7);
+  return { value: v, prev: ch == null ? null : +(v - ch).toFixed(1), peak: peak ? +peak[1] : null, date: wk.toISOString().slice(0, 10) };
+}
 async function yahoo(sym) {
   const r = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=1y&interval=1d`, { headers: UA, signal: T(7000) });
   const j = await r.json();
@@ -198,14 +242,15 @@ const WORDS = {
 const safe = (p) => p.catch((e) => ({ error: String(e.message || e).slice(0, 80) }));
 
 const NAMES = {
-  XHB: 'US homebuilders (ETF)', VNQ: 'US property REITs (ETF)', BXP: 'BXP (offices)', SLG: 'SL Green (NYC offices)',
+  XHB: 'US homebuilders (ETF)', VNQ: 'US property REITs (ETF)', BXP: 'BXP', SLG: 'SL Green', VNO: 'Vornado', KRC: 'Kilroy', HPP: 'Hudson Pacific', CUZ: 'Cousins',
+  'DLN.L': 'Derwent London', 'GPE.L': 'Great Portland', 'GFC.PA': 'Gecina (Paris)',
   'PSN.L': 'Persimmon', 'BTRW.L': 'Barratt Redrow', 'TW.L': 'Taylor Wimpey', 'LAND.L': 'Landsec', 'BLND.L': 'British Land', 'BBOX.L': 'Tritax Big Box',
   'IRES.IR': 'I-RES (Irish rental homes)', 'GVR.IR': 'Glenveagh (Irish homebuilder)', 'MRL.MC': 'Merlin Properties (Spain)', 'COL.MC': 'Colonial (Spain/Paris offices)',
   NVDA: 'Nvidia', MSFT: 'Microsoft', GOOGL: 'Alphabet', META: 'Meta', AMZN: 'Amazon', ORCL: 'Oracle', AVGO: 'Broadcom', AMD: 'AMD', CRWV: 'CoreWeave', NBIS: 'Nebius', ANT: 'Anthropic',
 };
 const STOCKS = {
-  us_h: ['XHB'], us_c: ['VNQ', 'BXP', 'SLG'], uk_h: ['PSN.L', 'BTRW.L', 'TW.L'], uk_c: ['LAND.L', 'BLND.L', 'BBOX.L'],
-  ie_h: ['IRES.IR', 'GVR.IR'], med_c: ['MRL.MC', 'COL.MC'],
+  us_h: ['XHB'], us_c: ['VNQ'], off_us: ['BXP', 'SLG', 'VNO', 'KRC', 'HPP', 'CUZ'], off_eu: ['DLN.L', 'GPE.L', 'GFC.PA', 'COL.MC'], uk_h: ['PSN.L', 'BTRW.L', 'TW.L'], uk_c: ['LAND.L', 'BLND.L', 'BBOX.L'],
+  ie_h: ['IRES.IR', 'GVR.IR'], med_c: ['MRL.MC'],
   ai: ['NVDA', 'MSFT', 'GOOGL', 'META', 'AMZN', 'ORCL', 'AVGO', 'AMD', 'CRWV', 'NBIS', 'ANT'],
 };
 const MED = [['ES', '🇪🇸', 'Spain'], ['PT', '🇵🇹', 'Portugal'], ['IT', '🇮🇹', 'Italy'], ['GR', '🇬🇷', 'Greece'], ['HR', '🇭🇷', 'Croatia'], ['CY', '🇨🇾', 'Cyprus'], ['MT', '🇲🇹', 'Malta']];
@@ -213,13 +258,14 @@ const MED = [['ES', '🇪🇸', 'Spain'], ['PT', '🇵🇹', 'Portugal'], ['IT',
 export default async (req) => {
   const allSyms = [...new Set(Object.values(STOCKS).flat())];
   const PX = ['GB', 'IE', ...MED.map((m) => m[0])];
-  const [BS, BC, FD, FM, FH, B, E, Y] = await Promise.all([
+  const [BS, BC, FD, FM, FH, B, E, Y, TR, KS] = await Promise.all([
     safe(bis('WS_SPP', `Q.${PX.join("+")}.N.628`)),
     safe(bis('WS_CPP', 'Q.US.0.A.0.2.6.0')),
     safe(fedDelinq()), safe(freddie()), safe(fhfa()),
     safe(boe(['IUMBV34', 'IUMBV42', 'LPMVTVX'])),
     safe(ecb(['IE', 'U2', ...MED.map((m) => m[0])])),
     Promise.all(allSyms.map((s) => safe(yahoo(s)))).then((a) => Object.fromEntries(allSyms.map((s, i) => [s, a[i] && !a[i].error ? { ...a[i], name: NAMES[s] || s } : null]))),
+    safe(trepp()), safe(kastle()),
   ]);
   const ok = (x) => (x && !x.error ? x : null);
   const F = {
@@ -227,7 +273,7 @@ export default async (req) => {
     COMRE: ok(BC)?.US || null,
   };
   const errors = {};
-  [['bis', BS], ['bis_cre', BC], ['fed', FD], ['freddie', FM], ['fhfa', FH]].forEach(([k, x]) => { if (x && x.error) errors[k] = x.error; });
+  [['bis', BS], ['bis_cre', BC], ['fed', FD], ['freddie', FM], ['fhfa', FH], ['trepp', TR], ['kastle', KS]].forEach(([k, x]) => { if (x && x.error) errors[k] = x.error; });
   if (B.error) errors.boe = B.error;
   if (E.error) errors.ecb = E.error;
   const stocks = (k) => STOCKS[k].map((s) => Y[s]).filter(Boolean);
@@ -258,10 +304,17 @@ export default async (req) => {
   ];
   // ---------- CRE ----------
   const usC = [
-    metric('us_cre_dq', F.DRCRELEXFACBS, { label: 'Commercial property loan delinquency (banks)', short: 'CRE delinquency', unit: '%', freq: 'Q', good: 'down', lead: true, tol: 0.05, src: 'Federal Reserve' }),
+    metric('us_cre_dq', F.DRCRELEXFACBS, { label: 'Commercial property loan delinquency (banks, all types)', short: 'CRE delinquency', unit: '%', freq: 'Q', good: 'down', lead: true, tol: 0.05, src: 'Federal Reserve' }),
     metric('us_cre_px', F.COMRE ? yoy(F.COMRE, 4) : null, { label: 'Commercial property prices, year on year', short: 'CRE prices', unit: '%', kind: 'growth', freq: 'Q', good: 'up', tol: 0.5, src: 'BIS (CoStar index)' }),
   ];
 
+  const tr = ok(TR), ks = ok(KS);
+  const offUs = [
+    metric('off_dq', tr?.office, { label: 'Office loan delinquency (CMBS)', short: 'Office delinquency', unit: '%', freq: 'M', good: 'down', lead: true, tol: 0.1, src: 'Trepp' }),
+    metric('cmbs_mat', tr?.matured, { label: 'All CMBS loans in trouble, incl. matured and unpaid', short: 'Matured loans', unit: '%', freq: 'M', good: 'down', tol: 0.1, src: 'Trepp' }),
+    ks ? { id: 'off_occ', label: 'Office attendance, 10 big cities', short: 'Attendance', unit: '%', freq: 'W', good: 'up', tol: 0.3, src: 'Kastle (vs pre-2020)', value: ks.value, prev: ks.prev, yr: null, date: ks.date, series: [], extra: ks.peak ? `Busiest day ${ks.peak}%` : '' } : null,
+  ];
+  const offAvg = (st) => { const xs = st.filter((x) => x.offHigh != null); return xs.length ? { offHigh: xs.reduce((a, x) => a + x.offHigh, 0) / xs.length, m3: xs.reduce((a, x) => a + (x.m3 ?? 0), 0) / xs.length, y1: xs.reduce((a, x) => a + (x.y1 ?? 0), 0) / xs.length } : null; };
   const R = (id, name, flag, metrics, st, extra = {}) => {
     const sig = regionSignal(metrics, st, WORDS);
     return { id, name, flag, ...sig, metrics: metrics.filter(Boolean), stocks: st, ...extra };
@@ -283,9 +336,11 @@ export default async (req) => {
         R('med', 'Mediterranean', '🌊', medM, [], { table: medRows, note: 'Albania and Montenegro have no regular live data feed.' }),
       ] },
       { id: 'cre', title: 'Commercial property', icon: '🏢', regions: [
-        R('us', 'United States', '🇺🇸', usC, stocks('us_c')),
-        R('uk', 'UK', '🇬🇧', [], stocks('uk_c'), { note: 'Judged on listed landlords’ share prices; official UK figures are quarterly.' }),
-        R('med', 'Spain and Med', '🌊', [], stocks('med_c'), { note: 'Judged on Spain’s two biggest listed landlords.' }),
+        R('off_us', 'US offices', '🏙️', offUs, stocks('off_us'), { group: 'Offices', dd: true, avg: offAvg(stocks('off_us')), note: 'Office share prices are the market’s live view of office values: the bar shows how far each landlord is below its 12-month high. Trepp’s delinquency is the share of office loans in commercial mortgage-backed securities that are 30+ days late, published early each month.' }),
+        R('off_eu', 'UK and Europe offices', '🇬🇧', [], stocks('off_eu'), { group: 'Offices', dd: true, avg: offAvg(stocks('off_eu')), note: 'London (Derwent, Great Portland), Paris (Gecina) and Madrid/Barcelona (Colonial) office landlords. Official office values in the UK and Europe are quarterly and paywalled.' }),
+        R('us', 'US, all commercial property', '🇺🇸', usC, stocks('us_c'), { group: 'Other commercial property', note: 'Bank loans and prices across all property types: offices, shops, warehouses, flats and hotels.' }),
+        R('uk', 'UK landlords', '🇬🇧', [], stocks('uk_c'), { group: 'Other commercial property', note: 'Judged on listed landlords’ share prices; official UK figures are quarterly.' }),
+        R('med', 'Spain', '🇪🇸', [], stocks('med_c'), { group: 'Other commercial property', note: 'Judged on Merlin, Spain’s biggest listed landlord.' }),
       ] },
       { id: 'ai', title: 'AI bubble watch', icon: '🤖', regions: [
         { id: 'ai', name: 'AI shares', flag: '🤖', signal: aiSignal, why: aiWhy, metrics: [], stocks: ai, avg: { offHigh: aiOff, m3: ai3, y1: aiY } },
