@@ -141,8 +141,8 @@ async function trepp() {
       if (/loan|tower|portfolio|building|propert/i.test(m[1]) && !/rate|basis points|bps/i.test(m[1])) continue;
       const v = +m[2]; if (v >= 4 && v <= 30) { office.push([d, v]); break; }
     }
-    const mb = /matured balloon[^%]{0,220}?(\d{1,2}\.\d{1,2})%/i.exec(b);
-    if (mb) matured.push([d, +mb[1]]);
+    const mb = /(?:matured balloon|beyond (?:their|the) maturity|past (?:their|the) maturity)[^%]{0,220}?(\d{1,2}\.\d{1,2})%/i.exec(b);
+    if (mb && +mb[1] > 4) matured.push([d, +mb[1]]);
   });
   const merge = (live, seed) => { const m = new Map(seed); live.forEach(([d, v]) => m.set(d, v)); return [...m.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1)); };
   if (!office.length && !overall.length) throw new Error('Trepp: no readings found');
