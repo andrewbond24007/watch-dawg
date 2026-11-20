@@ -1,15 +1,73 @@
 // WatchDawg market health: housing, commercial property (CRE) and the AI trade.
-// Official data from FRED (Federal Reserve Bank of St. Louis, incl. BIS property prices),
-// the Bank of England database and the ECB data portal, plus share prices from Yahoo.
+// Official data from the Federal Reserve, Freddie Mac, FHFA, the BIS, the Bank of England
+// and the ECB (FRED blocks cloud servers, so it isn't used), plus share prices from Yahoo.
 const UA = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36' };
 const T = (ms) => AbortSignal.timeout(ms);
 const START = '2019-01-01';
 
-async function fred(id) {
-  const r = await fetch(`https://fred.stlouisfed.org/graph/fredgraph.csv?id=${id}&cosd=${START}`, { headers: UA, signal: T(7000) });
-  if (!r.ok) throw new Error('FRED ' + r.status);
-  const rows = (await r.text()).trim().split('\n').slice(1).map((l) => l.split(','));
-  return rows.filter((x) => x[1] && x[1] !== '.' && !isNaN(+x[1])).map((x) => [x[0], +x[1]]);
+// Small CSV parser that copes with quoted fields (BIS metadata columns contain commas).
+function csv(text) {
+  const rows = []; let row = [], f = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) { if (c === '"') { if (text[i + 1] === '"') { f += '"'; i++; } else q = false; } else f += c; }
+    else if (c === '"') q = true;
+    else if (c === ',') { row.push(f); f = ''; }
+    else if (c === '\n' || c === '\r') { if (c === '\r' && text[i + 1] === '\n') i++; row.push(f); rows.push(row); row = []; f = ''; }
+    else f += c;
+  }
+  if (f || row.length) { row.push(f); rows.push(row); }
+  return rows.filter((r) => r.length > 1);
+}
+const qDate = (p) => { const m = /(\d{4})-Q(\d)/.exec(p); return m ? `${m[1]}-${String(m[2] * 3 - 2).padStart(2, '0')}-01` : p; };
+// BIS residential (WS_SPP, real index) or commercial (WS_CPP) property prices, straight from the BIS API.
+async function bis(flow, key, by = 'REF_AREA') {
+  const r = await fetch(`https://stats.bis.org/api/v2/data/dataflow/BIS/${flow}/1.0/${key}?format=csv&startPeriod=2017`, { headers: UA, signal: T(9000) });
+  if (!r.ok) throw new Error('BIS ' + r.status);
+  const rows = csv(await r.text()), h = rows[0];
+  const iK = h.indexOf(by), iT = h.indexOf('TIME_PERIOD'), iV = h.indexOf('OBS_VALUE');
+  const out = {};
+  for (const c of rows.slice(1)) if (c[iV] !== '' && !isNaN(+c[iV])) (out[c[iK]] ||= []).push([qDate(c[iT]), +c[iV]]);
+  Object.values(out).forEach((s) => s.sort((a, b) => (a[0] < b[0] ? -1 : 1)));
+  return out;
+}
+// Federal Reserve delinquency rates on bank loans (seasonally adjusted), quarterly.
+async function fedDelinq() {
+  const r = await fetch('https://www.federalreserve.gov/releases/chargeoff/delallsa.htm', { headers: UA, signal: T(9000) });
+  if (!r.ok) throw new Error('Fed ' + r.status);
+  const h = await r.text(), res = [], com = [];
+  for (const m of h.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/g)) {
+    const c = [...m[1].matchAll(/<t[hd][^>]*>([\s\S]*?)<\/t[hd]>/g)].map((x) => x[1].replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').trim());
+    const q = /^(\d{4}):(\d)$/.exec(c[0] || '');
+    if (!q || +q[1] < 2017) continue;
+    const d = `${q[1]}-${String(q[2] * 3 - 2).padStart(2, '0')}-01`;
+    if (!isNaN(+c[2]) && c[2] !== '') res.push([d, +c[2]]);
+    if (!isNaN(+c[3]) && c[3] !== '') com.push([d, +c[3]]);
+  }
+  if (!res.length) throw new Error('Fed table changed');
+  const asc = (s) => s.sort((a, b) => (a[0] < b[0] ? -1 : 1));
+  return { res: asc(res), com: asc(com) };
+}
+// Freddie Mac weekly 30-year fixed mortgage rate.
+async function freddie() {
+  const r = await fetch('https://www.freddiemac.com/pmms/docs/PMMS_history.csv', { headers: UA, signal: T(9000) });
+  if (!r.ok) throw new Error('Freddie ' + r.status);
+  return (await r.text()).trim().split(/\r?\n/).slice(1).map((l) => l.split(',')).map(([d, v]) => {
+    const m = /(\d+)\/(\d+)\/(\d{4})/.exec(d); return m && v && !isNaN(+v) ? [`${m[3]}-${m[1].padStart(2, '0')}-${m[2].padStart(2, '0')}`, +v] : null;
+  }).filter((p) => p && p[0] >= START);
+}
+// FHFA purchase-only house price index for the whole US, monthly (seasonally adjusted).
+async function fhfa() {
+  const r = await fetch('https://www.fhfa.gov/hpi/download/monthly/hpi_master.csv', { headers: UA, signal: T(9000) });
+  if (!r.ok) throw new Error('FHFA ' + r.status);
+  const out = [];
+  for (const l of (await r.text()).split(/\r?\n/)) {
+    if (!l.startsWith('traditional,purchase-only,monthly,USA or Census Division,United States,')) continue;
+    const c = l.split(','), v = +(c[9] || c[8]);
+    if (+c[6] >= 2017 && !isNaN(v) && v) out.push([`${c[6]}-${String(c[7]).padStart(2, '0')}-01`, v]);
+  }
+  if (!out.length) throw new Error('FHFA: no US rows');
+  return out;
 }
 async function boe(codes) {
   const u = `https://www.bankofengland.co.uk/boeapps/database/_iadb-fromshowcolumns.asp?csv.x=yes&Datefrom=01/Jan/2019&Dateto=now&SeriesCodes=${codes.join(',')}&CSVF=TN&UsingCodes=Y&VPD=Y&VFD=N`;
@@ -31,8 +89,9 @@ async function boe(codes) {
 }
 async function ecb(countries) {
   const u = `https://data-api.ecb.europa.eu/service/data/MIR/M.${countries.join('+')}.B.A2C.AM.R.A.2250.EUR.N?format=csvdata&startPeriod=2019-01`;
-  const r = await fetch(u, { headers: UA, signal: T(7000) });
-  if (!r.ok) throw new Error('ECB ' + r.status);
+  let r;
+  try { r = await fetch(u + '&detail=dataonly', { headers: { ...UA, Accept: 'text/csv' }, signal: T(20000) }); if (!r.ok) throw new Error('ECB ' + r.status); }
+  catch (e) { return ecbBackup(countries); }
   const lines = (await r.text()).trim().split(/\r?\n/);
   const head = lines[0].split(',');
   const iA = head.indexOf('REF_AREA'), iT = head.indexOf('TIME_PERIOD'), iV = head.indexOf('OBS_VALUE');
@@ -41,6 +100,17 @@ async function ecb(countries) {
     const c = l.split(',');
     if (!c[iV] || isNaN(+c[iV])) continue;
     (out[c[iA]] ||= []).push([c[iT] + '-01', +c[iV]]);
+  }
+  return out;
+}
+async function ecbBackup(countries) {
+  const ids = countries.map((c) => `M.${c}.B.A2C.AM.R.A.2250.EUR.N`).join('+');
+  const r = await fetch(`https://api.db.nomics.world/v22/series/ECB/MIR/${ids}?observations=1`, { headers: UA, signal: T(8000) });
+  if (!r.ok) throw new Error('ECB backup ' + r.status);
+  const out = {};
+  for (const d of (await r.json()).series?.docs || []) {
+    const cc = d.series_code.split('.')[1];
+    out[cc] = d.period.map((p, i) => [p + '-01', d.value[i]]).filter((x) => x[0] >= START && typeof x[1] === 'number');
   }
   return out;
 }
@@ -140,56 +210,56 @@ const STOCKS = {
 };
 const MED = [['ES', '🇪🇸', 'Spain'], ['PT', '🇵🇹', 'Portugal'], ['IT', '🇮🇹', 'Italy'], ['GR', '🇬🇷', 'Greece'], ['HR', '🇭🇷', 'Croatia'], ['CY', '🇨🇾', 'Cyprus'], ['MT', '🇲🇹', 'Malta']];
 
-let fredErr = {};
 export default async (req) => {
-  const dbg = new URL(req.url).searchParams.get('debug');
-  if (dbg) { const t0 = Date.now(); const out = {};
-    const E1 = (c, q) => async () => { const r = await fetch(`https://data-api.ecb.europa.eu/service/data/MIR/M.${c}.B.A2C.AM.R.A.2250.EUR.N?${q}`, { headers: { ...UA, Accept: 'text/csv' }, signal: T(9000) }); return r.status + ' ' + (await r.text()).slice(0, 400); };
-    await Promise.all([['e_dataonly', E1('ES', 'format=csvdata&detail=dataonly&lastNObservations=3')], ['e_multi', E1('ES+IE+PT+IT+GR+HR+CY+MT+U2', 'format=csvdata&detail=dataonly&startPeriod=2021-01')], ['e_json', E1('IE', 'format=jsondata&detail=dataonly&lastNObservations=3')]].map(async ([k, f]) => { const t = Date.now(); try { const v = await f(); out[k] = { ms: Date.now() - t, ok: true, sample: typeof v === 'string' ? v : JSON.stringify(v).slice(0, 200) }; } catch (e) { out[k] = { ms: Date.now() - t, err: String(e.cause || e).slice(0, 200) }; } }));
-    return new Response(JSON.stringify(out), { headers: { 'content-type': 'application/json', 'cache-control': 'no-store', 'netlify-vary': 'query' } }); }
-  const fredIds = ['DRSFRMACBS', 'MORTGAGE30US', 'CSUSHPINSA', 'DRCRELEXFACBS', 'COMREPUSQ159N',
-    'QGBN628BIS', 'QIEN628BIS', ...MED.map((m) => `Q${m[0]}N628BIS`)];
   const allSyms = [...new Set(Object.values(STOCKS).flat())];
-  const [F, B, E, Y] = await Promise.all([
-    Promise.all(fredIds.map((id) => safe(fred(id)))).then((a) => { fredErr = Object.fromEntries(fredIds.map((id, i) => [id, a[i]?.error])); return Object.fromEntries(fredIds.map((id, i) => [id, Array.isArray(a[i]) ? a[i] : null])); }),
+  const PX = ['GB', 'IE', ...MED.map((m) => m[0])];
+  const [BS, BC, FD, FM, FH, B, E, Y] = await Promise.all([
+    safe(bis('WS_SPP', `Q.${PX.join("+")}.N.628`)),
+    safe(bis('WS_CPP', 'Q.US.0.A.0.2.6.0')),
+    safe(fedDelinq()), safe(freddie()), safe(fhfa()),
     safe(boe(['IUMBV34', 'IUMBV42', 'LPMVTVX'])),
     safe(ecb(['IE', 'U2', ...MED.map((m) => m[0])])),
     Promise.all(allSyms.map((s) => safe(yahoo(s)))).then((a) => Object.fromEntries(allSyms.map((s, i) => [s, a[i] && !a[i].error ? { ...a[i], name: NAMES[s] || s } : null]))),
   ]);
+  const ok = (x) => (x && !x.error ? x : null);
+  const F = {
+    DRSFRMACBS: ok(FD)?.res, DRCRELEXFACBS: ok(FD)?.com, MORTGAGE30US: ok(FM), HPI: ok(FH),
+    COMRE: ok(BC)?.US || null,
+  };
   const errors = {};
-  fredIds.forEach((id) => { if (!F[id]) errors[id] = fredErr[id] || 'unavailable'; });
+  [['bis', BS], ['bis_cre', BC], ['fed', FD], ['freddie', FM], ['fhfa', FH]].forEach(([k, x]) => { if (x && x.error) errors[k] = x.error; });
   if (B.error) errors.boe = B.error;
   if (E.error) errors.ecb = E.error;
   const stocks = (k) => STOCKS[k].map((s) => Y[s]).filter(Boolean);
-  const bis = (cc) => (F[`Q${cc}N628BIS`] ? yoy(F[`Q${cc}N628BIS`], 4) : null);
+  const bisY = (cc) => (ok(BS)?.[cc] ? yoy(BS[cc], 4) : null);
 
   // ---------- housing ----------
   const usH = [
-    metric('us_dq', F.DRSFRMACBS, { label: 'Mortgage delinquency (banks)', short: 'Delinquency', unit: '%', freq: 'Q', good: 'down', lead: true, tol: 0.05, src: 'Federal Reserve via FRED' }),
-    metric('us_rate', F.MORTGAGE30US, { label: '30-year fixed mortgage rate', short: 'Mortgage rates', unit: '%', freq: 'W', good: 'down', tol: 0.2, src: 'Freddie Mac via FRED' }),
-    metric('us_hpi', F.CSUSHPINSA ? yoy(F.CSUSHPINSA, 12) : null, { label: 'Home prices, year on year (Case-Shiller)', short: 'Prices', unit: '%', kind: 'growth', freq: 'M', good: 'up', tol: 0.5, src: 'S&P Cotality Case-Shiller via FRED' }),
+    metric('us_dq', F.DRSFRMACBS, { label: 'Mortgage delinquency (banks)', short: 'Delinquency', unit: '%', freq: 'Q', good: 'down', lead: true, tol: 0.05, src: 'Federal Reserve' }),
+    metric('us_rate', F.MORTGAGE30US, { label: '30-year fixed mortgage rate', short: 'Mortgage rates', unit: '%', freq: 'W', good: 'down', tol: 0.2, src: 'Freddie Mac' }),
+    metric('us_hpi', F.HPI ? yoy(F.HPI, 12) : null, { label: 'Home prices, year on year (FHFA)', short: 'Prices', unit: '%', kind: 'growth', freq: 'M', good: 'up', tol: 0.5, src: 'FHFA house price index' }),
   ];
   const ukH = [
     metric('uk_2y', B.IUMBV34, { label: '2-year fixed mortgage rate (75% LTV)', short: 'Mortgage rates', unit: '%', freq: 'M', good: 'down', tol: 0.2, src: 'Bank of England' }),
     metric('uk_appr', B.LPMVTVX ? B.LPMVTVX.map((p) => [p[0], +(p[1] / 1000).toFixed(1)]) : null, { label: 'Mortgage approvals for house purchase', short: 'Approvals', unit: 'k', freq: 'M', good: 'up', tol: 3, src: 'Bank of England' }),
-    metric('uk_hpi', bis('GB'), { label: 'House prices, year on year', short: 'Prices', unit: '%', kind: 'growth', freq: 'Q', good: 'up', tol: 0.5, src: 'BIS via FRED' }),
+    metric('uk_hpi', bisY('GB'), { label: 'House prices, year on year', short: 'Prices', unit: '%', kind: 'growth', freq: 'Q', good: 'up', tol: 0.5, src: 'BIS' }),
   ];
   const ieH = [
     metric('ie_rate', E.IE, { label: 'Mortgage rate on new loans', short: 'Mortgage rates', unit: '%', freq: 'M', good: 'down', tol: 0.15, src: 'ECB' }),
-    metric('ie_hpi', bis('IE'), { label: 'House prices, year on year', short: 'Prices', unit: '%', kind: 'growth', freq: 'Q', good: 'up', tol: 0.5, src: 'BIS via FRED' }),
+    metric('ie_hpi', bisY('IE'), { label: 'House prices, year on year', short: 'Prices', unit: '%', kind: 'growth', freq: 'Q', good: 'up', tol: 0.5, src: 'BIS' }),
   ];
   const medRows = MED.map(([cc, flag, name]) => {
-    const r = E[cc], p = bis(cc);
+    const r = E[cc], p = bisY(cc);
     return { cc, flag, name, rate: r?.at(-1)?.[1] ?? null, rateDate: r?.at(-1)?.[0] ?? null, rateYr: r ? lastAt(r, 12) : null, px: p?.at(-1)?.[1] ?? null, pxDate: p?.at(-1)?.[0] ?? null, pxPrev: p && p.length > 1 ? p.at(-2)[1] : null };
   });
   const medM = [
     metric('ea_rate', E.U2, { label: 'Euro-area mortgage rate', short: 'Mortgage rates', unit: '%', freq: 'M', good: 'down', tol: 0.15, src: 'ECB' }),
-    ...['ES', 'PT', 'IT', 'GR'].map((cc) => metric(`${cc.toLowerCase()}_hpi`, bis(cc), { label: `${MED.find((m) => m[0] === cc)[2]} house prices, year on year`, short: `${MED.find((m) => m[0] === cc)[2]} prices`, unit: '%', kind: 'growth', freq: 'Q', good: 'up', tol: 0.5, hidden: true, src: 'BIS via FRED' })),
+    ...['ES', 'PT', 'IT', 'GR'].map((cc) => metric(`${cc.toLowerCase()}_hpi`, bisY(cc), { label: `${MED.find((m) => m[0] === cc)[2]} house prices, year on year`, short: `${MED.find((m) => m[0] === cc)[2]} prices`, unit: '%', kind: 'growth', freq: 'Q', good: 'up', tol: 0.5, hidden: true, src: 'BIS' })),
   ];
   // ---------- CRE ----------
   const usC = [
-    metric('us_cre_dq', F.DRCRELEXFACBS, { label: 'Commercial property loan delinquency (banks)', short: 'CRE delinquency', unit: '%', freq: 'Q', good: 'down', lead: true, tol: 0.05, src: 'Federal Reserve via FRED' }),
-    metric('us_cre_px', F.COMREPUSQ159N, { label: 'Commercial property prices, year on year', short: 'CRE prices', unit: '%', kind: 'growth', freq: 'Q', good: 'up', tol: 0.5, src: 'BIS via FRED' }),
+    metric('us_cre_dq', F.DRCRELEXFACBS, { label: 'Commercial property loan delinquency (banks)', short: 'CRE delinquency', unit: '%', freq: 'Q', good: 'down', lead: true, tol: 0.05, src: 'Federal Reserve' }),
+    metric('us_cre_px', F.COMRE ? yoy(F.COMRE, 4) : null, { label: 'Commercial property prices, year on year', short: 'CRE prices', unit: '%', kind: 'growth', freq: 'Q', good: 'up', tol: 0.5, src: 'BIS (CoStar index)' }),
   ];
 
   const R = (id, name, flag, metrics, st, extra = {}) => {
