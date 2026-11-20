@@ -294,6 +294,56 @@ h3{margin:18px 0 8px;font-size:15px;font-weight:700}
 .ownchart svg{flex:1;width:100%;min-height:0;display:block;touch-action:none}
 footer{margin-top:28px;font-size:11.5px;line-height:1.55;color:var(--muted)}
 @media (prefers-reduced-motion: reduce){*:not(.park):not(.park *){animation:none!important;transition:none!important}}
+
+/* market health */
+#healthRefresh.spin svg{animation:spin .8s linear}
+.hov{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.hov button{border:2px solid transparent;background:var(--surface);border-radius:16px;padding:12px 8px 10px;box-shadow:var(--shadow);display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;transition:transform .15s,border-color .2s,background-color .2s}
+.hov button:active{transform:scale(.97)}
+.hov button.on{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 9%,var(--surface))}
+.hov .ic{font-size:24px;line-height:1}
+.hov b{font-size:13px;font-weight:700;line-height:1.15}
+.sig{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;padding:3px 9px;border-radius:999px;background:var(--bg);color:var(--muted);white-space:nowrap}
+.sig::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor}
+.sig.green{background:var(--upbg);color:var(--upink)}.sig.red{background:var(--downbg);color:var(--downink)}.sig.amber{background:color-mix(in srgb,#d99a00 18%,var(--surface));color:#a86f00}
+:root[data-theme="dark"] .sig.amber{color:#f2bd48}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .sig.amber{color:#f2bd48}}
+.hreg{padding:14px 16px;margin-bottom:10px}
+.hreg .hh{display:flex;align-items:center;gap:8px}
+.hreg .hh .fl{font-size:22px;line-height:1}
+.hreg .hh h3{margin:0;flex:1;font-size:17px}
+.hreg .why{font-size:13px;color:var(--muted);margin:6px 0 2px;line-height:1.4}
+.hm{display:grid;grid-template-columns:1fr 84px;gap:2px 12px;align-items:center;padding:11px 0;border-top:1px solid var(--rule)}
+.hm:first-of-type{margin-top:8px}
+.hm .ml{font-size:13px;color:var(--muted);font-weight:600}
+.hm .mv{font-size:22px;font-weight:800;font-variation-settings:"wdth" 108;line-height:1.15}
+.hm .mv small{font-size:12px;font-weight:600;color:var(--muted);margin-left:6px;font-variation-settings:normal}
+.hm .mc{font-size:12px;color:var(--muted)}
+.hm .mc b.up{color:var(--upink)}.hm .mc b.down{color:var(--downink)}
+.hm svg{grid-row:1/4;grid-column:2;width:84px;height:34px;display:block}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.chip{font-size:12px;padding:5px 9px;border-radius:10px;background:var(--bg);display:inline-flex;gap:6px;align-items:baseline}
+.chip b{font-variant-numeric:tabular-nums}.chip b.up{color:var(--upink)}.chip b.down{color:var(--downink)}
+.hnote{font-size:12px;color:var(--muted);margin-top:10px;line-height:1.45}
+.htab{width:100%;border-collapse:collapse;margin-top:10px;font-size:13px}
+.htab th{font-size:11px;color:var(--muted);font-weight:600;text-align:right;padding:0 0 6px}
+.htab th:first-child,.htab td:first-child{text-align:left}
+.htab td{padding:7px 0;border-top:1px solid var(--rule);text-align:right;font-variant-numeric:tabular-nums}
+.htab td b.up{color:var(--upink)}.htab td b.down{color:var(--downink)}
+.aiavg{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+.aiavg div{background:var(--bg);border-radius:12px;padding:9px 8px;text-align:center}
+.aiavg b{display:block;font-size:19px;font-weight:800;font-variation-settings:"wdth" 108}
+.aiavg small{font-size:11px;color:var(--muted)}
+.dd{display:grid;grid-template-columns:1fr auto;gap:4px 10px;padding:9px 0;border-top:1px solid var(--rule);align-items:center}
+.dd:first-of-type{margin-top:10px}
+.dd .nm{font-size:14px;font-weight:600}
+.dd .nm small{color:var(--muted);font-weight:500;margin-left:5px;font-size:12px}
+.dd .r{font-size:13px;text-align:right;font-variant-numeric:tabular-nums}
+.dd .r b.up{color:var(--upink)}.dd .r b.down{color:var(--downink)}
+.dd .bar{grid-column:1/3;height:6px;border-radius:3px;background:var(--bg);overflow:hidden}
+.dd .bar i{display:block;height:100%;border-radius:3px;background:var(--c)}
+.hsub{display:flex;justify-content:space-between;align-items:center;margin:22px 0 10px}
+.hsub .day{margin:0}
 </style>
 </head>
 <body>
@@ -382,6 +432,21 @@ footer{margin-top:28px;font-size:11.5px;line-height:1.55;color:var(--muted)}
     </section>
   </div>
 
+  <!-- MARKET HEALTH -->
+  <div class="view" id="v-health">
+    <section style="margin-top:16px">
+      <div class="sh"><h2>Market health</h2><button class="iconbtn" id="healthRefresh" aria-label="Refresh market health"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v5h-5"/></svg></button></div>
+      <div class="pstatus" id="healthStatus"></div>
+      <div class="hov" id="healthOv" role="tablist" aria-label="Market health area"></div>
+      <div id="healthBox"><div class="empty" style="margin-top:12px">Loading market health…</div></div>
+      <div class="hsub"><div class="day" id="healthCalH">Coming up</div></div>
+      <div id="healthCal"></div>
+      <div class="hsub"><div class="day">In the news</div><button class="linkbtn" id="healthMore" hidden>Show more</button></div>
+      <div class="posts" id="healthNews"><div class="empty">Loading headlines…</div></div>
+      <p class="hint" id="healthHint" style="margin-top:12px;line-height:1.5"></p>
+    </section>
+  </div>
+
   <!-- NEWS -->
   <div class="view" id="v-news">
     <section style="margin-top:16px">
@@ -400,6 +465,7 @@ footer{margin-top:28px;font-size:11.5px;line-height:1.55;color:var(--muted)}
 <nav class="tabbar" role="tablist">
   <button class="tab" role="tab" data-tab="markets" aria-selected="true"><svg viewBox="0 0 24 24"><path d="M3 17l5-5 4 3 8-9"/><path d="M15 6h5v5"/></svg>Markets</button>
   <button class="tab" role="tab" data-tab="park" aria-selected="false"><svg viewBox="0 0 24 24"><circle cx="7" cy="9" r="2"/><circle cx="12" cy="6" r="2"/><circle cx="17" cy="9" r="2"/><path d="M12 12c-3.5 0-6 3.4-6 5.6 0 1.6 1.4 2.4 3 2.1 1.4-.3 2-.7 3-.7s1.6.4 3 .7c1.6.3 3-.5 3-2.1 0-2.2-2.5-5.6-6-5.6z"/></svg>Dog park</button>
+  <button class="tab" role="tab" data-tab="health" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M12 20s-7.5-4.4-7.5-10.2A4.3 4.3 0 0 1 12 7a4.3 4.3 0 0 1 7.5 2.8C19.5 15.6 12 20 12 20z"/><path d="M3 12h4l2-3 3 6 2-3h7"/></svg>Health</button>
   <button class="tab" role="tab" data-tab="news" aria-selected="false"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9h10M7 13h10M7 17h6"/></svg>News</button>
 </nav>
 
@@ -723,10 +789,10 @@ async function loadNews(force){
  NEWS.busy=false;renderAllNews();
 }
 async function loadCal(force){
- if(CAL.busy)return;if(!force&&CAL.at&&Date.now()-CAL.at<15*60e3){renderNewsTab();return;}
+ if(CAL.busy)return;if(!force&&CAL.at&&Date.now()-CAL.at<15*60e3){renderNewsTab();if(activeTab==='health')renderHealthCal();return;}
  CAL.busy=true;
  try{const j=await fetch('/.netlify/functions/calendar').then(r=>r.json());if(Array.isArray(j.events)){CAL.events=j.events;CAL.at=Date.now();CAL.err=false;}}catch(e){CAL.err=true;}
- CAL.busy=false;renderNewsTab();
+ CAL.busy=false;renderNewsTab();if(activeTab==='health')renderHealthCal();
 }
 function renderAllNews(){renderCryptoNews();renderNewsTab();if(activeTab==='park')renderMovers(parkItems());if(chItem)renderSymbolNews(chItem);}
 function renderCryptoNews(){
@@ -1170,6 +1236,95 @@ function renderMovers(items){
 }
 addEventListener('resize',()=>{if(activeTab==='park')syncPark();});
 
+/* ---------- market health ---------- */
+let HEALTH={data:store.get('wd.health',null),at:0,busy:false,err:false},hSec=store.get('wd.hsec','housing'),HNEWS={},hMore=false;
+const SIG_WORD={green:'Healthy',amber:'Mixed',red:'Under strain',none:'No data'};
+const H_NEWS={
+ housing:{q:['house prices','mortgage rates'],g:'"house prices" OR "housing market" OR "mortgage rates" OR "home sales"',cal:e=>e.cat==='housing',calH:'Housing data coming up'},
+ cre:{q:['commercial property','REIT'],g:'"commercial real estate" OR "commercial property" OR "office market" OR "REIT"',cal:e=>/rate decision|fomc|federal funds|official bank rate|main refinancing/i.test(e.title),calH:'Rate decisions ahead'},
+ ai:{q:['AI bubble','Nvidia'],g:'"AI bubble" OR "AI stocks" OR "Nvidia" OR "AI spending" OR "data centers"',cal:e=>/rate decision|fomc|federal funds|cpi/i.test(e.title)&&e.country==='USD',calH:'Big US events ahead'},
+};
+function hDate(m){const d=new Date(m.date);if(m.freq==='Q')return 'Q'+(Math.floor(d.getUTCMonth()/3)+1)+' '+d.getUTCFullYear();
+ if(m.freq==='W')return d.toLocaleDateString('en-GB',{day:'numeric',month:'short'});return d.toLocaleDateString('en-GB',{month:'short',year:'numeric',timeZone:'UTC'});}
+const hVal=(v,u)=>v==null?'—':u==='%'?(Math.abs(v)<10?v.toFixed(2):v.toFixed(1))+'%':u==='k'?v.toFixed(1)+'k':String(v);
+const hSigned=(v,u)=>v==null?'—':(v>0?'+':v<0?'−':'')+hVal(Math.abs(v),u);
+const tcls=t=>t>0?'up':t<0?'down':'';
+function overallSig(sec){const r=sec.regions.filter(x=>x.signal&&x.signal!=='none');if(!r.length)return 'none';
+ const s=r.reduce((a,x)=>a+(x.signal==='green'?1:x.signal==='red'?-1:0),0)/r.length;return s>=.34?'green':s<=-.34?'red':'amber';}
+function metricRow(m){
+ const t=m.trend||0,ch=m.yr!=null?m.value-m.yr:null;
+ const chTxt=ch==null?'':`<b class="${tcls(t)}">${m.kind==='growth'||m.unit==='%'?hSigned(ch,'%').replace('%',' pts'):hSigned(ch,m.unit)}</b> on a year ago`;
+ return `<div class="hm"><div class="ml">${esc(m.label)}</div>
+  <div class="mv num">${m.kind==='growth'?hSigned(m.value,m.unit):hVal(m.value,m.unit)}<small>${hDate(m)}</small></div>
+  <div class="mc">${chTxt}${chTxt?' · ':''}${esc(m.src||'')}</div>
+  <svg viewBox="0 0 100 26" preserveAspectRatio="none" aria-hidden="true" data-sp="${esc(m.id)}" data-v="${t>0?'--up':t<0?'--down':'--muted'}"></svg></div>`;
+}
+function chipRow(st){return st&&st.length?`<div class="chips">${st.map(x=>`<span class="chip">${esc(x.name)} <b class="${tcls(x.m3)}">${x.m3==null?'—':fmtPct(x.m3)}</b></span>`).join('')}</div><div class="hnote" style="margin-top:6px">Share prices over the last 3 months.</div>`:'';}
+function medTable(rows){
+ return `<table class="htab"><thead><tr><th>Country</th><th>Mortgage rate</th><th>House prices y/y</th></tr></thead><tbody>${rows.map(r=>{
+  const rt=r.rate!=null&&r.rateYr!=null?(r.rate<r.rateYr-.1?'up':r.rate>r.rateYr+.1?'down':''):'';
+  return `<tr><td>${r.flag} ${esc(r.name)}</td><td>${r.rate==null?'—':`<b class="${rt}">${r.rate.toFixed(2)}%</b>`}</td><td>${r.px==null?'—':`<b class="${r.px>0?'up':r.px<0?'down':''}">${hSigned(r.px,'%')}</b>`}</td></tr>`;}).join('')}</tbody></table>`;
+}
+function regionCard(r){
+ const ms=(r.metrics||[]).filter(m=>!m.hidden);
+ return `<div class="card hreg"><div class="hh"><span class="fl">${r.flag}</span><h3>${esc(r.name)}</h3><span class="sig ${r.signal}">${SIG_WORD[r.signal]||''}</span></div>
+  ${r.why?`<div class="why">${esc(r.why.charAt(0).toUpperCase()+r.why.slice(1))}.</div>`:''}
+  ${ms.map(metricRow).join('')}${r.table?medTable(r.table):''}${chipRow(r.stocks)}${r.note?`<div class="hnote">${esc(r.note)}</div>`:''}</div>`;
+}
+function aiCard(r){
+ const a=r.avg||{},st=(r.stocks||[]).slice().sort((x,y)=>(x.offHigh??0)-(y.offHigh??0));
+ return `<div class="card hreg"><div class="hh"><span class="fl">🤖</span><h3>AI bubble watch</h3><span class="sig ${r.signal}">${r.signal==='red'?'Deflating':r.signal==='amber'?'Wobbling':r.signal==='green'?'Still inflating':'No data'}</span></div>
+  ${r.why?`<div class="why">${esc(r.why)}.</div>`:''}
+  <div class="aiavg"><div><b class="num">${a.offHigh==null?'—':fmtPct(a.offHigh)}</b><small>vs 12-month high</small></div><div><b class="num ${tcls(a.m3)}" style="color:var(--${a.m3>0?'upink':a.m3<0?'downink':'ink'})">${a.m3==null?'—':fmtPct(a.m3)}</b><small>3 months</small></div><div><b class="num" style="color:var(--${a.y1>0?'upink':a.y1<0?'downink':'ink'})">${a.y1==null?'—':fmtPct(a.y1)}</b><small>1 year</small></div></div>
+  ${st.map(x=>{const off=Math.min(100,Math.abs(x.offHigh??0));const c=off>=30?'var(--down)':off>=12?'#d99a00':'var(--up)';
+   return `<div class="dd"><div class="nm">${esc(x.name)}<small>${esc(x.sym)}</small></div><div class="r">3m <b class="${tcls(x.m3)}">${x.m3==null?'—':fmtPct(x.m3)}</b> · <b class="down">${x.offHigh==null?'—':fmtPct(x.offHigh)}</b> off high</div><div class="bar" style="--c:${c}"><i style="width:${off}%"></i></div></div>`;}).join('')}
+  <div class="hnote">The bar shows how far each share is below its 12-month high. Green under 12%, amber to 30%, red beyond. Signal is based on the average drop.</div></div>`;
+}
+function renderHealth(){
+ if(activeTab!=='health')return;const d=HEALTH.data;
+ $('healthStatus').innerHTML=d?`<span>Updated <b>${timeAgo(d.fetched)}</b></span>${HEALTH.err?'<span class="bad">Couldn’t refresh; showing the last copy</span>':''}${HEALTH.busy?'<span>Refreshing…</span>':''}`:'';
+ if(!d){$('healthBox').innerHTML=`<div class="empty" style="margin-top:12px">${HEALTH.err?'Market health can’t load in this viewer.':'Loading market health…'}</div>`;$('healthOv').innerHTML='';}
+ else{
+  if(!d.sections.some(s=>s.id===hSec))hSec=d.sections[0].id;
+  $('healthOv').innerHTML=d.sections.map(s=>{const g=overallSig(s);return `<button role="tab" aria-selected="${s.id===hSec}" class="${s.id===hSec?'on':''}" data-s="${s.id}"><span class="ic">${s.icon}</span><b>${esc(s.id==='cre'?'Commercial property':s.id==='ai'?'AI bubble':s.title)}</b><span class="sig ${g}">${s.id==='ai'?{red:'Deflating',amber:'Wobbling',green:'Inflating',none:'No data'}[g]:SIG_WORD[g]}</span></button>`;}).join('');
+  const sec=d.sections.find(s=>s.id===hSec);
+  $('healthBox').innerHTML=`<div class="day">${sec.icon} ${esc(sec.title)}</div>`+(sec.id==='ai'?sec.regions.map(aiCard).join(''):sec.regions.map(regionCard).join(''));
+  const all=Object.fromEntries(sec.regions.flatMap(r=>r.metrics||[]).map(m=>[m.id,m]));
+  $('healthBox').querySelectorAll('svg[data-sp]').forEach(s=>{const m=all[s.dataset.sp];spark(s,(m?.series||[]).map(p=>p[1]),s.dataset.v);});
+ }
+ renderHealthCal();renderHealthNews();
+ $('healthHint').textContent='Each area gets a traffic light from its key figures compared with a year ago (rising arrears and mortgage rates count against it; rising prices, approvals and share prices count for it), with arrears weighted double as the early warning. Data: Federal Reserve, Freddie Mac, FHFA, Bank of England, ECB and BIS, plus share prices from Yahoo. Official figures are monthly or quarterly, so they change slowly; share prices update through the day.';
+}
+function renderHealthCal(){
+ const cfg=H_NEWS[hSec],now=Date.now();$('healthCalH').textContent=cfg.calH;
+ const ev=CAL.events.filter(e=>cfg.cal(e)&&new Date(e.date)>now-15*60e3).slice(0,4);
+ $('healthCal').innerHTML=ev.length?ev.map(e=>{const d=new Date(e.date);const lab=d.toDateString()===new Date().toDateString()?'Today':d.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'});
+  return evCard({...e,hint:(e.hint||'')+(e.expected?' · expected date':'')}).replace('<div class="evt">',`<div class="evt"><small style="margin:0 0 2px">${lab}</small>`);}).join('')
+  :`<div class="empty">${CAL.at?'Nothing scheduled in the next few weeks.':CAL.err?'Dates can’t load in this viewer.':'Loading dates…'}</div>`;
+}
+async function loadHealthNews(force){
+ const k=hSec,c=HNEWS[k];if(c&&(c.busy||(!force&&Date.now()-c.at<10*60e3))){renderHealthNews();return;}
+ HNEWS[k]={...(c||{items:[]}),busy:true};renderHealthNews();
+ try{const cfg=H_NEWS[k];const j=await fetch('/.netlify/functions/asset-news?hours=72&q='+encodeURIComponent(cfg.q.join(','))+'&g='+encodeURIComponent(cfg.g)).then(r=>r.json());
+  HNEWS[k]={items:Array.isArray(j.items)?j.items:[],at:Date.now(),busy:false};}
+ catch(e){HNEWS[k]={items:(c&&c.items)||[],at:Date.now(),busy:false,err:true};}
+ if(hSec===k)renderHealthNews();
+}
+function renderHealthNews(){
+ if(activeTab!=='health')return;const c=HNEWS[hSec],items=c?.items||[],n=hMore?14:5;
+ $('healthNews').innerHTML=items.length?items.slice(0,n).map((p,i)=>postCard(p,i===0&&!!p.img)).join(''):`<div class="empty">${c&&!c.busy?(c.err?'Headlines can’t load in this viewer.':'No fresh headlines on this right now.'):'Loading headlines…'}</div>`;
+ const b=$('healthMore');b.hidden=items.length<=5;b.textContent=hMore?'Show fewer':'Show more';
+}
+async function loadHealth(force){
+ if(HEALTH.busy)return;if(!force&&HEALTH.at&&Date.now()-HEALTH.at<20*60e3){renderHealth();return;}
+ HEALTH.busy=true;renderHealth();
+ try{const j=await fetch('/.netlify/functions/health').then(r=>r.json());if(Array.isArray(j.sections)){HEALTH.data=j;HEALTH.at=Date.now();HEALTH.err=false;store.set('wd.health',j);}else HEALTH.err=true;}catch(e){HEALTH.err=true;}
+ HEALTH.busy=false;renderHealth();
+}
+$('healthOv').addEventListener('click',e=>{const b=e.target.closest('button');if(!b||b.dataset.s===hSec)return;hSec=b.dataset.s;store.set('wd.hsec',hSec);hMore=false;buzz();renderHealth();loadHealthNews();});
+$('healthMore').addEventListener('click',()=>{hMore=!hMore;buzz();renderHealthNews();});
+$('healthRefresh').addEventListener('click',async e=>{const b=e.currentTarget;b.classList.remove('spin');void b.offsetWidth;b.classList.add('spin');buzz();await Promise.all([loadHealth(true),loadHealthNews(true),loadCal(true)]);toast('Market health refreshed');});
+
 /* ---------- tabs ---------- */
 $('recap').addEventListener('click',()=>{switchTab('park');setTimeout(()=>$('movers').scrollIntoView({behavior:'smooth',block:'start'}),350);});
 document.querySelector('.tabbar').addEventListener('click',e=>{const b=e.target.closest('.tab');if(b)switchTab(b.dataset.tab);});
@@ -1181,6 +1336,7 @@ function switchTab(name){
  window.scrollTo(0,0);
  if(name==='news'){renderNewsTab();loadCal();loadNews();}
  if(name==='park'){requestAnimationFrame(syncPark);loadQuotes();}
+ if(name==='health'){renderHealth();loadHealth();loadCal();loadHealthNews();}
 }
 
 /* ---------- editor ---------- */
@@ -1287,6 +1443,7 @@ setInterval(loadMetalsLive,30000);loadMetalsLive();
 setInterval(loadYahoo,120000);loadYahoo();
 loadNews();setInterval(()=>loadNews(),120000);setInterval(()=>{if(activeTab==='news'){loadCal();renderNewsTab();}},30000);
 setInterval(()=>{if(activeTab==='park')renderParkStatus();},15000);
+setInterval(()=>{if(activeTab==='health'){loadHealth();loadHealthNews();}},5*60e3);
 $('parkRefresh').addEventListener('click',async e=>{const b=e.currentTarget;b.classList.remove('spin');void b.offsetWidth;b.classList.add('spin');buzz();await Promise.all([loadCrypto(),loadMetalsLive(),loadQuotes(true),loadYahoo()]);syncPark();toast('Prices refreshed');});
 setInterval(()=>{clock();fresh();},1000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden){loadCrypto();loadQuotes();loadFng();loadMetalsLive();loadYahoo();}});

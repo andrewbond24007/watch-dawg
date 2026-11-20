@@ -71,7 +71,7 @@ async function fhfa() {
 }
 async function boe(codes) {
   const u = `https://www.bankofengland.co.uk/boeapps/database/_iadb-fromshowcolumns.asp?csv.x=yes&Datefrom=01/Jan/2019&Dateto=now&SeriesCodes=${codes.join(',')}&CSVF=TN&UsingCodes=Y&VPD=Y&VFD=N`;
-  const r = await fetch(u, { headers: { ...UA, Accept: 'text/csv,*/*' }, signal: T(7000) });
+  const r = await fetch(u, { headers: { ...UA, Accept: 'text/csv,*/*' }, signal: T(15000) });
   if (!r.ok) throw new Error('BoE ' + r.status);
   const lines = (await r.text()).trim().split(/\r?\n/);
   const head = lines[0].split(',').map((s) => s.trim());
