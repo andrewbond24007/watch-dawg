@@ -182,8 +182,14 @@ const OECD_CC = { GBR: 'GB', IRL: 'IE', ESP: 'ES', PRT: 'PT', ITA: 'IT', GRC: 'G
 async function oecdMeasure(measure) {
   const u = `https://sdmx.oecd.org/public/rest/data/OECD.ECO.MPD,DSD_AN_HOUSE_PRICES@DF_HOUSE_PRICES,1.0/${Object.keys(OECD_CC).join('+')}.Q.${measure}.?startPeriod=2017-Q1&format=csvfile`;
   let r;
-  for (let i = 0; i < 2; i++) { r = await fetch(u, { headers: UA, signal: T(10000) }).catch(() => null); if (r && r.ok) break; await new Promise((z) => setTimeout(z, 700)); }
-  if (!r || !r.ok) throw new Error('OECD ' + (r ? r.status : 'timeout'));
+  let why = '';
+  for (let i = 0; i < 2; i++) {
+    r = await fetch(u, { headers: { 'User-Agent': UA['User-Agent'], Accept: 'application/vnd.sdmx.data+csv; charset=utf-8' }, signal: T(10000) }).catch((e) => { why = String(e.cause?.code || e.message); return null; });
+    if (r && r.ok) break;
+    if (r) why = r.status + ' ' + (await r.text()).slice(0, 80);
+    await new Promise((z) => setTimeout(z, 700));
+  }
+  if (!r || !r.ok) throw new Error(`OECD ${measure}: ${why}`);
   const rows = csv(await r.text()), h = rows[0];
   const iA = h.indexOf('REF_AREA'), iT = h.indexOf('TIME_PERIOD'), iV = h.indexOf('OBS_VALUE'), out = {};
   for (const c of rows.slice(1)) { const cc = OECD_CC[c[iA]], v = +c[iV]; if (cc && c[iV] !== '' && !isNaN(v)) (out[cc] ||= []).push([qDate(c[iT]), v]); }
@@ -191,8 +197,10 @@ async function oecdMeasure(measure) {
   return out;
 }
 async function oecdRent() {
-  const [ptr, rent] = await Promise.all([oecdMeasure('HPI_RPI_AVG').catch(() => null), oecdMeasure('RPI').catch(() => null)]);
-  if (!ptr && !rent) throw new Error('OECD unavailable');
+  const errs = [];
+  const ptr = await oecdMeasure('HPI_RPI_AVG').catch((e) => { errs.push(e.message); return null; });
+  const rent = await oecdMeasure('RPI').catch((e) => { errs.push(e.message); return null; });
+  if (!ptr && !rent) throw new Error(errs.join(' | '));
   return { ptr: ptr || {}, rent: rent || {} };
 }
 async function yahoo(sym) {
