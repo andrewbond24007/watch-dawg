@@ -17,6 +17,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,300..800&display=swap" rel="stylesheet">
 <style>
 :root{
+  --newc:#2f7bf6;
   --bg:#ece7fb; --surface:#faf8ff; --ink:#1f1838; --muted:#6c6489; --rule:#ddd5f2; --accent:#6a4fd8;
   --up:#0ca30c; --down:#d03b3b; --upbg:#e0f5e0; --downbg:#fbe3e3; --upink:#087a08; --downink:#b42828;
   --pre:#cfc4ef; --reg:#0ca30c; --post:#cfc4ef; --shut:#e3ddf5;
@@ -341,6 +342,12 @@ footer{margin-top:28px;font-size:11.5px;line-height:1.55;color:var(--muted)}
 .dd .r b.up{color:var(--upink)}.dd .r b.down{color:var(--downink)}
 .dd .bar{grid-column:1/3;height:6px;border-radius:3px;background:var(--bg);overflow:hidden}
 .dd .bar i{display:block;height:100%;border-radius:3px;background:var(--c)}
+.ndot{position:absolute;width:10px;height:10px;border-radius:50%;background:var(--newc);box-shadow:0 0 0 2px var(--surface)}
+.tab{position:relative}.tab .ndot{top:3px;left:calc(50% + 8px)}
+.hov button{position:relative}.hov .ndot{top:8px;right:8px}
+.newtag{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#fff;background:var(--newc);border-radius:6px;padding:2px 6px;margin-left:6px;vertical-align:1px}
+.hm.isnew{background:color-mix(in srgb,var(--newc) 7%,transparent);margin:0 -10px;padding-left:10px;padding-right:10px;border-radius:10px}
+.pstatus .newc{color:var(--newc);font-weight:700}
 .hgroup{font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:18px 2px 8px}
 .hgroup:first-of-type{margin-top:4px}
 .hsub{display:flex;justify-content:space-between;align-items:center;margin:22px 0 10px}
@@ -1253,26 +1260,40 @@ const pc1=(v,d=1)=>v==null?'—':(v>0?'+':v<0?'−':'')+Math.abs(v).toFixed(d)+'
 const tcls=t=>t>0?'up':t<0?'down':'';
 function overallSig(sec){const r=sec.regions.filter(x=>x.signal&&x.signal!=='none');if(!r.length)return 'none';
  const s=r.reduce((a,x)=>a+(x.signal==='green'?1:x.signal==='red'?-1:0),0)/r.length;return s>=.34?'green':s<=-.34?'red':'amber';}
-function metricRow(m){
+/* "new since you last looked": remembers the release date of every official figure */
+let HSEEN=store.get('wd.hseen',null);const HFRESH=new Set();
+function hKeys(d){const out={};d.sections.forEach(s=>s.regions.forEach(r=>{
+ (r.metrics||[]).forEach(m=>{if(!m.hidden)out[s.id+'/'+r.id+'/'+m.id]=m.id==='off_occ'?m.value+'|'+m.prev:m.date;});
+ (r.table||[]).forEach(t=>{out[s.id+'/'+r.id+'/'+t.cc]=(t.rateDate||'')+'|'+(t.pxDate||'');});}));return out;}
+function hUnseen(){const d=HEALTH.data,by={};if(!d)return by;const k=hKeys(d);
+ if(!HSEEN){HSEEN=k;store.set('wd.hseen',HSEEN);return by;}
+ Object.entries(k).forEach(([key,sig])=>{if(HSEEN[key]!==sig)(by[key.split('/')[0]]||=[]).push(key);});return by;}
+function hMarkSeen(sec){const d=HEALTH.data;if(!d||!HSEEN)return;const k=hKeys(d);let ch=false;
+ Object.entries(k).forEach(([key,sig])=>{if(key.startsWith(sec+'/')&&HSEEN[key]!==sig){HFRESH.add(key);HSEEN[key]=sig;ch=true;}});if(ch)store.set('wd.hseen',HSEEN);}
+function updateHealthDot(){const u=hUnseen(),n=Object.values(u).reduce((a,x)=>a+x.length,0),tab=document.querySelector('.tab[data-tab="health"]');let dot=tab.querySelector('.ndot');
+ if(n&&!dot){dot=document.createElement('i');dot.className='ndot';tab.appendChild(dot);}else if(!n&&dot)dot.remove();
+ tab.setAttribute('aria-label','Health'+(n?`, ${n} new update${n>1?'s':''}`:''));return u;}
+function metricRow(m,key){
  const t=m.trend||0,ref=m.yr??m.prev,ch=ref!=null?m.value-ref:null;
  const when=m.yr!=null?'on a year ago':m.freq==='W'?'on the week':m.freq==='Q'?'on the quarter':'on the month';
  const chTxt=(ch==null?'':`<b class="${tcls(t)}">${m.kind==='growth'||m.unit==='%'?hSigned(ch,'%').replace('%',' pts'):hSigned(ch,m.unit)}</b> ${when}`)+(m.extra?(ch==null?'':' · ')+esc(m.extra):'');
- return `<div class="hm"><div class="ml">${esc(m.label)}</div>
+ const isNew=key&&HFRESH.has(key);
+ return `<div class="hm${isNew?' isnew':''}"><div class="ml">${esc(m.label)}${isNew?'<span class="newtag">New</span>':''}</div>
   <div class="mv num">${m.kind==='growth'?hSigned(m.value,m.unit):hVal(m.value,m.unit)}</div>
   <div class="mc">${chTxt?chTxt+'<br>':''}${hDate(m)} · ${esc(m.src||'')}</div>
   <svg viewBox="0 0 100 26" preserveAspectRatio="none" aria-hidden="true" data-sp="${esc(m.id)}" data-v="${t>0?'--up':t<0?'--down':'--muted'}"></svg></div>`;
 }
 function chipRow(st){return st&&st.length?`<div class="chips">${st.map(x=>`<span class="chip">${esc(x.name)} <b class="${tcls(x.m3)}">${x.m3==null?'—':fmtPct(x.m3)}</b></span>`).join('')}</div><div class="hnote" style="margin-top:6px">Share prices over the last 3 months.</div>`:'';}
-function medTable(rows){
+function medTable(rows,pre){
  return `<table class="htab"><thead><tr><th>Country</th><th>Mortgage rate</th><th>House prices y/y</th></tr></thead><tbody>${rows.map(r=>{
   const rt=r.rate!=null&&r.rateYr!=null?(r.rate<r.rateYr-.1?'up':r.rate>r.rateYr+.1?'down':''):'';
-  return `<tr><td>${r.flag} ${esc(r.name)}</td><td>${r.rate==null?'—':`<b class="${rt}">${r.rate.toFixed(2)}%</b>`}</td><td>${r.px==null?'—':`<b class="${r.px>0?'up':r.px<0?'down':''}">${hSigned(r.px,'%')}</b>`}</td></tr>`;}).join('')}</tbody></table>`;
+  return `<tr><td>${r.flag} ${esc(r.name)}${HFRESH.has(pre+r.cc)?'<span class="newtag">New</span>':''}</td><td>${r.rate==null?'—':`<b class="${rt}">${r.rate.toFixed(2)}%</b>`}</td><td>${r.px==null?'—':`<b class="${r.px>0?'up':r.px<0?'down':''}">${hSigned(r.px,'%')}</b>`}</td></tr>`;}).join('')}</tbody></table>`;
 }
 function regionCard(r){
  const ms=(r.metrics||[]).filter(m=>!m.hidden);
  return `<div class="card hreg"><div class="hh"><span class="fl">${r.flag}</span><h3>${esc(r.name)}</h3><span class="sig ${r.signal}">${SIG_WORD[r.signal]||''}</span></div>
   ${r.why?`<div class="why">${esc(r.why.charAt(0).toUpperCase()+r.why.slice(1))}.</div>`:''}
-  ${ms.map(metricRow).join('')}${r.table?medTable(r.table):''}${r.dd&&r.stocks&&r.stocks.length?`<div class="hnote" style="font-weight:600;color:var(--ink);margin-top:14px">Office landlord shares</div>${avgBoxes(r.avg)}${ddList(r.stocks)}`:chipRow(r.stocks)}${r.note?`<div class="hnote">${esc(r.note)}</div>`:''}</div>`;
+  ${ms.map(m=>metricRow(m,hSec+'/'+r.id+'/'+m.id)).join('')}${r.table?medTable(r.table,hSec+'/'+r.id+'/'):''}${r.dd&&r.stocks&&r.stocks.length?`<div class="hnote" style="font-weight:600;color:var(--ink);margin-top:14px">Office landlord shares</div>${avgBoxes(r.avg)}${ddList(r.stocks)}`:chipRow(r.stocks)}${r.note?`<div class="hnote">${esc(r.note)}</div>`:''}</div>`;
 }
 function ddList(st){
  return st.slice().sort((x,y)=>(x.offHigh??0)-(y.offHigh??0)).map(x=>{const off=Math.min(100,Math.abs(x.offHigh??0));const c=off>=30?'var(--down)':off>=12?'#d99a00':'var(--up)';
@@ -1292,7 +1313,9 @@ function renderHealth(){
  if(!d){$('healthBox').innerHTML=`<div class="empty" style="margin-top:12px">${HEALTH.err?'Market health can’t load in this viewer.':'Loading market health…'}</div>`;$('healthOv').innerHTML='';}
  else{
   if(!d.sections.some(s=>s.id===hSec))hSec=d.sections[0].id;
-  $('healthOv').innerHTML=d.sections.map(s=>{const g=overallSig(s);return `<button role="tab" aria-selected="${s.id===hSec}" class="${s.id===hSec?'on':''}" data-s="${s.id}"><span class="ic">${s.icon}</span><b>${esc(s.id==='cre'?'Commercial property':s.id==='ai'?'AI bubble':s.title)}</b><span class="sig ${g}">${s.id==='ai'?{red:'Deflating',amber:'Wobbling',green:'Inflating',none:'No data'}[g]:SIG_WORD[g]}</span></button>`;}).join('');
+  hMarkSeen(hSec);const unseen=updateHealthDot(),nFresh=[...HFRESH].filter(k=>k.startsWith(hSec+'/')).length;
+  if(nFresh)$('healthStatus').insertAdjacentHTML('beforeend',`<span class="newc">${nFresh} new figure${nFresh>1?'s':''} since you last looked</span>`);
+  $('healthOv').innerHTML=d.sections.map(s=>{const g=overallSig(s);return `<button role="tab" aria-selected="${s.id===hSec}" class="${s.id===hSec?'on':''}" data-s="${s.id}">${unseen[s.id]?'<i class="ndot" aria-label="New updates"></i>':''}<span class="ic">${s.icon}</span><b>${esc(s.id==='cre'?'Commercial property':s.id==='ai'?'AI bubble':s.title)}</b><span class="sig ${g}">${s.id==='ai'?{red:'Deflating',amber:'Wobbling',green:'Inflating',none:'No data'}[g]:SIG_WORD[g]}</span></button>`;}).join('');
   const sec=d.sections.find(s=>s.id===hSec);
   let grp='';
   $('healthBox').innerHTML=`<div class="day">${sec.icon} ${esc(sec.title)}</div>`+(sec.id==='ai'?sec.regions.map(aiCard).join(''):sec.regions.map(r=>{const h=r.group&&r.group!==grp?`<div class="hgroup">${esc(r.group)}</div>`:'';grp=r.group||grp;return h+regionCard(r);}).join(''));
@@ -1326,9 +1349,9 @@ async function loadHealth(force){
  if(HEALTH.busy)return;if(!force&&HEALTH.at&&Date.now()-HEALTH.at<20*60e3){renderHealth();return;}
  HEALTH.busy=true;renderHealth();
  try{const j=await fetch('/.netlify/functions/health').then(r=>r.json());if(Array.isArray(j.sections)){HEALTH.data=j;HEALTH.at=Date.now();HEALTH.err=false;store.set('wd.health',j);}else HEALTH.err=true;}catch(e){HEALTH.err=true;}
- HEALTH.busy=false;renderHealth();
+ HEALTH.busy=false;renderHealth();updateHealthDot();
 }
-$('healthOv').addEventListener('click',e=>{const b=e.target.closest('button');if(!b||b.dataset.s===hSec)return;hSec=b.dataset.s;store.set('wd.hsec',hSec);hMore=false;buzz();renderHealth();loadHealthNews();});
+$('healthOv').addEventListener('click',e=>{const b=e.target.closest('button');if(!b||b.dataset.s===hSec)return;HFRESH.clear();hSec=b.dataset.s;store.set('wd.hsec',hSec);hMore=false;buzz();renderHealth();loadHealthNews();});
 $('healthMore').addEventListener('click',()=>{hMore=!hMore;buzz();renderHealthNews();});
 $('healthRefresh').addEventListener('click',async e=>{const b=e.currentTarget;b.classList.remove('spin');void b.offsetWidth;b.classList.add('spin');buzz();await Promise.all([loadHealth(true),loadHealthNews(true),loadCal(true)]);toast('Market health refreshed');});
 
@@ -1337,6 +1360,7 @@ $('recap').addEventListener('click',()=>{switchTab('park');setTimeout(()=>$('mov
 document.querySelector('.tabbar').addEventListener('click',e=>{const b=e.target.closest('.tab');if(b)switchTab(b.dataset.tab);});
 function switchTab(name){
  if(name===activeTab)return window.scrollTo({top:0,behavior:'smooth'});
+ if(activeTab==='health')HFRESH.clear();
  activeTab=name;buzz();
  document.querySelectorAll('.tab').forEach(t=>t.setAttribute('aria-selected',t.dataset.tab===name));
  document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id==='v-'+name));
@@ -1451,6 +1475,8 @@ setInterval(loadYahoo,120000);loadYahoo();
 loadNews();setInterval(()=>loadNews(),120000);setInterval(()=>{if(activeTab==='news'){loadCal();renderNewsTab();}},30000);
 setInterval(()=>{if(activeTab==='park')renderParkStatus();},15000);
 setInterval(()=>{if(activeTab==='health'){loadHealth();loadHealthNews();}},5*60e3);
+setInterval(()=>{if(activeTab!=='health')loadHealth();},30*60e3);setTimeout(()=>{updateHealthDot();loadHealth();},4000);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')loadHealth();});
 $('parkRefresh').addEventListener('click',async e=>{const b=e.currentTarget;b.classList.remove('spin');void b.offsetWidth;b.classList.add('spin');buzz();await Promise.all([loadCrypto(),loadMetalsLive(),loadQuotes(true),loadYahoo()]);syncPark();toast('Prices refreshed');});
 setInterval(()=>{clock();fresh();},1000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden){loadCrypto();loadQuotes();loadFng();loadMetalsLive();loadYahoo();}});
