@@ -1281,13 +1281,16 @@ function overallSig(sec){const r=sec.regions.filter(x=>x.signal&&x.signal!=='non
 let HSEEN=store.get('wd.hseen',null),HVAL=store.get('wd.hval',{}),HLOG=store.get('wd.hlog',[]),hUpdOpen=false;const HFRESH=new Set();
 function hIndex(d){const out={};d.sections.forEach(s=>s.regions.forEach(r=>{
  (r.metrics||[]).forEach(m=>{if(m.hidden||m.live)return;out[s.id+'/'+r.id+'/'+m.id]={sec:s.id,icon:s.icon,region:r.name,label:m.label,sig:m.id==='off_occ'?m.value+'|'+m.prev:m.date,val:m.kind==='growth'?hSigned(m.value,m.unit):hVal(m.value,m.unit),when:hDate(m)};});
- (r.table||[]).forEach(t=>{out[s.id+'/'+r.id+'/'+t.cc]={sec:s.id,icon:s.icon,region:t.name,label:'mortgage rate and house prices',sig:(t.rateDate||'')+'|'+(t.pxDate||'')+'|'+(t.ptrDate||''),val:`${t.rate==null?'—':t.rate.toFixed(2)+'%'} rate, ${t.px==null?'—':hSigned(t.px,'%')} prices`,when:''};});}));return out;}
+ (r.table||[]).forEach(t=>{out[s.id+'/'+r.id+'/'+t.cc]={sec:s.id,icon:s.icon,region:t.name,label:'mortgage rate and house prices',sig:(t.rateDate||'')+'|'+(t.pxDate||''),val:`${t.rate==null?'—':t.rate.toFixed(2)+'%'} rate, ${t.px==null?'—':hSigned(t.px,'%')} prices`,when:''};
+  if(t.ptrDate)out[s.id+'/'+r.id+'/'+t.cc+'_ptr']={sec:s.id,icon:s.icon,region:t.name,label:'house prices vs rents',sig:t.ptrDate,val:hSigned(t.ptr,'%')+' vs long-run average',when:''};});}));return out;}
 function hKeys(d){const i=hIndex(d),o={};for(const k in i)o[k]=i[k].sig;return o;}
 function hUnseen(){const d=HEALTH.data,by={};if(!d)return by;const idx=hIndex(d);
  if(!HSEEN){HSEEN={};HVAL={};for(const k in idx){HSEEN[k]=idx[k].sig;HVAL[k]=idx[k].val;}store.set('wd.hseen',HSEEN);store.set('wd.hval',HVAL);return by;}
  let logged=false;
- for(const [k,x] of Object.entries(idx)){if(HSEEN[k]===x.sig)continue;(by[x.sec]||=[]).push(k);
+ let base=false;
+ for(const [k,x] of Object.entries(idx)){if(HSEEN[k]===undefined){HSEEN[k]=x.sig;HVAL[k]=x.val;base=true;continue;}if(HSEEN[k]===x.sig)continue;(by[x.sec]||=[]).push(k);
   if(!HLOG.some(e=>e.k===k&&e.sig===x.sig)){HLOG.unshift({k,sig:x.sig,sec:x.sec,icon:x.icon,region:x.region,label:x.label,from:HVAL[k]&&HVAL[k]!==x.val?HVAL[k]:null,to:x.val,when:x.when,at:Date.now()});HVAL[k]=x.val;logged=true;}}
+ if(base){store.set('wd.hseen',HSEEN);store.set('wd.hval',HVAL);}
  if(logged){HLOG=HLOG.slice(0,30);store.set('wd.hlog',HLOG);store.set('wd.hval',HVAL);}
  return by;}
 function hMarkSeen(sec){const d=HEALTH.data;if(!d||!HSEEN)return;const k=hKeys(d);let ch=false;
@@ -1308,7 +1311,7 @@ function renderUpdates(unseen){
 function goToUpdate(e){
  hUpdOpen=false;if(e.sec!==hSec){HFRESH.clear();hSec=e.sec;store.set('wd.hsec',hSec);hMore=false;loadHealthNews();}
  HFRESH.add(e.k);renderHealth();buzz();
- const el=document.querySelector(`#healthBox [data-k="${CSS.escape(e.k)}"]`);
+ const el=document.querySelector(`#healthBox [data-k="${CSS.escape(e.k)}"]`)||document.querySelector(`#healthBox [data-k="${CSS.escape(e.k.replace(/_ptr$/,''))}"]`);
  if(el){el.scrollIntoView({behavior:reduce?'auto':'smooth',block:'center'});el.classList.remove('flash');void el.offsetWidth;el.classList.add('flash');}
 }
 $('healthStatus').addEventListener('click',e=>{if(!e.target.closest('#upBtn'))return;hUpdOpen=!hUpdOpen;buzz();renderHealth();});
@@ -1328,7 +1331,7 @@ function chipRow(st){return st&&st.length?`<div class="chips">${st.map(x=>`<span
 function medTable(rows,pre){
  return `<table class="htab"><thead><tr><th>Country</th><th>Mortgage rate</th><th>Prices y/y</th><th>Prices vs rents</th></tr></thead><tbody>${rows.map(r=>{
   const rt=r.rate!=null&&r.rateYr!=null?(r.rate<r.rateYr-.1?'up':r.rate>r.rateYr+.1?'down':''):'';
-  return `<tr data-k="${esc(pre+r.cc)}"><td>${r.flag} ${esc(r.name)}${HFRESH.has(pre+r.cc)?'<span class="newtag">New</span>':''}</td><td>${r.rate==null?'—':`<b class="${rt}">${r.rate.toFixed(2)}%</b>`}</td><td>${r.px==null?'—':`<b class="${r.px>0?'up':r.px<0?'down':''}">${hSigned(r.px,'%')}</b>`}</td><td>${r.ptr==null?'—':hSigned(r.ptr,'%')}</td></tr>`;}).join('')}</tbody></table>`;
+  return `<tr data-k="${esc(pre+r.cc)}"><td>${r.flag} ${esc(r.name)}${HFRESH.has(pre+r.cc)||HFRESH.has(pre+r.cc+'_ptr')?'<span class="newtag">New</span>':''}</td><td>${r.rate==null?'—':`<b class="${rt}">${r.rate.toFixed(2)}%</b>`}</td><td>${r.px==null?'—':`<b class="${r.px>0?'up':r.px<0?'down':''}">${hSigned(r.px,'%')}</b>`}</td><td>${r.ptr==null?'—':hSigned(r.ptr,'%')}</td></tr>`;}).join('')}</tbody></table>`;
 }
 function regionCard(r){
  const ms=(r.metrics||[]).filter(m=>!m.hidden);
