@@ -189,11 +189,25 @@ async function oecdMeasure(measure) {
     if (r) why = r.status + ' ' + (await r.text()).slice(0, 80);
     await new Promise((z) => setTimeout(z, 700));
   }
-  if (!r || !r.ok) throw new Error(`OECD ${measure}: ${why}`);
+  if (!r || !r.ok) return oecdBackup(measure, why);
   const rows = csv(await r.text()), h = rows[0];
   const iA = h.indexOf('REF_AREA'), iT = h.indexOf('TIME_PERIOD'), iV = h.indexOf('OBS_VALUE'), out = {};
   for (const c of rows.slice(1)) { const cc = OECD_CC[c[iA]], v = +c[iV]; if (cc && c[iV] !== '' && !isNaN(v)) (out[cc] ||= []).push([qDate(c[iT]), v]); }
   Object.values(out).forEach((s) => s.sort((x, y) => (x[0] < y[0] ? -1 : 1)));
+  return out;
+}
+// DBnomics mirror of the same OECD dataset (OECD often refuses cloud servers); can lag by a quarter.
+async function oecdBackup(measure, why) {
+  const unit = measure === 'RPI' ? 'IX' : 'PT_AVG_L_TERM';
+  const ids = Object.keys(OECD_CC).map((iso) => `${iso}.Q.${measure}.${unit}`).join('+');
+  const r = await fetch(`https://api.db.nomics.world/v22/series/OECD/${encodeURIComponent('DSD_AN_HOUSE_PRICES@DF_HOUSE_PRICES')}/${ids}?observations=1`, { headers: UA, signal: T(10000) });
+  if (!r.ok) throw new Error(`OECD ${measure}: ${why}; backup ${r.status}`);
+  const out = {};
+  for (const d of (await r.json()).series?.docs || []) {
+    const cc = OECD_CC[d.series_code.split('.')[0]];
+    if (cc) out[cc] = d.period.map((p, i) => [qDate(p), d.value[i]]).filter((x) => x[0] >= '2017' && typeof x[1] === 'number');
+  }
+  if (!Object.keys(out).length) throw new Error(`OECD ${measure}: ${why}; backup empty`);
   return out;
 }
 async function oecdRent() {
