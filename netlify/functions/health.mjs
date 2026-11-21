@@ -211,8 +211,9 @@ async function lrPrice(region) {
   const get = (m) => fetch(`https://landregistry.data.gov.uk/data/ukhpi/region/${region}/month/${m}.json`, { headers: UA, signal: T(8000) })
     .then((r) => (r.ok ? r.text() : '')).then((t) => { const v = /"averagePrice"\s*:\s*([\d.]+)/.exec(t); return v ? +v[1] : null; }).catch(() => null);
   const ym = (d) => d.toISOString().slice(0, 7);
-  let latest = null;
-  for (let back = 1; back <= 5 && !latest; back++) { const d = new Date(); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() - back); if (await get(ym(d))) latest = d; }
+  const cands = [1, 2, 3, 4, 5].map((back) => { const d = new Date(); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() - back); return d; });
+  const found = await Promise.all(cands.map((d) => get(ym(d))));
+  const latest = cands[found.findIndex((v) => v)] || null;
   if (!latest) throw new Error('Land Registry: no recent month');
   const months = Array.from({ length: 13 }, (_, i) => { const d = new Date(latest); d.setUTCMonth(d.getUTCMonth() - i * 3); return ym(d); });
   const vals = await Promise.all(months.map(get));
