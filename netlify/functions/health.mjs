@@ -198,9 +198,8 @@ async function oecdMeasure(measure) {
 }
 // DBnomics mirror of the same OECD dataset (OECD often refuses cloud servers); can lag by a quarter.
 async function oecdBackup(measure, why) {
-  const unit = measure === 'RPI' ? 'IX' : 'PT_AVG_L_TERM';
-  const ids = Object.keys(OECD_CC).map((iso) => `${iso}.Q.${measure}.${unit}`).join('+');
-  const r = await fetch(`https://api.db.nomics.world/v22/series/OECD/${encodeURIComponent('DSD_AN_HOUSE_PRICES@DF_HOUSE_PRICES')}/${ids}?observations=1`, { headers: UA, signal: T(10000) });
+  const dims = encodeURIComponent(JSON.stringify({ REF_AREA: Object.keys(OECD_CC), MEASURE: [measure], FREQ: ['Q'] }));
+  const r = await fetch(`https://api.db.nomics.world/v22/series/OECD/${encodeURIComponent('DSD_AN_HOUSE_PRICES@DF_HOUSE_PRICES')}?dimensions=${dims}&observations=1&limit=50`, { headers: UA, signal: T(10000) });
   if (!r.ok) throw new Error(`OECD ${measure}: ${why}; backup ${r.status}`);
   const out = {};
   for (const d of (await r.json()).series?.docs || []) {
