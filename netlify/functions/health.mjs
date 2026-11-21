@@ -208,16 +208,17 @@ async function onsRents() {
 }
 // HM Land Registry UK house price index: official average price, monthly, by region.
 async function lrPrice(region) {
-  const get = (m) => fetch(`https://landregistry.data.gov.uk/data/ukhpi/region/${region}/month/${m}.json`, { headers: UA, signal: T(8000) })
-    .then((r) => (r.ok ? r.text() : '')).then((t) => { const v = /"averagePrice"\s*:\s*([\d.]+)/.exec(t); return v ? +v[1] : null; }).catch(() => null);
+  const once = (m) => fetch(`https://landregistry.data.gov.uk/data/ukhpi/region/${region}/month/${m}.json`, { headers: UA, signal: T(8000) })
+    .then((r) => (r.status === 404 ? 'none' : r.ok ? r.text() : null)).then((t) => { if (t === 'none') return 'none'; const v = t && /"averagePrice"\s*:\s*([\d.]+)/.exec(t); return v ? +v[1] : null; }).catch(() => null);
+  const get = async (m) => { let v = await once(m); if (v === null) v = await once(m); return typeof v === 'number' ? v : null; };
   const ym = (d) => d.toISOString().slice(0, 7);
-  const cands = [1, 2, 3, 4, 5].map((back) => { const d = new Date(); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() - back); return d; });
-  const found = await Promise.all(cands.map((d) => get(ym(d))));
-  const latest = cands[found.findIndex((v) => v)] || null;
-  if (!latest) throw new Error('Land Registry: no recent month');
-  const months = Array.from({ length: 13 }, (_, i) => { const d = new Date(latest); d.setUTCMonth(d.getUTCMonth() - i * 3); return ym(d); });
+  const back = (n) => { const d = new Date(); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() - n); return ym(d); };
+  // every month for the last 15 months (latest release and a year earlier), then quarterly back three years
+  const months = [...Array.from({ length: 15 }, (_, i) => back(i + 1)), ...Array.from({ length: 7 }, (_, i) => back(18 + i * 3))];
   const vals = await Promise.all(months.map(get));
-  return months.map((m, i) => [m + '-01', vals[i]]).filter((p) => p[1]).reverse();
+  const out = months.map((m, i) => [m + '-01', vals[i]]).filter((p) => p[1]).reverse();
+  if (!out.length) throw new Error('Land Registry: no recent months');
+  return out;
 }
 // Numbeo gross rental yields by country (crowd-sourced survey, refreshed twice a year).
 async function numbeo() {
