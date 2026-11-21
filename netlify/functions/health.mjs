@@ -179,21 +179,21 @@ async function usYield() {
 }
 // OECD: price-to-rent ratio as % of its long-run average (100 = normal), and the rent index.
 const OECD_CC = { GBR: 'GB', IRL: 'IE', ESP: 'ES', PRT: 'PT', ITA: 'IT', GRC: 'GR', USA: 'US' };
-async function oecdRent() {
-  const u = `https://sdmx.oecd.org/public/rest/data/OECD.ECO.MPD,DSD_AN_HOUSE_PRICES@DF_HOUSE_PRICES,1.0/${Object.keys(OECD_CC).join('+')}.Q.HPI_RPI_AVG+RPI.?startPeriod=2017-Q1&format=csvfile`;
-  const r = await fetch(u, { headers: UA, signal: T(12000) });
-  if (!r.ok) throw new Error('OECD ' + r.status);
+async function oecdMeasure(measure) {
+  const u = `https://sdmx.oecd.org/public/rest/data/OECD.ECO.MPD,DSD_AN_HOUSE_PRICES@DF_HOUSE_PRICES,1.0/${Object.keys(OECD_CC).join('+')}.Q.${measure}.?startPeriod=2017-Q1&format=csvfile`;
+  let r;
+  for (let i = 0; i < 2; i++) { r = await fetch(u, { headers: UA, signal: T(10000) }).catch(() => null); if (r && r.ok) break; await new Promise((z) => setTimeout(z, 700)); }
+  if (!r || !r.ok) throw new Error('OECD ' + (r ? r.status : 'timeout'));
   const rows = csv(await r.text()), h = rows[0];
-  const iA = h.indexOf('REF_AREA'), iM = h.indexOf('MEASURE'), iT = h.indexOf('TIME_PERIOD'), iV = h.indexOf('OBS_VALUE');
-  const out = { ptr: {}, rent: {} };
-  for (const c of rows.slice(1)) {
-    const cc = OECD_CC[c[iA]], v = +c[iV];
-    if (!cc || c[iV] === '' || isNaN(v)) continue;
-    const k = c[iM] === 'RPI' ? 'rent' : c[iM] === 'HPI_RPI_AVG' ? 'ptr' : null;
-    if (k) (out[k][cc] ||= []).push([qDate(c[iT]), v]);
-  }
-  for (const k of ['ptr', 'rent']) Object.values(out[k]).forEach((s) => s.sort((a, b) => (a[0] < b[0] ? -1 : 1)));
+  const iA = h.indexOf('REF_AREA'), iT = h.indexOf('TIME_PERIOD'), iV = h.indexOf('OBS_VALUE'), out = {};
+  for (const c of rows.slice(1)) { const cc = OECD_CC[c[iA]], v = +c[iV]; if (cc && c[iV] !== '' && !isNaN(v)) (out[cc] ||= []).push([qDate(c[iT]), v]); }
+  Object.values(out).forEach((s) => s.sort((x, y) => (x[0] < y[0] ? -1 : 1)));
   return out;
+}
+async function oecdRent() {
+  const [ptr, rent] = await Promise.all([oecdMeasure('HPI_RPI_AVG').catch(() => null), oecdMeasure('RPI').catch(() => null)]);
+  if (!ptr && !rent) throw new Error('OECD unavailable');
+  return { ptr: ptr || {}, rent: rent || {} };
 }
 async function yahoo(sym) {
   const r = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=1y&interval=1d&events=div`, { headers: UA, signal: T(7000) });
