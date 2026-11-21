@@ -158,8 +158,45 @@ async function kastle() {
   const wk = new Date(); wk.setUTCDate(wk.getUTCDate() - ((wk.getUTCDay() + 6) % 7) - 7);
   return { value: v, prev: ch == null ? null : +(v - ch).toFixed(1), peak: peak ? +peak[1] : null, date: wk.toISOString().slice(0, 10) };
 }
+// ---------- rental yields ----------
+// Zillow typical rent (ZORI) and typical home value (ZHVI) for the whole US -> gross rental yield, monthly.
+async function zillowRow(u) {
+  const r = await fetch(u, { headers: UA, signal: T(12000) });
+  if (!r.ok) throw new Error('Zillow ' + r.status);
+  const t = await r.text(), nl = t.indexOf('\n'), head = t.slice(0, nl).trim().split(',');
+  const row = t.split('\n').find((l) => /^\d+,\d+,"?United States"?,country/i.test(l));
+  if (!row) throw new Error('Zillow: no US row');
+  const c = row.trim().split(','), out = {};
+  head.forEach((h, i) => { if (/^\d{4}-\d{2}-\d{2}$/.test(h) && c[i] && !isNaN(+c[i])) out[h.slice(0, 7) + '-01'] = +c[i]; });
+  return out;
+}
+async function usYield() {
+  const [rent, val] = await Promise.all([
+    zillowRow('https://files.zillowstatic.com/research/public_csvs/zori/Metro_zori_uc_sfrcondomfr_sm_month.csv'),
+    zillowRow('https://files.zillowstatic.com/research/public_csvs/zhvi/Metro_zhvi_uc_sfrcondo_tier_0.33_0.67_sm_sa_month.csv'),
+  ]);
+  return Object.keys(rent).filter((d) => val[d] && d >= START).sort().map((d) => [d, +(rent[d] * 12 / val[d] * 100).toFixed(2)]);
+}
+// OECD: price-to-rent ratio as % of its long-run average (100 = normal), and the rent index.
+const OECD_CC = { GBR: 'GB', IRL: 'IE', ESP: 'ES', PRT: 'PT', ITA: 'IT', GRC: 'GR', USA: 'US' };
+async function oecdRent() {
+  const u = `https://sdmx.oecd.org/public/rest/data/OECD.ECO.MPD,DSD_AN_HOUSE_PRICES@DF_HOUSE_PRICES,1.0/${Object.keys(OECD_CC).join('+')}.Q.HPI_RPI_AVG+RPI.?startPeriod=2017-Q1&format=csvfile`;
+  const r = await fetch(u, { headers: UA, signal: T(12000) });
+  if (!r.ok) throw new Error('OECD ' + r.status);
+  const rows = csv(await r.text()), h = rows[0];
+  const iA = h.indexOf('REF_AREA'), iM = h.indexOf('MEASURE'), iT = h.indexOf('TIME_PERIOD'), iV = h.indexOf('OBS_VALUE');
+  const out = { ptr: {}, rent: {} };
+  for (const c of rows.slice(1)) {
+    const cc = OECD_CC[c[iA]], v = +c[iV];
+    if (!cc || c[iV] === '' || isNaN(v)) continue;
+    const k = c[iM] === 'RPI' ? 'rent' : c[iM] === 'HPI_RPI_AVG' ? 'ptr' : null;
+    if (k) (out[k][cc] ||= []).push([qDate(c[iT]), v]);
+  }
+  for (const k of ['ptr', 'rent']) Object.values(out[k]).forEach((s) => s.sort((a, b) => (a[0] < b[0] ? -1 : 1)));
+  return out;
+}
 async function yahoo(sym) {
-  const r = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=1y&interval=1d`, { headers: UA, signal: T(7000) });
+  const r = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=1y&interval=1d&events=div`, { headers: UA, signal: T(7000) });
   const j = await r.json();
   const res = j?.chart?.result?.[0];
   if (!res) throw new Error('no data');
@@ -172,8 +209,11 @@ async function yahoo(sym) {
   const hi = Math.max(...pts.map((p) => p[1]), price);
   const pc = (a, b) => (a != null && b ? (a / b - 1) * 100 : null);
   const step = Math.max(1, Math.floor(pts.length / 60));
+  const yrAgo = Date.now() / 1000 - 365 * 86400;
+  const divs = Object.values(res.events?.dividends || {}).filter((d) => d.date >= yrAgo).reduce((a, d) => a + (d.amount || 0), 0);
+  const dy = price ? +(divs / price * 100).toFixed(2) : null;
   return {
-    sym, price, cur: m.currency || 'USD',
+    sym, price, cur: m.currency || 'USD', dy,
     d1: pc(price, prevClose), m3: pc(price, back(91)), y1: pc(price, pts[0]?.[1]), offHigh: pc(price, hi),
     spark: pts.filter((_, i) => i % step === 0 || i === pts.length - 1).map((p) => +p[1].toFixed(4)),
   };
@@ -222,6 +262,7 @@ function regionSignal(metrics, stocks, words) {
   let tot = 0, w = 0;
   const notes = [];
   metrics.filter(Boolean).forEach((m) => {
+    if (m.noscore) { m.trend = 0; return; }
     const s = score(m), wt = m.lead ? 2 : 1;
     m.trend = s;
     tot += s * wt; w += wt;
@@ -258,14 +299,14 @@ const MED = [['ES', '🇪🇸', 'Spain'], ['PT', '🇵🇹', 'Portugal'], ['IT',
 export default async (req) => {
   const allSyms = [...new Set(Object.values(STOCKS).flat())];
   const PX = ['GB', 'IE', ...MED.map((m) => m[0])];
-  const [BS, BC, FD, FM, FH, B, E, Y, TR, KS] = await Promise.all([
+  const [BS, BC, FD, FM, FH, B, E, Y, TR, KS, ZY, OE, TNX] = await Promise.all([
     safe(bis('WS_SPP', `Q.${PX.join("+")}.N.628`)),
     safe(bis('WS_CPP', 'Q.US.0.A.0.2.6.0')),
     safe(fedDelinq()), safe(freddie()), safe(fhfa()),
-    safe(boe(['IUMBV34', 'IUMBV42', 'LPMVTVX'])),
+    safe(boe(['IUMBV34', 'IUMBV42', 'LPMVTVX', 'IUDMNZC'])),
     safe(ecb(['IE', 'U2', ...MED.map((m) => m[0])])),
     Promise.all(allSyms.map((s) => safe(yahoo(s)))).then((a) => Object.fromEntries(allSyms.map((s, i) => [s, a[i] && !a[i].error ? { ...a[i], name: NAMES[s] || s } : null]))),
-    safe(trepp()), safe(kastle()),
+    safe(trepp()), safe(kastle()), safe(usYield()), safe(oecdRent()), safe(yahoo('^TNX')),
   ]);
   const ok = (x) => (x && !x.error ? x : null);
   const F = {
@@ -273,30 +314,49 @@ export default async (req) => {
     COMRE: ok(BC)?.US || null,
   };
   const errors = {};
-  [['bis', BS], ['bis_cre', BC], ['fed', FD], ['freddie', FM], ['fhfa', FH], ['trepp', TR], ['kastle', KS]].forEach(([k, x]) => { if (x && x.error) errors[k] = x.error; });
+  [['bis', BS], ['bis_cre', BC], ['fed', FD], ['freddie', FM], ['fhfa', FH], ['trepp', TR], ['kastle', KS], ['zillow', ZY], ['oecd', OE], ['treasury', TNX]].forEach(([k, x]) => { if (x && x.error) errors[k] = x.error; });
   if (B.error) errors.boe = B.error;
   if (E.error) errors.ecb = E.error;
   const stocks = (k) => STOCKS[k].map((s) => Y[s]).filter(Boolean);
   const bisY = (cc) => (ok(BS)?.[cc] ? yoy(BS[cc], 4) : null);
 
+  const tr = ok(TR), ks = ok(KS), oe = ok(OE);
+  const t10 = ok(TNX)?.price ?? null, g10 = !B.error && B.IUDMNZC?.length ? B.IUDMNZC.at(-1)[1] : null;
+  const vsBond = (y, b, name) => (y != null && b != null ? `${y - b >= 0 ? '+' : '−'}${Math.abs(y - b).toFixed(1)} pts vs ${name} (${b.toFixed(2)}%)` : '');
+  const avgDy = (st) => { const xs = st.filter((x) => x.dy != null && x.dy > 0); return xs.length ? +(xs.reduce((a, x) => a + x.dy, 0) / xs.length).toFixed(2) : null; };
+  const liveYield = (id, label, st, bond, bondName) => { const v = avgDy(st), none = st.filter((x) => !x.dy).map((x) => x.name), note = none.length ? `${none.join(', ')} ${none.length > 1 ? 'pay' : 'pays'} no dividend, so ${none.length > 1 ? 'are' : 'is'} left out` : ''; return v == null ? null : { id, label, short: 'Yield', unit: '%', freq: 'D', live: true, noscore: true, value: v, prev: null, yr: null, date: new Date().toISOString().slice(0, 10), series: [], src: 'Dividends, last 12 months', extra: vsBond(v, bond, bondName) + (note ? ' · ' + note : '') }; };
+  const ptr = (cc) => (oe?.ptr?.[cc] ? oe.ptr[cc].map((p) => [p[0], +(p[1] - 100).toFixed(1)]) : null);
+  const rentY = (cc) => (oe?.rent?.[cc] ? yoy(oe.rent[cc], 4) : null);
+  const ptrM = (cc) => metric(`${cc.toLowerCase()}_ptr`, ptr(cc), { label: 'House prices vs rents, compared with long-run average', short: 'Prices vs rents', unit: '%', kind: 'growth', freq: 'Q', good: 'down', noscore: true, tol: 1, src: 'OECD', extra: 'Above 0 means rental yields are below normal' });
+  const rentM = (cc) => metric(`${cc.toLowerCase()}_rent`, rentY(cc), { label: 'Rents, year on year', short: 'Rents', unit: '%', kind: 'growth', freq: 'Q', good: 'up', noscore: true, tol: 0.5, src: 'OECD' });
+  const offUs = [
+    metric('off_dq', tr?.office, { label: 'Office loan delinquency (CMBS)', short: 'Office delinquency', unit: '%', freq: 'M', good: 'down', lead: true, tol: 0.1, src: 'Trepp' }),
+    metric('cmbs_mat', tr?.matured, { label: 'All CMBS loans in trouble, incl. matured and unpaid', short: 'Matured loans', unit: '%', freq: 'M', good: 'down', tol: 0.1, src: 'Trepp' }),
+    liveYield('off_dy', 'Office landlords’ dividend yield', stocks('off_us'), t10, '10-year Treasury'),
+    ks ? { id: 'off_occ', label: 'Office attendance, 10 big cities', short: 'Attendance', unit: '%', freq: 'W', good: 'up', tol: 0.3, src: 'Kastle (vs pre-2020)', value: ks.value, prev: ks.prev, yr: null, date: ks.date, series: [], extra: ks.peak ? `Busiest day ${ks.peak}%` : '' } : null,
+  ];
+  const offAvg = (st) => { const xs = st.filter((x) => x.offHigh != null); return xs.length ? { offHigh: xs.reduce((a, x) => a + x.offHigh, 0) / xs.length, m3: xs.reduce((a, x) => a + (x.m3 ?? 0), 0) / xs.length, y1: xs.reduce((a, x) => a + (x.y1 ?? 0), 0) / xs.length } : null; };
   // ---------- housing ----------
   const usH = [
     metric('us_dq', F.DRSFRMACBS, { label: 'Mortgage delinquency (banks)', short: 'Delinquency', unit: '%', freq: 'Q', good: 'down', lead: true, tol: 0.05, src: 'Federal Reserve' }),
     metric('us_rate', F.MORTGAGE30US, { label: '30-year fixed mortgage rate', short: 'Mortgage rates', unit: '%', freq: 'W', good: 'down', tol: 0.2, src: 'Freddie Mac' }),
+    ZY && !ZY.error ? { ...metric('us_yield', ZY, { label: 'Gross rental yield (typical rent × 12 ÷ typical home value)', short: 'Rental yield', unit: '%', freq: 'M', good: 'up', noscore: true, tol: 0.1, src: 'Zillow' }), extra: vsBond(ZY.at(-1)[1], t10, '10-year Treasury') } : null,
     metric('us_hpi', F.HPI ? yoy(F.HPI, 12) : null, { label: 'Home prices, year on year (FHFA)', short: 'Prices', unit: '%', kind: 'growth', freq: 'M', good: 'up', tol: 0.5, src: 'FHFA house price index' }),
   ];
   const ukH = [
     metric('uk_2y', B.IUMBV34, { label: '2-year fixed mortgage rate (75% LTV)', short: 'Mortgage rates', unit: '%', freq: 'M', good: 'down', tol: 0.2, src: 'Bank of England' }),
     metric('uk_appr', B.LPMVTVX ? B.LPMVTVX.map((p) => [p[0], +(p[1] / 1000).toFixed(1)]) : null, { label: 'Mortgage approvals for house purchase', short: 'Approvals', unit: 'k', freq: 'M', good: 'up', tol: 3, src: 'Bank of England' }),
+    ptrM('GB'), rentM('GB'),
     metric('uk_hpi', bisY('GB'), { label: 'House prices, year on year', short: 'Prices', unit: '%', kind: 'growth', freq: 'Q', good: 'up', tol: 0.5, src: 'BIS' }),
   ];
   const ieH = [
     metric('ie_rate', E.IE, { label: 'Mortgage rate on new loans', short: 'Mortgage rates', unit: '%', freq: 'M', good: 'down', tol: 0.15, src: 'ECB' }),
+    ptrM('IE'), rentM('IE'),
     metric('ie_hpi', bisY('IE'), { label: 'House prices, year on year', short: 'Prices', unit: '%', kind: 'growth', freq: 'Q', good: 'up', tol: 0.5, src: 'BIS' }),
   ];
   const medRows = MED.map(([cc, flag, name]) => {
     const r = E[cc], p = bisY(cc);
-    return { cc, flag, name, rate: r?.at(-1)?.[1] ?? null, rateDate: r?.at(-1)?.[0] ?? null, rateYr: r ? lastAt(r, 12) : null, px: p?.at(-1)?.[1] ?? null, pxDate: p?.at(-1)?.[0] ?? null, pxPrev: p && p.length > 1 ? p.at(-2)[1] : null };
+    return { cc, flag, name, ptr: ptr(cc)?.at(-1)?.[1] ?? null, ptrDate: ptr(cc)?.at(-1)?.[0] ?? null, rate: r?.at(-1)?.[1] ?? null, rateDate: r?.at(-1)?.[0] ?? null, rateYr: r ? lastAt(r, 12) : null, px: p?.at(-1)?.[1] ?? null, pxDate: p?.at(-1)?.[0] ?? null, pxPrev: p && p.length > 1 ? p.at(-2)[1] : null };
   });
   const medM = [
     metric('ea_rate', E.U2, { label: 'Euro-area mortgage rate', short: 'Mortgage rates', unit: '%', freq: 'M', good: 'down', tol: 0.15, src: 'ECB' }),
@@ -308,13 +368,6 @@ export default async (req) => {
     metric('us_cre_px', F.COMRE ? yoy(F.COMRE, 4) : null, { label: 'Commercial property prices, year on year', short: 'CRE prices', unit: '%', kind: 'growth', freq: 'Q', good: 'up', tol: 0.5, src: 'BIS (CoStar index)' }),
   ];
 
-  const tr = ok(TR), ks = ok(KS);
-  const offUs = [
-    metric('off_dq', tr?.office, { label: 'Office loan delinquency (CMBS)', short: 'Office delinquency', unit: '%', freq: 'M', good: 'down', lead: true, tol: 0.1, src: 'Trepp' }),
-    metric('cmbs_mat', tr?.matured, { label: 'All CMBS loans in trouble, incl. matured and unpaid', short: 'Matured loans', unit: '%', freq: 'M', good: 'down', tol: 0.1, src: 'Trepp' }),
-    ks ? { id: 'off_occ', label: 'Office attendance, 10 big cities', short: 'Attendance', unit: '%', freq: 'W', good: 'up', tol: 0.3, src: 'Kastle (vs pre-2020)', value: ks.value, prev: ks.prev, yr: null, date: ks.date, series: [], extra: ks.peak ? `Busiest day ${ks.peak}%` : '' } : null,
-  ];
-  const offAvg = (st) => { const xs = st.filter((x) => x.offHigh != null); return xs.length ? { offHigh: xs.reduce((a, x) => a + x.offHigh, 0) / xs.length, m3: xs.reduce((a, x) => a + (x.m3 ?? 0), 0) / xs.length, y1: xs.reduce((a, x) => a + (x.y1 ?? 0), 0) / xs.length } : null; };
   const R = (id, name, flag, metrics, st, extra = {}) => {
     const sig = regionSignal(metrics, st, WORDS);
     return { id, name, flag, ...sig, metrics: metrics.filter(Boolean), stocks: st, ...extra };
@@ -333,13 +386,13 @@ export default async (req) => {
         R('us', 'United States', '🇺🇸', usH, stocks('us_h')),
         R('uk', 'UK and NI', '🇬🇧', ukH, stocks('uk_h'), { note: 'Arrears for the UK and Northern Ireland are published quarterly by the FCA and aren’t in a live feed yet.' }),
         R('ie', 'Ireland', '🇮🇪', ieH, stocks('ie_h')),
-        R('med', 'Mediterranean', '🌊', medM, [], { table: medRows, note: 'Albania and Montenegro have no regular live data feed.' }),
+        R('med', 'Mediterranean', '🌊', medM, [], { table: medRows, note: 'Prices vs rents compares the price-to-rent ratio with its long-run average (OECD): above 0 means rental yields are lower than usual. Croatia, Cyprus and Malta aren’t covered. Albania and Montenegro have no regular live data feed.' }),
       ] },
       { id: 'cre', title: 'Commercial property', icon: '🏢', regions: [
         R('off_us', 'US offices', '🏙️', offUs, stocks('off_us'), { group: 'Offices', dd: true, avg: offAvg(stocks('off_us')), note: 'Office share prices are the market’s live view of office values: the bar shows how far each landlord is below its 12-month high. Trepp’s delinquency is the share of office loans in commercial mortgage-backed securities that are 30+ days late, published early each month.' }),
-        R('off_eu', 'UK and Europe offices', '🇬🇧', [], stocks('off_eu'), { group: 'Offices', dd: true, avg: offAvg(stocks('off_eu')), note: 'London (Derwent, Great Portland), Paris (Gecina) and Madrid/Barcelona (Colonial) office landlords. Official office values in the UK and Europe are quarterly and paywalled.' }),
-        R('us', 'US, all commercial property', '🇺🇸', usC, stocks('us_c'), { group: 'Other commercial property', note: 'Bank loans and prices across all property types: offices, shops, warehouses, flats and hotels.' }),
-        R('uk', 'UK landlords', '🇬🇧', [], stocks('uk_c'), { group: 'Other commercial property', note: 'Judged on listed landlords’ share prices; official UK figures are quarterly.' }),
+        R('off_eu', 'UK and Europe offices', '🇬🇧', [liveYield('offeu_dy', 'London office landlords’ dividend yield', stocks('off_eu').filter((x) => /\.L$/.test(x.sym)), g10, '10-year gilt')], stocks('off_eu'), { group: 'Offices', dd: true, avg: offAvg(stocks('off_eu')), note: 'London (Derwent, Great Portland), Paris (Gecina) and Madrid/Barcelona (Colonial) office landlords. Official office values in the UK and Europe are quarterly and paywalled.' }),
+        R('us', 'US, all commercial property', '🇺🇸', [...usC, liveYield('reit_dy', 'US property REITs’ dividend yield (VNQ)', stocks('us_c'), t10, '10-year Treasury')], stocks('us_c'), { group: 'Other commercial property', note: 'Bank loans and prices across all property types: offices, shops, warehouses, flats and hotels.' }),
+        R('uk', 'UK landlords', '🇬🇧', [liveYield('ukc_dy', 'UK landlords’ dividend yield', stocks('uk_c'), g10, '10-year gilt')], stocks('uk_c'), { group: 'Other commercial property', note: 'Judged on listed landlords’ share prices; official UK figures are quarterly.' }),
         R('med', 'Spain', '🇪🇸', [], stocks('med_c'), { group: 'Other commercial property', note: 'Judged on Merlin, Spain’s biggest listed landlord.' }),
       ] },
       { id: 'ai', title: 'AI bubble watch', icon: '🤖', regions: [

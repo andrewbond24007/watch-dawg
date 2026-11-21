@@ -1269,7 +1269,7 @@ const H_NEWS={
  cre:{q:['office delinquency','office market'],g:'"office market" OR "office vacancy" OR "office loans" OR "office building" OR "commercial real estate" OR "CMBS"',cal:e=>/rate decision|fomc|federal funds|official bank rate|main refinancing/i.test(e.title),calH:'Rate decisions ahead'},
  ai:{q:['AI bubble','Nvidia'],g:'"AI bubble" OR "AI stocks" OR "Nvidia" OR "AI spending" OR "data centers"',cal:e=>/rate decision|fomc|federal funds|cpi/i.test(e.title)&&e.country==='USD',calH:'Big US events ahead'},
 };
-function hDate(m){const d=new Date(m.date);if(m.freq==='Q')return 'Q'+(Math.floor(d.getUTCMonth()/3)+1)+' '+d.getUTCFullYear();
+function hDate(m){if(m.freq==='D')return 'Live';const d=new Date(m.date);if(m.freq==='Q')return 'Q'+(Math.floor(d.getUTCMonth()/3)+1)+' '+d.getUTCFullYear();
  if(m.freq==='W')return d.toLocaleDateString('en-GB',{day:'numeric',month:'short'});return d.toLocaleDateString('en-GB',{month:'short',year:'numeric',timeZone:'UTC'});}
 const hVal=(v,u)=>v==null?'—':u==='%'?(Math.abs(v)<10?v.toFixed(2):v.toFixed(1))+'%':u==='k'?v.toFixed(1)+'k':String(v);
 const hSigned=(v,u)=>v==null?'—':(v>0?'+':v<0?'−':'')+hVal(Math.abs(v),u);
@@ -1280,8 +1280,8 @@ function overallSig(sec){const r=sec.regions.filter(x=>x.signal&&x.signal!=='non
 /* "new since you last looked": remembers each official figure's release, logs what changed */
 let HSEEN=store.get('wd.hseen',null),HVAL=store.get('wd.hval',{}),HLOG=store.get('wd.hlog',[]),hUpdOpen=false;const HFRESH=new Set();
 function hIndex(d){const out={};d.sections.forEach(s=>s.regions.forEach(r=>{
- (r.metrics||[]).forEach(m=>{if(m.hidden)return;out[s.id+'/'+r.id+'/'+m.id]={sec:s.id,icon:s.icon,region:r.name,label:m.label,sig:m.id==='off_occ'?m.value+'|'+m.prev:m.date,val:m.kind==='growth'?hSigned(m.value,m.unit):hVal(m.value,m.unit),when:hDate(m)};});
- (r.table||[]).forEach(t=>{out[s.id+'/'+r.id+'/'+t.cc]={sec:s.id,icon:s.icon,region:t.name,label:'mortgage rate and house prices',sig:(t.rateDate||'')+'|'+(t.pxDate||''),val:`${t.rate==null?'—':t.rate.toFixed(2)+'%'} rate, ${t.px==null?'—':hSigned(t.px,'%')} prices`,when:''};});}));return out;}
+ (r.metrics||[]).forEach(m=>{if(m.hidden||m.live)return;out[s.id+'/'+r.id+'/'+m.id]={sec:s.id,icon:s.icon,region:r.name,label:m.label,sig:m.id==='off_occ'?m.value+'|'+m.prev:m.date,val:m.kind==='growth'?hSigned(m.value,m.unit):hVal(m.value,m.unit),when:hDate(m)};});
+ (r.table||[]).forEach(t=>{out[s.id+'/'+r.id+'/'+t.cc]={sec:s.id,icon:s.icon,region:t.name,label:'mortgage rate and house prices',sig:(t.rateDate||'')+'|'+(t.pxDate||'')+'|'+(t.ptrDate||''),val:`${t.rate==null?'—':t.rate.toFixed(2)+'%'} rate, ${t.px==null?'—':hSigned(t.px,'%')} prices`,when:''};});}));return out;}
 function hKeys(d){const i=hIndex(d),o={};for(const k in i)o[k]=i[k].sig;return o;}
 function hUnseen(){const d=HEALTH.data,by={};if(!d)return by;const idx=hIndex(d);
  if(!HSEEN){HSEEN={};HVAL={};for(const k in idx){HSEEN[k]=idx[k].sig;HVAL[k]=idx[k].val;}store.set('wd.hseen',HSEEN);store.set('wd.hval',HVAL);return by;}
@@ -1326,9 +1326,9 @@ function metricRow(m,key){
 }
 function chipRow(st){return st&&st.length?`<div class="chips">${st.map(x=>`<span class="chip">${esc(x.name)} <b class="${tcls(x.m3)}">${x.m3==null?'—':fmtPct(x.m3)}</b></span>`).join('')}</div><div class="hnote" style="margin-top:6px">Share prices over the last 3 months.</div>`:'';}
 function medTable(rows,pre){
- return `<table class="htab"><thead><tr><th>Country</th><th>Mortgage rate</th><th>House prices y/y</th></tr></thead><tbody>${rows.map(r=>{
+ return `<table class="htab"><thead><tr><th>Country</th><th>Mortgage rate</th><th>Prices y/y</th><th>Prices vs rents</th></tr></thead><tbody>${rows.map(r=>{
   const rt=r.rate!=null&&r.rateYr!=null?(r.rate<r.rateYr-.1?'up':r.rate>r.rateYr+.1?'down':''):'';
-  return `<tr data-k="${esc(pre+r.cc)}"><td>${r.flag} ${esc(r.name)}${HFRESH.has(pre+r.cc)?'<span class="newtag">New</span>':''}</td><td>${r.rate==null?'—':`<b class="${rt}">${r.rate.toFixed(2)}%</b>`}</td><td>${r.px==null?'—':`<b class="${r.px>0?'up':r.px<0?'down':''}">${hSigned(r.px,'%')}</b>`}</td></tr>`;}).join('')}</tbody></table>`;
+  return `<tr data-k="${esc(pre+r.cc)}"><td>${r.flag} ${esc(r.name)}${HFRESH.has(pre+r.cc)?'<span class="newtag">New</span>':''}</td><td>${r.rate==null?'—':`<b class="${rt}">${r.rate.toFixed(2)}%</b>`}</td><td>${r.px==null?'—':`<b class="${r.px>0?'up':r.px<0?'down':''}">${hSigned(r.px,'%')}</b>`}</td><td>${r.ptr==null?'—':hSigned(r.ptr,'%')}</td></tr>`;}).join('')}</tbody></table>`;
 }
 function regionCard(r){
  const ms=(r.metrics||[]).filter(m=>!m.hidden);
@@ -1338,7 +1338,7 @@ function regionCard(r){
 }
 function ddList(st){
  return st.slice().sort((x,y)=>(x.offHigh??0)-(y.offHigh??0)).map(x=>{const off=Math.min(100,Math.abs(x.offHigh??0));const c=off>=30?'var(--down)':off>=12?'#d99a00':'var(--up)';
-  return `<div class="dd"><div class="nm">${esc(x.name)}<small>${esc(x.sym)}</small></div><div class="r"><b class="${tcls(x.m3)}">${pc1(x.m3)}</b> 3m · <b class="down">${pc1(x.offHigh,0)}</b> off high</div><div class="bar" style="--c:${c}"><i style="width:${off}%"></i></div></div>`;}).join('');
+  return `<div class="dd"><div class="nm">${esc(x.name)}<small>${esc(x.sym)}${x.dy>0?' · '+x.dy.toFixed(1)+'% yield':''}</small></div><div class="r"><b class="${tcls(x.m3)}">${pc1(x.m3)}</b> 3m · <b class="down">${pc1(x.offHigh,0)}</b> off high</div><div class="bar" style="--c:${c}"><i style="width:${off}%"></i></div></div>`;}).join('');
 }
 function avgBoxes(a){return a?`<div class="aiavg"><div><b class="num">${pc1(a.offHigh,0)}</b><small>vs 12-month high</small></div><div><b class="num" style="color:var(--${a.m3>0?'upink':a.m3<0?'downink':'ink'})">${pc1(a.m3,0)}</b><small>3 months</small></div><div><b class="num" style="color:var(--${a.y1>0?'upink':a.y1<0?'downink':'ink'})">${pc1(a.y1,0)}</b><small>1 year</small></div></div>`:'';}
 function aiCard(r){
@@ -1363,7 +1363,7 @@ function renderHealth(){
   $('healthBox').querySelectorAll('svg[data-sp]').forEach(s=>{const m=all[s.dataset.sp];spark(s,(m?.series||[]).map(p=>p[1]),s.dataset.v);});
  }
  renderHealthCal();renderHealthNews();
- $('healthHint').textContent='Each area gets a traffic light from its key figures compared with a year ago (rising arrears and mortgage rates count against it; rising prices, approvals and share prices count for it), with arrears weighted double as the early warning. Data: Federal Reserve, Freddie Mac, FHFA, Bank of England, ECB and BIS, plus share prices from Yahoo. Official figures are monthly or quarterly, so they change slowly; share prices update through the day.';
+ $('healthHint').textContent='Rental and dividend yields are shown for context and don’t count towards the traffic lights: higher yields mean cheaper property but usually follow falling prices. Each area gets a traffic light from its key figures compared with a year ago (rising arrears and mortgage rates count against it; rising prices, approvals and share prices count for it), with arrears weighted double as the early warning. Data: Federal Reserve, Freddie Mac, FHFA, Bank of England, ECB and BIS, plus share prices from Yahoo. Official figures are monthly or quarterly, so they change slowly; share prices update through the day.';
 }
 function renderHealthCal(){
  const cfg=H_NEWS[hSec],now=Date.now();$('healthCalH').textContent=cfg.calH;
