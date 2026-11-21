@@ -348,6 +348,22 @@ footer{margin-top:28px;font-size:11.5px;line-height:1.55;color:var(--muted)}
 .newtag{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#fff;background:var(--newc);border-radius:6px;padding:2px 6px;margin-left:6px;vertical-align:1px}
 .hm.isnew{background:color-mix(in srgb,var(--newc) 7%,transparent);margin:0 -10px;padding-left:10px;padding-right:10px;border-radius:10px}
 .pstatus .newc{color:var(--newc);font-weight:700}
+.upbtn{border:0;background:color-mix(in srgb,var(--newc) 12%,var(--surface));color:var(--newc);font-size:12px;font-weight:700;border-radius:999px;padding:4px 10px;display:inline-flex;align-items:center;gap:6px}
+.upbtn.quiet{background:var(--surface);color:var(--muted);box-shadow:var(--shadow)}
+.upbtn .ch{transition:transform .2s;display:inline-block}.upbtn[aria-expanded="true"] .ch{transform:rotate(180deg)}
+.upbtn .d{width:7px;height:7px;border-radius:50%;background:var(--newc)}
+.upd{padding:6px 14px;margin:-2px 0 12px;animation:viewin .22s ease}
+.upd .uh{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--muted);padding:6px 0 4px}
+.upi{display:grid;grid-template-columns:24px 1fr auto;gap:2px 10px;width:100%;text-align:left;border:0;background:none;padding:10px 0;border-top:1px solid var(--rule);align-items:center}
+.upi .ic{grid-row:1/3;font-size:18px;line-height:1;position:relative}
+.upi .ic .ndot{top:-3px;right:-4px;width:8px;height:8px}
+.upi .t{font-size:14px;font-weight:600}
+.upi .t small{font-weight:500;color:var(--muted)}
+.upi .v{grid-column:2;font-size:13px;color:var(--muted)}.upi .v b{color:var(--ink);font-variant-numeric:tabular-nums}
+.upi .go{grid-row:1/3;grid-column:3;color:var(--accent);font-size:18px}
+.upi.seen .t{font-weight:500}
+.flash{animation:flash 1.6s ease}
+@keyframes flash{0%,40%{box-shadow:0 0 0 3px var(--newc)}100%{box-shadow:0 0 0 3px transparent}}
 .hgroup{font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:18px 2px 8px}
 .hgroup:first-of-type{margin-top:4px}
 .hsub{display:flex;justify-content:space-between;align-items:center;margin:22px 0 10px}
@@ -445,6 +461,7 @@ footer{margin-top:28px;font-size:11.5px;line-height:1.55;color:var(--muted)}
     <section style="margin-top:16px">
       <div class="sh"><h2>Market health</h2><button class="iconbtn" id="healthRefresh" aria-label="Refresh market health"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v5h-5"/></svg></button></div>
       <div class="pstatus" id="healthStatus"></div>
+      <div class="card upd" id="healthUpd" hidden></div>
       <div class="hov" id="healthOv" role="tablist" aria-label="Market health area"></div>
       <div id="healthBox"><div class="empty" style="margin-top:12px">Loading market health…</div></div>
       <div class="hsub"><div class="day" id="healthCalH">Coming up</div></div>
@@ -1260,25 +1277,49 @@ const pc1=(v,d=1)=>v==null?'—':(v>0?'+':v<0?'−':'')+Math.abs(v).toFixed(d)+'
 const tcls=t=>t>0?'up':t<0?'down':'';
 function overallSig(sec){const r=sec.regions.filter(x=>x.signal&&x.signal!=='none');if(!r.length)return 'none';
  const s=r.reduce((a,x)=>a+(x.signal==='green'?1:x.signal==='red'?-1:0),0)/r.length;return s>=.34?'green':s<=-.34?'red':'amber';}
-/* "new since you last looked": remembers the release date of every official figure */
-let HSEEN=store.get('wd.hseen',null);const HFRESH=new Set();
-function hKeys(d){const out={};d.sections.forEach(s=>s.regions.forEach(r=>{
- (r.metrics||[]).forEach(m=>{if(!m.hidden)out[s.id+'/'+r.id+'/'+m.id]=m.id==='off_occ'?m.value+'|'+m.prev:m.date;});
- (r.table||[]).forEach(t=>{out[s.id+'/'+r.id+'/'+t.cc]=(t.rateDate||'')+'|'+(t.pxDate||'');});}));return out;}
-function hUnseen(){const d=HEALTH.data,by={};if(!d)return by;const k=hKeys(d);
- if(!HSEEN){HSEEN=k;store.set('wd.hseen',HSEEN);return by;}
- Object.entries(k).forEach(([key,sig])=>{if(HSEEN[key]!==sig)(by[key.split('/')[0]]||=[]).push(key);});return by;}
+/* "new since you last looked": remembers each official figure's release, logs what changed */
+let HSEEN=store.get('wd.hseen',null),HVAL=store.get('wd.hval',{}),HLOG=store.get('wd.hlog',[]),hUpdOpen=false;const HFRESH=new Set();
+function hIndex(d){const out={};d.sections.forEach(s=>s.regions.forEach(r=>{
+ (r.metrics||[]).forEach(m=>{if(m.hidden)return;out[s.id+'/'+r.id+'/'+m.id]={sec:s.id,icon:s.icon,region:r.name,label:m.label,sig:m.id==='off_occ'?m.value+'|'+m.prev:m.date,val:m.kind==='growth'?hSigned(m.value,m.unit):hVal(m.value,m.unit),when:hDate(m)};});
+ (r.table||[]).forEach(t=>{out[s.id+'/'+r.id+'/'+t.cc]={sec:s.id,icon:s.icon,region:t.name,label:'mortgage rate and house prices',sig:(t.rateDate||'')+'|'+(t.pxDate||''),val:`${t.rate==null?'—':t.rate.toFixed(2)+'%'} rate, ${t.px==null?'—':hSigned(t.px,'%')} prices`,when:''};});}));return out;}
+function hKeys(d){const i=hIndex(d),o={};for(const k in i)o[k]=i[k].sig;return o;}
+function hUnseen(){const d=HEALTH.data,by={};if(!d)return by;const idx=hIndex(d);
+ if(!HSEEN){HSEEN={};HVAL={};for(const k in idx){HSEEN[k]=idx[k].sig;HVAL[k]=idx[k].val;}store.set('wd.hseen',HSEEN);store.set('wd.hval',HVAL);return by;}
+ let logged=false;
+ for(const [k,x] of Object.entries(idx)){if(HSEEN[k]===x.sig)continue;(by[x.sec]||=[]).push(k);
+  if(!HLOG.some(e=>e.k===k&&e.sig===x.sig)){HLOG.unshift({k,sig:x.sig,sec:x.sec,icon:x.icon,region:x.region,label:x.label,from:HVAL[k]&&HVAL[k]!==x.val?HVAL[k]:null,to:x.val,when:x.when,at:Date.now()});HVAL[k]=x.val;logged=true;}}
+ if(logged){HLOG=HLOG.slice(0,30);store.set('wd.hlog',HLOG);store.set('wd.hval',HVAL);}
+ return by;}
 function hMarkSeen(sec){const d=HEALTH.data;if(!d||!HSEEN)return;const k=hKeys(d);let ch=false;
  Object.entries(k).forEach(([key,sig])=>{if(key.startsWith(sec+'/')&&HSEEN[key]!==sig){HFRESH.add(key);HSEEN[key]=sig;ch=true;}});if(ch)store.set('wd.hseen',HSEEN);}
 function updateHealthDot(){const u=hUnseen(),n=Object.values(u).reduce((a,x)=>a+x.length,0),tab=document.querySelector('.tab[data-tab="health"]');let dot=tab.querySelector('.ndot');
  if(n&&!dot){dot=document.createElement('i');dot.className='ndot';tab.appendChild(dot);}else if(!n&&dot)dot.remove();
  tab.setAttribute('aria-label','Health'+(n?`, ${n} new update${n>1?'s':''}`:''));return u;}
+function renderUpdates(unseen){
+ const unseenKeys=new Set(Object.values(unseen).flat()),isNew=e=>unseenKeys.has(e.k)||HFRESH.has(e.k),nNew=HLOG.filter(isNew).length;
+ const btn=HLOG.length?`<button class="upbtn${nNew?'':' quiet'}" id="upBtn" aria-expanded="${hUpdOpen}" aria-controls="healthUpd">${nNew?'<i class="d"></i>':''}${nNew?`${nNew} new update${nNew>1?'s':''}`:'Recent updates'} <span class="ch">▾</span></button>`:'';
+ $('healthStatus').insertAdjacentHTML('beforeend',btn);
+ const box=$('healthUpd');box.hidden=!hUpdOpen||!HLOG.length;if(box.hidden)return;
+ box.innerHTML=`<div class="uh"><span>Latest official releases, newest first</span>${HLOG.length?'<button class="linkbtn" id="upClear" style="font-size:12px">Clear list</button>':''}</div>`+HLOG.slice(0,15).map((e,i)=>`<button class="upi${isNew(e)?'':' seen'}" data-i="${i}">
+  <span class="ic">${e.icon}${isNew(e)?'<i class="ndot"></i>':''}</span>
+  <span class="t">${esc(e.region)} <small>${esc(e.label.charAt(0).toLowerCase()+e.label.slice(1))}</small></span>
+  <span class="v">${e.from?`${esc(e.from)} → `:''}<b>${esc(e.to)}</b>${e.when?' · '+esc(e.when)+' release':''} · ${timeAgo(e.at)}</span><span class="go">›</span></button>`).join('');
+}
+function goToUpdate(e){
+ hUpdOpen=false;if(e.sec!==hSec){HFRESH.clear();hSec=e.sec;store.set('wd.hsec',hSec);hMore=false;loadHealthNews();}
+ HFRESH.add(e.k);renderHealth();buzz();
+ const el=document.querySelector(`#healthBox [data-k="${CSS.escape(e.k)}"]`);
+ if(el){el.scrollIntoView({behavior:reduce?'auto':'smooth',block:'center'});el.classList.remove('flash');void el.offsetWidth;el.classList.add('flash');}
+}
+$('healthStatus').addEventListener('click',e=>{if(!e.target.closest('#upBtn'))return;hUpdOpen=!hUpdOpen;buzz();renderHealth();});
+$('healthUpd').addEventListener('click',e=>{if(e.target.closest('#upClear')){HLOG=[];store.set('wd.hlog',HLOG);hUpdOpen=false;renderHealth();return;}
+ const b=e.target.closest('.upi');if(b)goToUpdate(HLOG[+b.dataset.i]);});
 function metricRow(m,key){
  const t=m.trend||0,ref=m.yr??m.prev,ch=ref!=null?m.value-ref:null;
  const when=m.yr!=null?'on a year ago':m.freq==='W'?'on the week':m.freq==='Q'?'on the quarter':'on the month';
  const chTxt=(ch==null?'':`<b class="${tcls(t)}">${m.kind==='growth'||m.unit==='%'?hSigned(ch,'%').replace('%',' pts'):hSigned(ch,m.unit)}</b> ${when}`)+(m.extra?(ch==null?'':' · ')+esc(m.extra):'');
  const isNew=key&&HFRESH.has(key);
- return `<div class="hm${isNew?' isnew':''}"><div class="ml">${esc(m.label)}${isNew?'<span class="newtag">New</span>':''}</div>
+ return `<div class="hm${isNew?' isnew':''}" data-k="${esc(key||'')}"><div class="ml">${esc(m.label)}${isNew?'<span class="newtag">New</span>':''}</div>
   <div class="mv num">${m.kind==='growth'?hSigned(m.value,m.unit):hVal(m.value,m.unit)}</div>
   <div class="mc">${chTxt?chTxt+'<br>':''}${hDate(m)} · ${esc(m.src||'')}</div>
   <svg viewBox="0 0 100 26" preserveAspectRatio="none" aria-hidden="true" data-sp="${esc(m.id)}" data-v="${t>0?'--up':t<0?'--down':'--muted'}"></svg></div>`;
@@ -1287,7 +1328,7 @@ function chipRow(st){return st&&st.length?`<div class="chips">${st.map(x=>`<span
 function medTable(rows,pre){
  return `<table class="htab"><thead><tr><th>Country</th><th>Mortgage rate</th><th>House prices y/y</th></tr></thead><tbody>${rows.map(r=>{
   const rt=r.rate!=null&&r.rateYr!=null?(r.rate<r.rateYr-.1?'up':r.rate>r.rateYr+.1?'down':''):'';
-  return `<tr><td>${r.flag} ${esc(r.name)}${HFRESH.has(pre+r.cc)?'<span class="newtag">New</span>':''}</td><td>${r.rate==null?'—':`<b class="${rt}">${r.rate.toFixed(2)}%</b>`}</td><td>${r.px==null?'—':`<b class="${r.px>0?'up':r.px<0?'down':''}">${hSigned(r.px,'%')}</b>`}</td></tr>`;}).join('')}</tbody></table>`;
+  return `<tr data-k="${esc(pre+r.cc)}"><td>${r.flag} ${esc(r.name)}${HFRESH.has(pre+r.cc)?'<span class="newtag">New</span>':''}</td><td>${r.rate==null?'—':`<b class="${rt}">${r.rate.toFixed(2)}%</b>`}</td><td>${r.px==null?'—':`<b class="${r.px>0?'up':r.px<0?'down':''}">${hSigned(r.px,'%')}</b>`}</td></tr>`;}).join('')}</tbody></table>`;
 }
 function regionCard(r){
  const ms=(r.metrics||[]).filter(m=>!m.hidden);
@@ -1313,8 +1354,7 @@ function renderHealth(){
  if(!d){$('healthBox').innerHTML=`<div class="empty" style="margin-top:12px">${HEALTH.err?'Market health can’t load in this viewer.':'Loading market health…'}</div>`;$('healthOv').innerHTML='';}
  else{
   if(!d.sections.some(s=>s.id===hSec))hSec=d.sections[0].id;
-  hMarkSeen(hSec);const unseen=updateHealthDot(),nFresh=[...HFRESH].filter(k=>k.startsWith(hSec+'/')).length;
-  if(nFresh)$('healthStatus').insertAdjacentHTML('beforeend',`<span class="newc">${nFresh} new figure${nFresh>1?'s':''} since you last looked</span>`);
+  const unseenAll=hUnseen();hMarkSeen(hSec);const unseen=updateHealthDot();renderUpdates(unseenAll);
   $('healthOv').innerHTML=d.sections.map(s=>{const g=overallSig(s);return `<button role="tab" aria-selected="${s.id===hSec}" class="${s.id===hSec?'on':''}" data-s="${s.id}">${unseen[s.id]?'<i class="ndot" aria-label="New updates"></i>':''}<span class="ic">${s.icon}</span><b>${esc(s.id==='cre'?'Commercial property':s.id==='ai'?'AI bubble':s.title)}</b><span class="sig ${g}">${s.id==='ai'?{red:'Deflating',amber:'Wobbling',green:'Inflating',none:'No data'}[g]:SIG_WORD[g]}</span></button>`;}).join('');
   const sec=d.sections.find(s=>s.id===hSec);
   let grp='';
