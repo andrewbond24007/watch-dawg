@@ -1,6 +1,7 @@
 // WatchDawg market health: housing, commercial property (CRE) and the AI trade.
 // Official data from the Federal Reserve, Freddie Mac, FHFA, the BIS, the Bank of England
 // and the ECB (FRED blocks cloud servers, so it isn't used), plus share prices from Yahoo.
+import * as XLSX from 'xlsx';
 const UA = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36' };
 const T = (ms) => AbortSignal.timeout(ms);
 const START = '2019-01-01';
@@ -175,10 +176,60 @@ async function usYield() {
     zillowRow('https://files.zillowstatic.com/research/public_csvs/zori/Metro_zori_uc_sfrcondomfr_sm_month.csv'),
     zillowRow('https://files.zillowstatic.com/research/public_csvs/zhvi/Metro_zhvi_uc_sfrcondo_tier_0.33_0.67_sm_sa_month.csv'),
   ]);
-  return Object.keys(rent).filter((d) => val[d] && d >= START).sort().map((d) => [d, +(rent[d] * 12 / val[d] * 100).toFixed(2)]);
+  const ds = Object.keys(rent).sort();
+  const y = ds.filter((d) => val[d] && d >= START).map((d) => [d, +(rent[d] * 12 / val[d] * 100).toFixed(2)]);
+  y.rent = ds.map((d) => [d, rent[d]]);
+  return y;
 }
 // OECD: price-to-rent ratio as % of its long-run average (100 = normal), and the rent index.
 const OECD_CC = { GBR: 'GB', IRL: 'IE', ESP: 'ES', PRT: 'PT', ITA: 'IT', GRC: 'GR', USA: 'US' };
+// ONS Price Index of Private Rents: official average monthly rent for the UK and Northern Ireland.
+async function onsRents() {
+  const page = await fetch('https://www.ons.gov.uk/economy/inflationandpriceindices/datasets/priceindexofprivaterentsukmonthlypricestatistics', { headers: UA, signal: T(8000) }).then((r) => r.text());
+  const href = (page.match(/href="(\/file\?uri=[^"]+\.xlsx)"/) || [])[1];
+  if (!href) throw new Error('ONS: spreadsheet link not found');
+  const buf = await fetch('https://www.ons.gov.uk' + href, { headers: UA, signal: T(15000) }).then((r) => r.arrayBuffer());
+  const wb = XLSX.read(buf, { type: 'array', dense: true });
+  const sh = wb.Sheets['Table 1'] || wb.Sheets[wb.SheetNames.at(-1)];
+  const rows = XLSX.utils.sheet_to_json(sh, { header: 1, raw: true, blankrows: false });
+  const hi = rows.findIndex((r) => r.includes('Time period') && r.includes('Rental price'));
+  if (hi < 0) throw new Error('ONS: table layout changed');
+  const h = rows[hi], iT = h.indexOf('Time period'), iA = h.indexOf('Area name'), iP = h.indexOf('Rental price'), iI = h.indexOf('Index');
+  const out = { UK: { rent: [], idx: [] }, NI: { rent: [], idx: [] } };
+  for (const r of rows.slice(hi + 1)) {
+    const k = r[iA] === 'United Kingdom' ? 'UK' : r[iA] === 'Northern Ireland' ? 'NI' : null;
+    if (!k || typeof r[iT] !== 'number') continue;
+    const d = new Date(Date.UTC(1899, 11, 30) + r[iT] * 864e5).toISOString().slice(0, 7) + '-01';
+    if (typeof r[iP] === 'number') out[k].rent.push([d, r[iP]]);
+    if (typeof r[iI] === 'number') out[k].idx.push([d, r[iI]]);
+  }
+  if (!out.UK.rent.length) throw new Error('ONS: no UK rows');
+  return out;
+}
+// HM Land Registry UK house price index: official average price, monthly, by region.
+async function lrPrice(region) {
+  const get = (m) => fetch(`https://landregistry.data.gov.uk/data/ukhpi/region/${region}/month/${m}.json`, { headers: UA, signal: T(8000) })
+    .then((r) => (r.ok ? r.text() : '')).then((t) => { const v = /"averagePrice"\s*:\s*([\d.]+)/.exec(t); return v ? +v[1] : null; }).catch(() => null);
+  const ym = (d) => d.toISOString().slice(0, 7);
+  let latest = null;
+  for (let back = 1; back <= 5 && !latest; back++) { const d = new Date(); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() - back); if (await get(ym(d))) latest = d; }
+  if (!latest) throw new Error('Land Registry: no recent month');
+  const months = Array.from({ length: 13 }, (_, i) => { const d = new Date(latest); d.setUTCMonth(d.getUTCMonth() - i * 3); return ym(d); });
+  const vals = await Promise.all(months.map(get));
+  return months.map((m, i) => [m + '-01', vals[i]]).filter((p) => p[1]).reverse();
+}
+// Numbeo gross rental yields by country (crowd-sourced survey, refreshed twice a year).
+async function numbeo() {
+  const t = await fetch('https://www.numbeo.com/property-investment/rankings_by_country.jsp', { headers: UA, signal: T(8000) }).then((r) => r.text());
+  const per = /<title>[^<]*?(\d{4})(\s*Mid-Year)?/i.exec(t);
+  const out = { period: per ? (per[2] ? 'Mid-' : 'Early ') + per[1] : '', date: per ? `${per[1]}-${per[2] ? '07' : '01'}-01` : null, c: {} };
+  for (const m of t.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/g)) {
+    const c = [...m[1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)].map((x) => x[1].replace(/<[^>]+>/g, '').trim());
+    if (c.length >= 5) { const name = c.find((x) => /[A-Za-z]/.test(x)); const nums = c.filter((x) => /^[\d.]+$/.test(x)).map(Number); if (name && nums.length >= 4) out.c[name] = { centre: nums[nums.length >= 7 ? 1 : 0], outside: nums[nums.length >= 7 ? 2 : 1] }; }
+  }
+  if (!Object.keys(out.c).length) throw new Error('Numbeo: table not found');
+  return out;
+}
 async function oecdMeasure(measure) {
   const u = `https://sdmx.oecd.org/public/rest/data/OECD.ECO.MPD,DSD_AN_HOUSE_PRICES@DF_HOUSE_PRICES,1.0/${Object.keys(OECD_CC).join('+')}.Q.${measure}.?startPeriod=2017-Q1&format=csvfile`;
   let r;
@@ -316,11 +367,12 @@ const STOCKS = {
   ai: ['NVDA', 'MSFT', 'GOOGL', 'META', 'AMZN', 'ORCL', 'AVGO', 'AMD', 'CRWV', 'NBIS', 'ANT'],
 };
 const MED = [['ES', '🇪🇸', 'Spain'], ['PT', '🇵🇹', 'Portugal'], ['IT', '🇮🇹', 'Italy'], ['GR', '🇬🇷', 'Greece'], ['HR', '🇭🇷', 'Croatia'], ['CY', '🇨🇾', 'Cyprus'], ['MT', '🇲🇹', 'Malta']];
+const MED_EXTRA = [['AL', '🇦🇱', 'Albania'], ['ME', '🇲🇪', 'Montenegro']];
 
 export default async (req) => {
   const allSyms = [...new Set(Object.values(STOCKS).flat())];
   const PX = ['GB', 'IE', ...MED.map((m) => m[0])];
-  const [BS, BC, FD, FM, FH, B, E, Y, TR, KS, ZY, OE, TNX] = await Promise.all([
+  const [BS, BC, FD, FM, FH, B, E, Y, TR, KS, ZY, OE, TNX, ON, LRU, LRN, NB] = await Promise.all([
     safe(bis('WS_SPP', `Q.${PX.join("+")}.N.628`)),
     safe(bis('WS_CPP', 'Q.US.0.A.0.2.6.0')),
     safe(fedDelinq()), safe(freddie()), safe(fhfa()),
@@ -328,6 +380,7 @@ export default async (req) => {
     safe(ecb(['IE', 'U2', ...MED.map((m) => m[0])])),
     Promise.all(allSyms.map((s) => safe(yahoo(s)))).then((a) => Object.fromEntries(allSyms.map((s, i) => [s, a[i] && !a[i].error ? { ...a[i], name: NAMES[s] || s } : null]))),
     safe(trepp()), safe(kastle()), safe(usYield()), safe(oecdRent()), safe(yahoo('^TNX')),
+    safe(onsRents()), safe(lrPrice('united-kingdom')), safe(lrPrice('northern-ireland')), safe(numbeo()),
   ]);
   const ok = (x) => (x && !x.error ? x : null);
   const F = {
@@ -335,7 +388,7 @@ export default async (req) => {
     COMRE: ok(BC)?.US || null,
   };
   const errors = {};
-  [['bis', BS], ['bis_cre', BC], ['fed', FD], ['freddie', FM], ['fhfa', FH], ['trepp', TR], ['kastle', KS], ['zillow', ZY], ['oecd', OE], ['treasury', TNX]].forEach(([k, x]) => { if (x && x.error) errors[k] = x.error; });
+  [['bis', BS], ['bis_cre', BC], ['fed', FD], ['freddie', FM], ['fhfa', FH], ['trepp', TR], ['kastle', KS], ['zillow', ZY], ['oecd', OE], ['treasury', TNX], ['ons', ON], ['landreg', LRU], ['landreg_ni', LRN], ['numbeo', NB]].forEach(([k, x]) => { if (x && x.error) errors[k] = x.error; });
   if (B.error) errors.boe = B.error;
   if (E.error) errors.ecb = E.error;
   const stocks = (k) => STOCKS[k].map((s) => Y[s]).filter(Boolean);
@@ -348,7 +401,11 @@ export default async (req) => {
   const liveYield = (id, label, st, bond, bondName) => { const v = avgDy(st), none = st.filter((x) => !x.dy).map((x) => x.name), note = none.length ? `${none.join(', ')} ${none.length > 1 ? 'pay' : 'pays'} no dividend, so ${none.length > 1 ? 'are' : 'is'} left out` : ''; return v == null ? null : { id, label, short: 'Yield', unit: '%', freq: 'D', live: true, noscore: true, value: v, prev: null, yr: null, date: new Date().toISOString().slice(0, 10), series: [], src: 'Dividends, last 12 months', extra: vsBond(v, bond, bondName) + (note ? ' · ' + note : '') }; };
   const ptr = (cc) => (oe?.ptr?.[cc] ? oe.ptr[cc].map((p) => [p[0], +(p[1] - 100).toFixed(1)]) : null);
   const rentY = (cc) => (oe?.rent?.[cc] ? yoy(oe.rent[cc], 4) : null);
-  const ptrM = (cc) => metric(`${cc.toLowerCase()}_ptr`, ptr(cc), { label: 'House prices vs rents, compared with long-run average', short: 'Prices vs rents', unit: '%', kind: 'growth', freq: 'Q', good: 'down', noscore: true, tol: 1, src: 'OECD', extra: 'Above 0 means rental yields are below normal' });
+  const on = ok(ON), nb = ok(NB);
+  const ukYield = (k, lr) => { const r = on?.[k]?.rent, p = ok(lr); if (!r || !p) return null; const rm = new Map(r); return p.filter((x) => rm.has(x[0])).map((x) => [x[0], +(rm.get(x[0]) * 12 / x[1] * 100).toFixed(2)]); };
+  const lastRent = (k) => on?.[k]?.rent?.at(-1)?.[1];
+  const nbY = (name) => { const x = nb?.c?.[name]; return x ? +((x.centre + x.outside) / 2).toFixed(1) : null; };
+  const nbMetric = (id, name, bond, bondName) => { const v = nbY(name), x = nb?.c?.[name]; return v == null ? null : { id, label: 'Gross rental yield (survey)', short: 'Rental yield', unit: '%', freq: 'H', when: nb.period, noscore: true, value: v, prev: null, yr: null, date: nb.date, series: [], src: 'Numbeo, crowd-sourced', extra: `City centre ${x.centre}%, outside ${x.outside}%` + (bond != null ? ' · ' + vsBond(v, bond, bondName) : '') }; };
   const rentM = (cc) => metric(`${cc.toLowerCase()}_rent`, rentY(cc), { label: 'Rents, year on year', short: 'Rents', unit: '%', kind: 'growth', freq: 'Q', good: 'up', noscore: true, tol: 0.5, src: 'OECD' });
   const offUs = [
     metric('off_dq', tr?.office, { label: 'Office loan delinquency (CMBS)', short: 'Office delinquency', unit: '%', freq: 'M', good: 'down', lead: true, tol: 0.1, src: 'Trepp' }),
@@ -362,22 +419,26 @@ export default async (req) => {
     metric('us_dq', F.DRSFRMACBS, { label: 'Mortgage delinquency (banks)', short: 'Delinquency', unit: '%', freq: 'Q', good: 'down', lead: true, tol: 0.05, src: 'Federal Reserve' }),
     metric('us_rate', F.MORTGAGE30US, { label: '30-year fixed mortgage rate', short: 'Mortgage rates', unit: '%', freq: 'W', good: 'down', tol: 0.2, src: 'Freddie Mac' }),
     ZY && !ZY.error ? { ...metric('us_yield', ZY, { label: 'Gross rental yield (typical rent × 12 ÷ typical home value)', short: 'Rental yield', unit: '%', freq: 'M', good: 'up', noscore: true, tol: 0.1, src: 'Zillow' }), extra: vsBond(ZY.at(-1)[1], t10, '10-year Treasury') } : null,
+    ZY && !ZY.error && ZY.rent ? { ...metric('us_rent', yoy(ZY.rent, 12), { label: 'Rents, year on year', short: 'Rents', unit: '%', kind: 'growth', freq: 'M', good: 'up', noscore: true, tol: 0.5, src: 'Zillow observed rent index' }), extra: `Typical rent $${Math.round(ZY.rent.at(-1)[1]).toLocaleString('en-US')}/month` } : null,
     metric('us_hpi', F.HPI ? yoy(F.HPI, 12) : null, { label: 'Home prices, year on year (FHFA)', short: 'Prices', unit: '%', kind: 'growth', freq: 'M', good: 'up', tol: 0.5, src: 'FHFA house price index' }),
   ];
   const ukH = [
     metric('uk_2y', B.IUMBV34, { label: '2-year fixed mortgage rate (75% LTV)', short: 'Mortgage rates', unit: '%', freq: 'M', good: 'down', tol: 0.2, src: 'Bank of England' }),
     metric('uk_appr', B.LPMVTVX ? B.LPMVTVX.map((p) => [p[0], +(p[1] / 1000).toFixed(1)]) : null, { label: 'Mortgage approvals for house purchase', short: 'Approvals', unit: 'k', freq: 'M', good: 'up', tol: 3, src: 'Bank of England' }),
-    ptrM('GB'), rentM('GB'),
+    (() => { const y = ukYield('UK', LRU); const m = metric('uk_yield', y, { label: 'Gross rental yield (average rent × 12 ÷ average price)', short: 'Rental yield', unit: '%', freq: 'M', good: 'up', noscore: true, tol: 0.1, src: 'ONS rents, Land Registry prices' }); return m && { ...m, extra: vsBond(m.value, g10, '10-year gilt') }; })(),
+    (() => { const m = metric('uk_rent', on ? yoy(on.UK.idx, 12) : null, { label: 'Rents, year on year', short: 'Rents', unit: '%', kind: 'growth', freq: 'M', good: 'up', noscore: true, tol: 0.5, src: 'ONS' }); return m && { ...m, extra: `Average rent £${lastRent('UK')?.toLocaleString('en-GB')}/month` }; })(),
+    (() => { const y = ukYield('NI', LRN); const m = metric('ni_yield', y, { label: 'Northern Ireland: gross rental yield', short: 'NI rental yield', unit: '%', freq: 'M', good: 'up', noscore: true, tol: 0.1, src: 'ONS rents, Land Registry prices' }); return m && { ...m, extra: vsBond(m.value, g10, '10-year gilt') }; })(),
+    (() => { const m = metric('ni_rent', on ? yoy(on.NI.idx, 12) : null, { label: 'Northern Ireland: rents, year on year', short: 'NI rents', unit: '%', kind: 'growth', freq: 'M', good: 'up', noscore: true, tol: 0.5, src: 'ONS' }); return m && { ...m, extra: `Average rent £${lastRent('NI')?.toLocaleString('en-GB')}/month` }; })(),
     metric('uk_hpi', bisY('GB'), { label: 'House prices, year on year', short: 'Prices', unit: '%', kind: 'growth', freq: 'Q', good: 'up', tol: 0.5, src: 'BIS' }),
   ];
   const ieH = [
     metric('ie_rate', E.IE, { label: 'Mortgage rate on new loans', short: 'Mortgage rates', unit: '%', freq: 'M', good: 'down', tol: 0.15, src: 'ECB' }),
-    ptrM('IE'), rentM('IE'),
+    nbMetric('ie_yield', 'Ireland', null, ''), rentM('IE'),
     metric('ie_hpi', bisY('IE'), { label: 'House prices, year on year', short: 'Prices', unit: '%', kind: 'growth', freq: 'Q', good: 'up', tol: 0.5, src: 'BIS' }),
   ];
-  const medRows = MED.map(([cc, flag, name]) => {
+  const medRows = [...MED, ...MED_EXTRA].map(([cc, flag, name]) => {
     const r = E[cc], p = bisY(cc);
-    return { cc, flag, name, ptr: ptr(cc)?.at(-1)?.[1] ?? null, ptrDate: ptr(cc)?.at(-1)?.[0] ?? null, rate: r?.at(-1)?.[1] ?? null, rateDate: r?.at(-1)?.[0] ?? null, rateYr: r ? lastAt(r, 12) : null, px: p?.at(-1)?.[1] ?? null, pxDate: p?.at(-1)?.[0] ?? null, pxPrev: p && p.length > 1 ? p.at(-2)[1] : null };
+    return { cc, flag, name, yld: nbY(name), yldDate: nbY(name) != null ? nb.date : null, rent: rentY(cc)?.at(-1)?.[1] ?? null, rentDate: rentY(cc)?.at(-1)?.[0] ?? null, rate: r?.at(-1)?.[1] ?? null, rateDate: r?.at(-1)?.[0] ?? null, rateYr: r ? lastAt(r, 12) : null, px: p?.at(-1)?.[1] ?? null, pxDate: p?.at(-1)?.[0] ?? null, pxPrev: p && p.length > 1 ? p.at(-2)[1] : null };
   });
   const medM = [
     metric('ea_rate', E.U2, { label: 'Euro-area mortgage rate', short: 'Mortgage rates', unit: '%', freq: 'M', good: 'down', tol: 0.15, src: 'ECB' }),
@@ -407,7 +468,7 @@ export default async (req) => {
         R('us', 'United States', '🇺🇸', usH, stocks('us_h')),
         R('uk', 'UK and NI', '🇬🇧', ukH, stocks('uk_h'), { note: 'Arrears for the UK and Northern Ireland are published quarterly by the FCA and aren’t in a live feed yet.' }),
         R('ie', 'Ireland', '🇮🇪', ieH, stocks('ie_h')),
-        R('med', 'Mediterranean', '🌊', medM, [], { table: medRows, note: 'Prices vs rents compares the price-to-rent ratio with its long-run average (OECD): above 0 means rental yields are lower than usual. Croatia, Cyprus and Malta aren’t covered. Albania and Montenegro have no regular live data feed.' }),
+        R('med', 'Mediterranean', '🌊', medM, [], { table: medRows, note: 'Yield is gross rent ÷ price from Numbeo’s crowd-sourced survey (refreshed twice a year), averaged across city centre and outside. Rents y/y is official OECD data, quarterly, for Spain, Portugal, Italy and Greece. Albania and Montenegro have no official mortgage or price feeds.' }),
       ] },
       { id: 'cre', title: 'Commercial property', icon: '🏢', regions: [
         R('off_us', 'US offices', '🏙️', offUs, stocks('off_us'), { group: 'Offices', dd: true, avg: offAvg(stocks('off_us')), note: 'Office share prices are the market’s live view of office values: the bar shows how far each landlord is below its 12-month high. Trepp’s delinquency is the share of office loans in commercial mortgage-backed securities that are 30+ days late, published early each month.' }),
