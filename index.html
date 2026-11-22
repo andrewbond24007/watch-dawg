@@ -20,7 +20,7 @@
   --newc:#2f7bf6;
   --bg:#ece7fb; --surface:#faf8ff; --ink:#1f1838; --muted:#6c6489; --rule:#ddd5f2; --accent:#6a4fd8;
   --up:#0ca30c; --down:#d03b3b; --upbg:#e0f5e0; --downbg:#fbe3e3; --upink:#087a08; --downink:#b42828;
-  --pre:#cfc4ef; --reg:#0ca30c; --post:#cfc4ef; --shut:#e3ddf5;
+  --pre:#cfc4ef; --reg:#0ca30c; --post:#cfc4ef; --shut:#e3ddf5; --night:#a9c8f0; --fut:#1f9e8f;
   --spx:#3366d6; --ndx:#0e9aab; --nvda:#5f9600; --ant:#c96442;
   --btc:#f7931a; --eth:#5b73e0; --sol:#8a3ffc;
   --au:#d4a72c; --ag:#b9c0c8; --pd:#97a6b5;
@@ -29,7 +29,7 @@
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --bg:#1c1733; --surface:#28214a; --ink:#efeafd; --muted:#a8a0c8; --rule:#372e5e; --accent:#b9a6ff;
   --upbg:#163a25; --downbg:#43192a; --upink:#4fd66a; --downink:#ff7a7a;
-  --pre:#4a3f80; --post:#4a3f80; --shut:#2e2654;
+  --pre:#4a3f80; --post:#4a3f80; --shut:#2e2654; --night:#2f4f80;
   --spx:#6b95ff; --ndx:#34c3d3; --nvda:#86c414; --ant:#e08a68;
   --eth:#8a9cff; --sol:#a86bff; --au:#e0b93f; --ag:#c4cbd3; --pd:#a5b3c2;
   --shadow:none; --badgeink:#1c1733; --scrim:rgba(5,3,15,.6);
@@ -37,7 +37,7 @@
 :root[data-theme="dark"]{
   --bg:#1c1733; --surface:#28214a; --ink:#efeafd; --muted:#a8a0c8; --rule:#372e5e; --accent:#b9a6ff;
   --upbg:#163a25; --downbg:#43192a; --upink:#4fd66a; --downink:#ff7a7a;
-  --pre:#4a3f80; --post:#4a3f80; --shut:#2e2654;
+  --pre:#4a3f80; --post:#4a3f80; --shut:#2e2654; --night:#2f4f80;
   --spx:#6b95ff; --ndx:#34c3d3; --nvda:#86c414; --ant:#e08a68;
   --eth:#8a9cff; --sol:#a86bff; --au:#e0b93f; --ag:#c4cbd3; --pd:#a5b3c2;
   --shadow:none; --badgeink:#1c1733; --scrim:rgba(5,3,15,.6);
@@ -86,6 +86,12 @@ main{max-width:560px;margin:0 auto;padding:calc(14px + env(safe-area-inset-top))
 .ticks{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:6px}
 .legend{display:flex;gap:14px;font-size:12px;color:var(--muted);margin-top:10px;flex-wrap:wrap}
 .legend span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px;background:var(--c)}
+.fband{height:6px;border-radius:3px;margin-top:5px}
+.sess{margin-top:12px;border-top:1px solid var(--rule)}
+.sess div{display:grid;grid-template-columns:10px 1fr auto;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--rule);font-size:13px}
+.sess .lamp{width:8px;height:8px}.sess .lamp.on{background:var(--c,var(--reg))}
+.sess b{font-weight:600}.sess small{display:block;color:var(--muted);font-size:11.5px;font-weight:500}
+.sess span:last-child{color:var(--muted);text-align:right;font-variant-numeric:tabular-nums}
 .futnote{font-size:13px;line-height:1.45;margin-top:10px;color:var(--muted)}
 .recap{display:flex;align-items:center;gap:10px;width:100%;margin-top:10px;border:0;background:var(--surface);border-radius:14px;padding:9px 14px;box-shadow:var(--shadow);font-size:13px;color:var(--muted);text-align:left;overflow:hidden;white-space:nowrap}
 .recap .rl{font-weight:700;color:var(--ink)}
@@ -412,7 +418,9 @@ footer{margin-top:28px;font-size:11.5px;line-height:1.55;color:var(--muted)}
       <div class="countdown num" id="countdown">—</div>
       <div class="band-wrap"><div class="band" id="band"></div></div>
       <div class="ticks num" id="ticks"></div>
-      <div class="legend"><span style="--c:var(--pre)">Pre-market</span><span style="--c:var(--reg)">Open</span><span style="--c:var(--post)">After hours</span></div>
+      <div class="band fband" id="fband" aria-hidden="true"></div>
+      <div class="legend"><span style="--c:var(--pre)">Pre-market</span><span style="--c:var(--reg)">Open</span><span style="--c:var(--post)">After hours</span><span style="--c:var(--night)">Overnight</span><span style="--c:var(--fut)">Futures</span></div>
+      <div class="sess" id="sess"></div>
       <div class="futnote" id="futnote"></div>
     </div>
     <button class="recap" id="recap" hidden></button>
@@ -1498,6 +1506,20 @@ const ymdDow=ymd=>{const [y,m,d]=ymd.split('-').map(Number);return new Date(Date
 const isTradingDay=ymd=>{const w=ymdDow(ymd);return w!==0&&w!==6&&!US_HOLIDAYS[ymd];};
 const closeMin=ymd=>US_EARLY[ymd]?780:960;
 const sessionsFor=ymd=>{if(!isTradingDay(ymd))return [];const c=closeMin(ymd);return [[240,570,'--pre'],[570,c,'--reg'],[c,c===960?1200:1020,'--post']];};
+/* other US sessions, in New York minutes relative to a given day */
+const DOW=ymd=>ymdDow(ymd);
+function overnightFor(ymd){const w=DOW(ymd);return w>=0&&w<=4&&isTradingDay(ymdAdd(ymd,1))?[[1200,1440+240]]:[];}  // 8pm–4am ET, Sun–Thu nights before a trading day
+// CME equity futures: Sun 6pm ET to Fri 5pm ET with a daily 5–6pm pause; shut all day on Christmas, New Year's Day and Good Friday,
+// shortened (to 1pm ET) on other US market holidays and to 1:15pm ET on early-close days
+const futShut=ymd=>/Christmas|New Year|Good Friday/.test(US_HOLIDAYS[ymd]||'');
+function futuresFor(ymd){const w=DOW(ymd),nxt=ymdAdd(ymd,1),out=[];
+ if(w>=1&&w<=5&&!futShut(ymd))out.push([0,US_HOLIDAYS[ymd]?780:US_EARLY[ymd]?795:1020]);
+ if(w!==5&&w!==6&&!futShut(nxt)&&!futShut(ymd))out.push([1080,1440]);
+ if(futShut(ymd)&&w>=0&&w<=4&&!futShut(nxt)&&DOW(nxt)!==6)out.push([1080,1440]);
+ return out;}
+function sessionStatus(fn,ymd,mins){const iv=[];for(let d=-1;d<=7;d++)fn(ymdAdd(ymd,d)).forEach(([a,b])=>iv.push([a+d*1440,b+d*1440]));iv.sort((x,y)=>x[0]-y[0]);
+ const merged=[];iv.forEach(x=>{const l=merged.at(-1);if(l&&x[0]<=l[1])l[1]=Math.max(l[1],x[1]);else merged.push([...x]);});
+ const cur=merged.find(([a,b])=>mins>=a&&mins<b);if(cur)return {open:true,until:cur[1]-mins};const nx=merged.find(([a])=>a>mins);return {open:false,opensIn:nx?nx[0]-mins:null};}
 function fmtDur(m){m=Math.max(0,Math.floor(m));const h=Math.floor(m/60),mm=m%60;return h?`${h}h ${String(mm).padStart(2,'0')}m`:`${mm}m`;}
 function localAt(etMin,nowEt){return new Date(Date.now()+(etMin-nowEt)*60000).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});}
 function whenLocal(addMin){const t=new Date(Date.now()+addMin*60000),today=new Date(),tmw=new Date(Date.now()+864e5);
@@ -1511,7 +1533,15 @@ function clock(){
  // draw each New York day's own sessions (none on weekends and holidays) across your local day
  [-1,0,1].forEach(dd=>sessionsFor(ymdAdd(ymd,dd)).forEach(([a,b,v])=>{const s=Math.max(0,a+off+dd*1440),e=Math.min(1440,b+off+dd*1440);
   if(e>s){const i=document.createElement('i');i.style.left=(s/14.4)+'%';i.style.width=((e-s)/14.4)+'%';i.style.background=`var(${v})`;band.appendChild(i);}}));
+ const paint=(el,dd,segs,v)=>segs.forEach(([a,b])=>{const s=Math.max(0,a+off+dd*1440),e=Math.min(1440,b+off+dd*1440);if(e>s){const i=document.createElement('i');i.style.left=(s/14.4)+'%';i.style.width=((e-s)/14.4)+'%';i.style.background=`var(${v})`;el.appendChild(i);}});
+ const fb=$('fband');fb.innerHTML='';
+ [-2,-1,0,1].forEach(dd=>{const k=ymdAdd(ymd,dd);paint(band,dd,overnightFor(k),'--night');paint(fb,dd,futuresFor(k),'--fut');});
  const n=document.createElement('div');n.className='now';n.style.left=(lm/14.4)+'%';band.appendChild(n);
+ const row=(name,sub,c,st,openTxt)=>`<div><span class="lamp${st.open?' on':''}" style="--c:var(${c})"></span><span><b>${name}</b><small>${sub}</small></span><span>${st.open?openTxt(st):st.opensIn==null?'—':st.opensIn<=720?'Opens in '+fmtDur(st.opensIn):'Opens '+whenLocal(st.opensIn)}</span></div>`;
+ const fut=sessionStatus(futuresFor,ymd,mins),ovn=sessionStatus(overnightFor,ymd,mins);
+ $('sess').innerHTML=row('Futures','S&amp;P 500, Nasdaq 100, Dow','--fut',fut,s=>`Open · ${s.until<=720?'pauses in '+fmtDur(s.until):'until '+whenLocal(s.until)}`)
+  +row('Overnight stock trading','24-hour brokers, 8pm–4am New York','--night',ovn,s=>`Open · until ${whenLocal(s.until)}`)
+  +row('Crypto','Bitcoin, Ethereum and the rest','--reg',{open:true},()=>'Open 24/7');
  const nx=nextOpen(ymd,mins),dow=ymdDow(ymd),postEnd=close===960?1200:1020,over=trading&&mins>=postEnd;
  const weekendAhead=nx&&[...Array(Math.max(0,Math.round((Date.parse(nx.ymd)-Date.parse(ymd))/864e5)-1))].some((_,i)=>[0,6].includes(ymdDow(ymdAdd(ymd,i+1))));
  const why=US_HOLIDAYS[ymd]?`Closed for ${US_HOLIDAYS[ymd]}`:(dow===0||dow===6||(over&&weekendAhead))?'Closed for the weekend':over?'Closed for the day':'';
@@ -1525,7 +1555,7 @@ function clock(){
   cd=!nx?'':nx.add<=720?`Opens in ${fmtDur(nx.add)}`:`Opens ${whenLocal(nx.add)}`;}
  if(open&&US_HOLIDAYS[ymdAdd(ymd,1)])state+=` · closed tomorrow for ${US_HOLIDAYS[ymdAdd(ymd,1)]}`;
  $('state').innerHTML=`<b>${state}</b>`;$('lamp').className='lamp'+(open?' open':'');$('countdown').textContent=cd;
- $('futnote').textContent=open?'The S&P 500 and Nasdaq 100 rows are following the live index.':'The S&P 500 and Nasdaq 100 rows are following overnight futures. Single stocks hold their last price until trading resumes.';
+ $('futnote').textContent=open?'The S&P 500 and Nasdaq 100 rows are following the live index.':fut.open?'The S&P 500 and Nasdaq 100 rows are following futures, which are trading now. Single stocks hold their last price until trading resumes.':'Futures are paused too, so the S&P 500 and Nasdaq 100 rows show their last futures price. Single stocks hold their last price until trading resumes.';
 }
 
 /* ---------- start ---------- */
