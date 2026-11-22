@@ -56,6 +56,8 @@ main{max-width:560px;margin:0 auto;padding:calc(14px + env(safe-area-inset-top))
 .brand{display:flex;align-items:center;gap:10px;margin:0;font-size:26px;font-weight:800;font-variation-settings:"wdth" 125;letter-spacing:-.01em;flex:1;min-width:0}
 .logo{width:36px;height:36px;flex:none}
 .live{white-space:nowrap;font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.brand{white-space:nowrap}
+@media (max-width:420px){.brand{font-size:21px;gap:8px}.brand .logo{width:32px;height:32px}.live{font-size:11px}.live #updated{max-width:92px;overflow:hidden;text-overflow:ellipsis}}
 .pulse{width:8px;height:8px;border-radius:50%;background:var(--up);position:relative}
 .pulse::after{content:"";position:absolute;inset:0;border-radius:50%;background:var(--up);animation:ping 2s ease-out infinite}
 .pulse.stale,.pulse.stale::after{background:#c08a1e}.pulse.stale::after{animation:none}
@@ -413,9 +415,9 @@ footer{margin-top:28px;font-size:11.5px;line-height:1.55;color:var(--muted)}
 .hmb{display:grid;grid-template-columns:1fr 92px;grid-template-rows:auto auto;gap:2px 12px;align-items:center;width:100%;border:0;background:none;text-align:left;padding:11px 0;color:var(--ink);font:inherit;cursor:pointer}
 .hmb .ml{grid-column:1;font-size:13px;color:var(--muted);font-weight:600}
 .hmb .mvl{grid-column:1;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
-.hmb .mv{font-size:21px;font-weight:800;font-variation-settings:"wdth" 108;line-height:1.15;white-space:nowrap}
-.hmb .mc{font-size:12px;color:var(--muted);white-space:nowrap}
-.hmb .mc b.up{color:var(--upink)}.hmb .mc b.down{color:var(--downink)}
+.hmb .hval{font-size:21px;font-weight:800;font-variation-settings:"wdth" 108;line-height:1.15;white-space:nowrap}
+.hmb .hchg{font-size:12px;color:var(--muted);white-space:nowrap}
+.hmb .hchg b.up{color:var(--upink)}.hmb .hchg b.down{color:var(--downink)}
 .hmb .spk{grid-column:2;grid-row:1/3;display:flex;flex-direction:column;align-items:flex-end;gap:2px}
 .hmb .spk svg{width:92px;height:30px;display:block}
 .hmb .spk small{font-size:10px;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
@@ -426,12 +428,12 @@ footer{margin-top:28px;font-size:11.5px;line-height:1.55;color:var(--muted)}
 .mom{margin:10px 0 4px;padding:10px;border-radius:14px;background:var(--bg)}
 .mom .momh{margin:0 2px 8px;padding:0;border:0}
 .mtiles{display:grid;grid-template-columns:repeat(var(--n),1fr);gap:6px}
-.mt{border:0;background:var(--surface);border-radius:10px;padding:8px 8px 7px;text-align:left;display:flex;flex-direction:column;gap:1px;min-width:0;color:var(--ink);font:inherit;cursor:pointer}
-.mt small{font-size:11px;color:var(--muted);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.mt b{font-size:18px;font-weight:800;font-variation-settings:"wdth" 108}
-.mt span{font-size:10.5px;color:var(--muted);white-space:nowrap}
-.mt span b{font-size:10.5px;font-weight:700}.mt span b.up{color:var(--upink)}.mt span b.down{color:var(--downink)}
-.mt.isnew{box-shadow:inset 0 0 0 2px var(--newc)}
+.mtile{border:0;background:var(--surface);border-radius:10px;padding:8px 8px 7px;text-align:left;display:flex;flex-direction:column;gap:1px;min-width:0;color:var(--ink);font:inherit;cursor:pointer}
+.mtile small{font-size:11px;color:var(--muted);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mtile b{font-size:18px;font-weight:800;font-variation-settings:"wdth" 108}
+.mtile span{font-size:10.5px;color:var(--muted);white-space:nowrap}
+.mtile span b{font-size:10.5px;font-weight:700}.mtile span b.up{color:var(--upink)}.mtile span b.down{color:var(--downink)}
+.mtile.isnew{box-shadow:inset 0 0 0 2px var(--newc)}
 .subh{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:16px 0 2px}
 .more .subh:first-child{margin-top:8px}
 .morebtn{display:flex;justify-content:center;align-items:center;gap:6px;width:100%;margin-top:10px;border:0;border-radius:12px;background:var(--bg);color:var(--accent);font-weight:700;font-size:13px;padding:10px}
@@ -1453,7 +1455,7 @@ const HEXP=new Set();
 const perWord=m=>m.yr!=null?'y/y':m.freq==='W'?'w/w':m.freq==='Q'?'q/q':m.freq==='D'?'':'m/m';
 function mChange(m){const ref=m.yr??m.prev;if(ref==null||m.vs0)return '';const ch=m.value-ref,pts=m.kind==='growth'||m.kind==='change'||m.unit==='%';
  return `<b class="${tcls(m.trend||0)}">${pts?hSigned(ch,'%').replace('%',' pts'):hSigned(ch,m.unit)}</b> ${perWord(m)}`;}
-const mVal=m=>m.kind==='growth'||m.kind==='change'?hSigned(m.value,m.unit):hVal(m.value,m.unit);
+const mVal=m=>m.kind==='growth'||m.kind==='change'?(m.value>0?'+':m.value<0?'−':'')+Math.abs(m.value).toFixed(1)+'%':hVal(m.value,m.unit);
 function mRange(m){const v=(m.series||[]).map(p=>p[1]).filter(x=>x!=null);if(v.length<4)return '';const lo=Math.min(...v),hi=Math.max(...v);
  const f=x=>m.unit==='days'?Math.round(x):m.unit==='k'?x.toFixed(0)+'k':m.kind==='growth'||m.kind==='change'?(x>0?'+':'')+x.toFixed(Math.abs(x)<10?1:0)+'%':m.unit==='%'?x.toFixed(1)+'%':x.toFixed(1);
  return `${f(lo)} to ${f(hi)}`;}
@@ -1461,7 +1463,7 @@ function metricRow(m,key){
  const isNew=key&&HFRESH.has(key),t=m.trend||0,ch=mChange(m),rng=mRange(m);
  return `<div class="hm${isNew?' isnew':''}" data-k="${esc(key||'')}"><button class="hmb" aria-expanded="false">
   <span class="ml">${esc(SL[m.id]||m.short||m.label)}${isNew?'<span class="newtag">New</span>':''}</span>
-  <span class="mvl"><span class="mv num">${mVal(m)}</span>${ch?`<span class="mc">${ch}</span>`:''}</span>
+  <span class="mvl"><span class="hval num">${mVal(m)}</span>${ch?`<span class="hchg">${ch}</span>`:''}</span>
   <span class="spk"><svg viewBox="0 0 100 26" preserveAspectRatio="none" aria-hidden="true" data-sp="${esc(m.id)}" data-v="${t>0?'--up':t<0?'--down':'--muted'}"></svg>${rng?`<small>${rng}</small>`:''}</span></button>
   <div class="md" hidden><b>${esc(m.label)}</b><br>${hDate(m)} · ${esc(m.src||'')}${m.extra?`<br>${esc(m.extra)}`:''}${m.noscore?'<br><i>Shown for context; doesn’t count towards the rating.</i>':''}</div></div>`;
 }
@@ -1470,7 +1472,7 @@ function momStrip(r,ms,key){
  const order=TILES[key]||[],tiles=[...order.map(id=>mm.find(m=>m.id===id)).filter(Boolean),...mm.filter(m=>!order.includes(m.id))].slice(0,3);
  const MW={up:['↗','Picking up','green'],flat:['→','Steady','amber'],down:['↘','Slowing','red']},w=MW[r.momentum]||null;
  return `<div class="mom"><div class="momh"><span>Momentum</span>${w?`<span class="sig ${w[2]}">${w[0]} ${w[1]}</span>`:''}</div><div class="mtiles" style="--n:${tiles.length}">${tiles.map(m=>{const k=key+'/'+m.id,nw=HFRESH.has(k);
-  return `<button class="mt${nw?' isnew':''}" data-jump="${esc(k)}"><small>${esc(TL[m.id]||SL[m.id]||m.short)}${nw?' <span class="newtag">New</span>':''}</small><b class="num">${mVal(m)}</b><span>${mChange(m)||esc(hDate(m))}</span></button>`;}).join('')}</div></div>`;
+  return `<button class="mtile${nw?' isnew':''}" data-jump="${esc(k)}"><small>${esc(TL[m.id]||SL[m.id]||m.short)}${nw?' <span class="newtag">New</span>':''}</small><b class="num">${mVal(m)}</b><span>${mChange(m)||esc(hDate(m))}</span></button>`;}).join('')}</div></div>`;
 }
 function medTable(rows,pre){
  const cell=(lab,v,cls)=>`<span><small>${lab}</small><b class="${cls||''}">${v}</b></span>`;
@@ -1489,17 +1491,20 @@ function regionCard(r){
  const more=moreN?`<div class="more"${open?'':' hidden'}>${groups.map(([h,list])=>`<div class="subh">${h}</div>${list.map(m=>metricRow(m,key+'/'+m.id)).join('')}`).join('')}${hasDd?`<div class="subh">Each landlord</div>${ddList(r.stocks)}`:''}${r.note?`<div class="hnote">${esc(r.note)}</div>`:''}</div>
   <button class="morebtn" data-exp="${esc(key)}" aria-expanded="${open}">${open?'Show fewer':`Show all ${moreN+keyM.length} figures`}<span class="ch">▾</span></button>`:r.note?`<div class="hnote">${esc(r.note)}</div>`:'';
  return `<div class="card hreg" data-card="${esc(key)}"><div class="hh"><span class="fl">${r.flag}</span><h3>${esc(r.name)}</h3><span class="sig ${r.signal}">${SIG_WORD[r.signal]||''}</span>${mapA?`<button class="mapbtn" data-map="${mapA}" aria-label="Map of ${esc(r.name)} house prices">Map</button>`:''}</div>
-  ${r.why?`<div class="why">${esc(r.why.charAt(0).toUpperCase()+r.why.slice(1))}.</div>`:''}
+  ${r.why?`<div class="why">${esc((w=>w.charAt(0).toUpperCase()+w.slice(1))(lowWhy(r.why)))}.</div>`:''}
   ${momStrip(r,ms,key)}${keyM.map(m=>metricRow(m,key+'/'+m.id)).join('')}${r.table?medTable(r.table,key+'/'):''}${hasDd?`<div class="subh">Office landlord shares</div>${avgBoxes(r.avg)}`:chipRow(r.stocks)}${more}</div>`;
 }
 /* section briefing: one plain-English line plus a reason per area */
 const RNAME={us:'US',uk:'UK and NI',ie:'Ireland',med:'Mediterranean',off_us:'US offices',off_eu:'UK and Europe offices'};
 const listJoin=a=>a.length<2?a.join(''):a.slice(0,-1).join(', ')+' and '+a.at(-1);
+const PROPER=/^(Spain|Portugal|Italy|Greece|NI|UK|US|Ireland|London|Europe|AI|CRE|REIT)/;
+const lowWhy=w=>w.split(', ').map(x=>PROPER.test(x)?x:x.charAt(0).toLowerCase()+x.slice(1)).join(', ');
 const sigLow=s=>({green:'healthy',amber:'mixed',red:'under strain',none:'unclear'})[s];
 function sectionBrief(sec){
- const R=sec.regions,bul=R.filter(r=>r.why).slice(0,4).map(r=>`<li><b>${esc(RNAME[r.id]||r.name)}</b> ${esc(r.why)}</li>`);let head='';
- if(sec.id==='housing'){const dn=R.filter(r=>r.momentum==='down').map(r=>RNAME[r.id]),up=R.filter(r=>r.momentum==='up').map(r=>RNAME[r.id]);
-  const px=R.map(r=>{const m=(r.metrics||[]).find(x=>/_hpi$/.test(x.id)&&!x.hidden);return m?[RNAME[r.id],m.value]:r.table?[RNAME[r.id],r.table.filter(t=>t.px!=null).reduce((a,t,_,arr)=>a+t.px/arr.length,0)]:null;}).filter(Boolean);
+ const R=sec.regions,bul=R.filter(r=>r.why).slice(0,4).map(r=>`<li><b>${esc(RNAME[r.id]||r.name)}</b> ${esc(lowWhy(r.why))}</li>`);let head='';
+ const THE={us:'the US',uk:'the UK',ie:'Ireland',med:'the Mediterranean'};
+ if(sec.id==='housing'){const dn=R.filter(r=>r.momentum==='down').map(r=>THE[r.id]),up=R.filter(r=>r.momentum==='up').map(r=>THE[r.id]);
+  const px=R.map(r=>{const m=(r.metrics||[]).find(x=>/_hpi$/.test(x.id)&&!x.hidden);return m?[THE[r.id],m.value]:r.table?[THE[r.id],r.table.filter(t=>t.px!=null).reduce((a,t,_,arr)=>a+t.px/arr.length,0)]:null;}).filter(Boolean);
   const fall=px.filter(p=>p[1]<0).map(p=>p[0]);
   const sales=dn.length?`Sales are slowing in ${listJoin(dn)}`:up.length?`Sales are picking up in ${listJoin(up)}`:'Sales are holding steady';
   head=sales+(fall.length?`${dn.length?' and':', but'} prices are falling in ${listJoin(fall)}.`:`${dn.length?', but':' and'} prices are still rising everywhere tracked.`);}
@@ -1569,7 +1574,7 @@ async function loadHealth(force){
 $('healthBox').addEventListener('click',e=>{
  const hb=e.target.closest('.hmb');if(hb){const md=hb.nextElementSibling;md.hidden=!md.hidden;hb.setAttribute('aria-expanded',!md.hidden);hb.parentNode.classList.toggle('open',!md.hidden);buzz();return;}
  const mb=e.target.closest('.morebtn');if(mb){const k=mb.dataset.exp;HEXP.has(k)?HEXP.delete(k):HEXP.add(k);buzz();renderHealth();if(!HEXP.has(k))document.querySelector(`[data-card="${CSS.escape(k)}"]`)?.scrollIntoView({block:'nearest',behavior:reduce?'auto':'smooth'});return;}
- const mt=e.target.closest('.mt[data-jump]');if(mt){const k=mt.dataset.jump,card=k.split('/').slice(0,2).join('/');HEXP.add(card);buzz();renderHealth();const el=document.querySelector(`#healthBox [data-k="${CSS.escape(k)}"]`);if(el){el.scrollIntoView({block:'center',behavior:reduce?'auto':'smooth'});el.classList.remove('flash');void el.offsetWidth;el.classList.add('flash');}}
+ const mt=e.target.closest('.mtile[data-jump]');if(mt){const k=mt.dataset.jump,card=k.split('/').slice(0,2).join('/');HEXP.add(card);buzz();renderHealth();const el=document.querySelector(`#healthBox [data-k="${CSS.escape(k)}"]`);if(el){el.scrollIntoView({block:'center',behavior:reduce?'auto':'smooth'});el.classList.remove('flash');void el.offsetWidth;el.classList.add('flash');}}
 });
 $('healthOv').addEventListener('click',e=>{const b=e.target.closest('button');if(!b||b.dataset.s===hSec)return;HFRESH.clear();HEXP.clear();hSec=b.dataset.s;store.set('wd.hsec',hSec);hMore=false;buzz();renderHealth();loadHealthNews();});
 $('healthMore').addEventListener('click',()=>{hMore=!hMore;buzz();renderHealthNews();});
