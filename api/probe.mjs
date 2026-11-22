@@ -1,17 +1,10 @@
-const UA = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36', 'Accept-Language': 'en' };
-const T = (ms) => AbortSignal.timeout(ms);
-const P = {
-  page: 'https://www.clevelandfed.org/indicators-and-data/inflation-nowcasting',
-  m1: 'https://www.clevelandfed.org/-/media/files/webcharts/inflationnowcasting/nowcast_month.json',
-  q1: 'https://www.clevelandfed.org/-/media/files/webcharts/inflationnowcasting/nowcast_quarter.json',
-  y1: 'https://www.clevelandfed.org/-/media/files/webcharts/inflationnowcasting/nowcast_year.json',
-};
+const UA = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36' };
 export const GET = async () => {
   const out = {};
-  await Promise.all(Object.entries(P).map(async ([k, u]) => {
-    try { const r = await fetch(u, { headers: UA, signal: T(12000) }); const t = await r.text();
-      out[k] = `${r.status} ${r.headers.get('content-type')} ${t.length}b :: ` + (k === 'page' ? [...new Set([...t.matchAll(/["'(]([^"'()]*(?:nowcast|webcharts)[^"'()]*\.(?:json|csv|xlsx))/gi)].map((m) => m[1]))].slice(0, 12).join(' | ') : t.slice(0, 700));
-    } catch (e) { out[k] = 'ERR ' + String(e.cause?.code || e.message); }
-  }));
+  for (const k of ['month', 'year']) {
+    const t0 = Date.now();
+    const j = JSON.parse(await fetch(`https://www.clevelandfed.org/-/media/files/webcharts/inflationnowcasting/nowcast_${k}.json`, { headers: UA, signal: AbortSignal.timeout(15000) }).then((r) => r.text()));
+    out[k] = { n: j.length, ms: Date.now() - t0, last: j.slice(-3).map((c) => ({ sub: c.chart.subcaption, comment: c.chart._comment, cats: (c.categories?.[0]?.category || []).slice(-3).map((x) => x.label), sets: (c.dataset || []).map((d) => { const v = (d.data || []).map((x) => x.value).filter((x) => x !== '' && x != null); return d.seriesname + ' n' + (d.data || []).length + ' last=' + v.at(-1) + ' prev=' + v.at(-2); }) })) };
+  }
   return Response.json(out, { headers: { 'cache-control': 'no-store' } });
 };
