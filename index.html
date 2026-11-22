@@ -1326,6 +1326,7 @@ function renderMovers(items){
 addEventListener('resize',()=>{if(activeTab==='park')syncPark();});
 
 /* ---------- market health ---------- */
+const HEALTH_V=3; // bump when the health data changes shape, so phones skip older cached copies
 let HEALTH={data:store.get('wd.health',null),at:0,busy:false,err:false},hSec=store.get('wd.hsec','housing'),HNEWS={},hMore=false;
 const SIG_WORD={green:'Healthy',amber:'Mixed',red:'Under strain',none:'No data'};
 const H_NEWS={
@@ -1458,7 +1459,7 @@ function renderHealthNews(){
 async function loadHealth(force){
  if(HEALTH.busy)return;if(!force&&HEALTH.at&&Date.now()-HEALTH.at<20*60e3){renderHealth();return;}
  HEALTH.busy=true;renderHealth();
- try{const j=await fetch('/.netlify/functions/health').then(r=>r.json());if(Array.isArray(j.sections)){HEALTH.data=j;HEALTH.at=Date.now();HEALTH.err=false;store.set('wd.health',j);}else HEALTH.err=true;}catch(e){HEALTH.err=true;}
+ try{const j=await fetch('/.netlify/functions/health?v='+HEALTH_V).then(r=>r.json());if(Array.isArray(j.sections)){HEALTH.data=j;HEALTH.at=Date.now();HEALTH.err=false;store.set('wd.health',j);}else HEALTH.err=true;}catch(e){HEALTH.err=true;}
  HEALTH.busy=false;renderHealth();updateHealthDot();
 }
 $('healthOv').addEventListener('click',e=>{const b=e.target.closest('button');if(!b||b.dataset.s===hSec)return;HFRESH.clear();hSec=b.dataset.s;store.set('wd.hsec',hSec);hMore=false;buzz();renderHealth();loadHealthNews();});
