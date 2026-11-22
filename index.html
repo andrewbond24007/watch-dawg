@@ -389,6 +389,8 @@ footer{margin-top:28px;font-size:11.5px;line-height:1.55;color:var(--muted)}
 .mrow .p{color:var(--muted)}
 .mrow.sel{background:color-mix(in srgb,var(--accent) 8%,transparent);border-radius:8px}
 .mapbtn{border:0;background:var(--bg);color:var(--accent);font-weight:700;font-size:12px;border-radius:999px;padding:4px 10px;margin-left:6px;white-space:nowrap}
+.momh{display:flex;justify-content:space-between;align-items:center;margin:14px 0 2px;padding-top:12px;border-top:2px solid var(--rule);font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.momh+.hm{border-top:0}
 .hgroup{font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:18px 2px 8px}
 .hgroup:first-of-type{margin-top:4px}
 .hsub{display:flex;justify-content:space-between;align-items:center;margin:22px 0 10px}
@@ -1333,7 +1335,7 @@ const H_NEWS={
 };
 function hDate(m){if(m.freq==='D')return 'Live';if(m.when)return m.when;const d=new Date(m.date);if(m.freq==='Q')return 'Q'+(Math.floor(d.getUTCMonth()/3)+1)+' '+d.getUTCFullYear();
  if(m.freq==='W')return d.toLocaleDateString('en-GB',{day:'numeric',month:'short'});return d.toLocaleDateString('en-GB',{month:'short',year:'numeric',timeZone:'UTC'});}
-const hVal=(v,u)=>v==null?'—':u==='%'?(Math.abs(v)<10?v.toFixed(2):v.toFixed(1))+'%':u==='k'?v.toFixed(1)+'k':String(v);
+const hVal=(v,u)=>v==null?'—':u==='days'?Math.round(v)+' days':u==='%'?(Math.abs(v)<10?v.toFixed(2):v.toFixed(1))+'%':u==='k'?v.toFixed(1)+'k':String(v);
 const hSigned=(v,u)=>v==null?'—':(v>0?'+':v<0?'−':'')+hVal(Math.abs(v),u);
 const pc1=(v,d=1)=>v==null?'—':(v>0?'+':v<0?'−':'')+Math.abs(v).toFixed(d)+'%';
 const tcls=t=>t>0?'up':t<0?'down':'';
@@ -1383,10 +1385,10 @@ $('healthUpd').addEventListener('click',e=>{if(e.target.closest('#upClear')){HLO
 function metricRow(m,key){
  const t=m.trend||0,ref=m.yr??m.prev,ch=ref!=null?m.value-ref:null;
  const when=m.yr!=null?'on a year ago':m.freq==='W'?'on the week':m.freq==='Q'?'on the quarter':'on the month';
- const chTxt=(ch==null?'':`<b class="${tcls(t)}">${m.kind==='growth'||m.unit==='%'?hSigned(ch,'%').replace('%',' pts'):hSigned(ch,m.unit)}</b> ${when}`)+(m.extra?(ch==null?'':' · ')+esc(m.extra):'');
+ const chTxt=(ch==null||m.vs0?'':`<b class="${tcls(t)}">${m.kind==='growth'||m.kind==='change'||m.unit==='%'?hSigned(ch,'%').replace('%',' pts'):hSigned(ch,m.unit)}</b> ${when}`)+(m.extra?(ch==null?'':' · ')+esc(m.extra):'');
  const isNew=key&&HFRESH.has(key);
  return `<div class="hm${isNew?' isnew':''}" data-k="${esc(key||'')}"><div class="ml">${esc(m.label)}${isNew?'<span class="newtag">New</span>':''}</div>
-  <div class="mv num">${m.kind==='growth'?hSigned(m.value,m.unit):hVal(m.value,m.unit)}</div>
+  <div class="mv num">${m.kind==='growth'||m.kind==='change'?hSigned(m.value,m.unit):hVal(m.value,m.unit)}</div>
   <div class="mc">${chTxt?chTxt+'<br>':''}${hDate(m)} · ${esc(m.src||'')}</div>
   <svg viewBox="0 0 100 26" preserveAspectRatio="none" aria-hidden="true" data-sp="${esc(m.id)}" data-v="${t>0?'--up':t<0?'--down':'--muted'}"></svg></div>`;
 }
@@ -1397,11 +1399,12 @@ function medTable(rows,pre){
   return `<tr data-k="${esc(pre+r.cc)}"><td>${r.flag} ${esc(r.name)}${HFRESH.has(pre+r.cc)||HFRESH.has(pre+r.cc+'_yld')||HFRESH.has(pre+r.cc+'_rent')?'<span class="newtag">New</span>':''}</td><td>${r.rate==null?'—':`<b class="${rt}">${r.rate.toFixed(2)}%</b>`}</td><td>${r.px==null?'—':`<b class="${r.px>0?'up':r.px<0?'down':''}">${hSigned(r.px,'%')}</b>`}</td><td>${r.yld==null?'—':r.yld.toFixed(1)+'%'}</td><td>${r.rent==null?'—':`<b class="${r.rent>0?'up':r.rent<0?'down':''}">${hSigned(r.rent,'%')}</b>`}</td></tr>`;}).join('')}</tbody></table>`;
 }
 function regionCard(r){
- const ms=(r.metrics||[]).filter(m=>!m.hidden);
+ const ms0=(r.metrics||[]).filter(m=>!m.hidden),ms=[...ms0.filter(m=>m.grp!=='mom'),...ms0.filter(m=>m.grp==='mom')];
+ const MW={up:['Picking up','green'],flat:['Steady','amber'],down:['Slowing','red']};
  const mapA=hSec==='housing'?{us:'us',uk:'uk',ie:'ie',med:'med'}[r.id]:null;
  return `<div class="card hreg"><div class="hh"><span class="fl">${r.flag}</span><h3>${esc(r.name)}</h3><span class="sig ${r.signal}">${SIG_WORD[r.signal]||''}</span>${mapA?`<button class="mapbtn" data-map="${mapA}" aria-label="Map of ${esc(r.name)} house prices">Map</button>`:''}</div>
   ${r.why?`<div class="why">${esc(r.why.charAt(0).toUpperCase()+r.why.slice(1))}.</div>`:''}
-  ${ms.map(m=>metricRow(m,hSec+'/'+r.id+'/'+m.id)).join('')}${r.table?medTable(r.table,hSec+'/'+r.id+'/'):''}${r.dd&&r.stocks&&r.stocks.length?`<div class="hnote" style="font-weight:600;color:var(--ink);margin-top:14px">Office landlord shares</div>${avgBoxes(r.avg)}${ddList(r.stocks)}`:chipRow(r.stocks)}${r.note?`<div class="hnote">${esc(r.note)}</div>`:''}</div>`;
+  ${ms.map((m,i)=>(m.grp==='mom'&&ms[i-1]?.grp!=='mom'?`<div class="momh"><span>Momentum</span>${r.momentum?`<span class="sig ${MW[r.momentum][1]}">${MW[r.momentum][0]}</span>`:''}</div>`:'')+metricRow(m,hSec+'/'+r.id+'/'+m.id)).join('')}${r.table?medTable(r.table,hSec+'/'+r.id+'/'):''}${r.dd&&r.stocks&&r.stocks.length?`<div class="hnote" style="font-weight:600;color:var(--ink);margin-top:14px">Office landlord shares</div>${avgBoxes(r.avg)}${ddList(r.stocks)}`:chipRow(r.stocks)}${r.note?`<div class="hnote">${esc(r.note)}</div>`:''}</div>`;
 }
 function ddList(st){
  return st.slice().sort((x,y)=>(x.offHigh??0)-(y.offHigh??0)).map(x=>{const off=Math.min(100,Math.abs(x.offHigh??0));const c=off>=30?'var(--down)':off>=12?'#d99a00':'var(--up)';
