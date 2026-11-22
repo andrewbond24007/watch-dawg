@@ -31,6 +31,10 @@ function whenLocal(addMin){const t=new Date(Date.now()+addMin*60000),today=new D
  const day=t.toDateString()===today.toDateString()?'':t.toDateString()===tmw.toDateString()?'tomorrow ':t.toLocaleDateString('en-GB',{weekday:'short'})+' ';
  return day+t.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});}
 function nextOpen(ymd,mins){if(isTradingDay(ymd)&&mins<570)return {add:570-mins,ymd};for(let n=1;n<=10;n++){const k=ymdAdd(ymd,n);if(isTradingDay(k))return {add:n*1440-mins+570,ymd:k};}return null;}
+// shrink the big countdown line until it fits its card (e.g. "Opens tomorrow 14:30" on a narrow phone)
+function fitCountdown(el){if(!el||!el.style)return;el.style.fontSize='';const max=parseFloat(getComputedStyle(el).fontSize)||40;let f=max;
+ while(f>18&&el.scrollWidth>el.clientWidth+1){f-=1;el.style.fontSize=f+'px';}}
+let fitTimer=null;if(typeof window!=='undefined')window.addEventListener('resize',()=>{clearTimeout(fitTimer);fitTimer=setTimeout(()=>fitCountdown(document.getElementById('countdown')),150);});
 function clock(){
  const now=new Date(),{ymd,mins}=etParts(now),trading=isTradingDay(ymd),close=closeMin(ymd),early=!!US_EARLY[ymd];
  const lm=now.getHours()*60+now.getMinutes()+now.getSeconds()/60;let off=lm-mins;if(off>720)off-=1440;if(off<-720)off+=1440;
@@ -59,6 +63,7 @@ function clock(){
   if(nx&&nx.ymd!==ymd)for(let k=ymdAdd(ymd,1);k<nx.ymd;k=ymdAdd(k,1))if(US_HOLIDAYS[k]){state+=` · closed ${new Date(k+'T12:00:00Z').toLocaleDateString('en-GB',{weekday:'short',timeZone:'UTC'})} for ${US_HOLIDAYS[k]}`;break;}
   cd=!nx?'':nx.add<=720?`Opens in ${fmtDur(nx.add)}`:`Opens ${whenLocal(nx.add)}`;}
  if(open&&US_HOLIDAYS[ymdAdd(ymd,1)])state+=` · closed tomorrow for ${US_HOLIDAYS[ymdAdd(ymd,1)]}`;
- $('state').innerHTML=`<b>${state}</b>`;$('lamp').className='lamp'+(open?' open':'');$('countdown').textContent=cd;
+ $('state').innerHTML=`<b>${state}</b>`;$('lamp').className='lamp'+(open?' open':'');
+ const cdEl=$('countdown');if(cdEl.textContent!==cd){cdEl.textContent=cd;fitCountdown(cdEl);}
  $('futnote').textContent=open?'The S&P 500 and Nasdaq 100 rows are following the live index.':fut.open?'The S&P 500 and Nasdaq 100 rows are following futures, which are trading now. Single stocks hold their last price until trading resumes.':'Futures are paused too, so the S&P 500 and Nasdaq 100 rows show their last futures price. Single stocks hold their last price until trading resumes.';
 }

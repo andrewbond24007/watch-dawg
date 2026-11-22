@@ -8,8 +8,8 @@ function clockAt(iso) {
   const Real = Date, fixed = new Real(iso).getTime();
   class D extends Real { constructor(...a) { super(...(a.length ? a : [fixed])); } static now() { return fixed; } }
   const els = {}; const $ = (id) => (els[id] ||= { innerHTML: '', textContent: '', className: '', appendChild() {}, querySelector() { return null; } });
-  const doc = { createElement: () => ({ style: {} }) };
-  return new Function('Date', '$', 'document', `${code}; clock(); return {
+  const doc = { createElement: () => ({ style: {} }), getElementById: () => null };
+  return new Function('Date', '$', 'document', 'getComputedStyle', 'window', `${code}; clock(); return {
     state: $('state').innerHTML.replace(/<[^>]+>/g, ''), countdown: $('countdown').textContent, open: $('lamp').className.includes('open'),
     sess: $('sess').innerHTML.replace(/<[^>]+>/g, ' ').replace(/\\s+/g, ' ') };`)(D, $, doc);
 }
