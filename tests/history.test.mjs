@@ -35,3 +35,8 @@ test('status remembers when a source started failing and when it last worked', (
   s = updateStatus(s, {}, ['kastle'], '2026-11-23T10:00:00Z');
   assert.equal(s.sources.kastle.ok, true);
 });
+test('weekly figures seed last week from the reported change', () => {
+  const h = {};
+  appendHistory(doc(56.5, '2026-11-09', { freq: 'W', prev: 56.4 }), h);
+  assert.deepEqual(h['cre/off_us/off_occ'], [['2026-11-02', 56.4], ['2026-11-09', 56.5]]);
+});
