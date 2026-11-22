@@ -172,8 +172,10 @@ export function parseKastle(t, now = new Date()) {
 // ---------- rental yields ----------
 // Zillow typical rent (ZORI) and typical home value (ZHVI) for the whole US -> gross rental yield, monthly.
 async function zillowRow(u) {
-  const r = await fetch(u, { headers: UA, signal: T(12000) });
-  if (!r.ok) throw new Error('Zillow ' + r.status);
+  // large files (up to ~5MB): generous timeout and one retry
+  let r = null;
+  for (let i = 0; i < 2 && !(r && r.ok); i++) r = await fetch(u, { headers: UA, signal: T(20000) }).catch(() => null);
+  if (!r || !r.ok) throw new Error('Zillow ' + (r ? r.status : 'timed out twice'));
   const t = await r.text(), nl = t.indexOf('\n'), head = t.slice(0, nl).trim().split(',');
   const row = t.split('\n').find((l) => /^\d+,\d+,"?United States"?,country/i.test(l));
   if (!row) throw new Error('Zillow: no US row');
