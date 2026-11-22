@@ -2,9 +2,10 @@
 // jobs, unemployment, PPI) from the official BLS data service.
 const SERIES = {
   cpi: 'CUSR0000SA0', core: 'CUSR0000SA0L1E', cpiNsa: 'CUUR0000SA0', coreNsa: 'CUUR0000SA0L1E',
-  nfp: 'CES0000000001', unemp: 'LNS14000000', ppi: 'WPSFD4', corePpi: 'WPSFD49104',
+  nfp: 'CES0000000001', unemp: 'LNS14000000', unempN: 'LNS13000000', labour: 'LNS11000000', ppi: 'WPSFD4', corePpi: 'WPSFD49104',
 };
-const pct = (a, b) => (a != null && b) ? Math.round((a / b - 1) * 1000) / 10 : null;
+// two decimals, worked out from the official index levels (BLS headlines round to one)
+const pct = (a, b) => (a != null && b) ? Math.round((a / b - 1) * 10000) / 100 : null;
 export default async (req) => {
   let res, ok = false;
   try {
@@ -27,7 +28,7 @@ export default async (req) => {
   const out = ok ? {
     cpiMoM: mom('cpi'), coreCpiMoM: mom('core'), cpiYoY: yoy('cpiNsa'), coreCpiYoY: yoy('coreNsa'),
     nfp: at('nfp', 0) && at('nfp', 1) ? { p: at('nfp', 0).p, v: Math.round(at('nfp', 0).v - at('nfp', 1).v) } : null,
-    unemp: at('unemp', 0) ? { p: at('unemp', 0).p, v: at('unemp', 0).v } : null,
+    unemp: at('unemp', 0) ? { p: at('unemp', 0).p, v: at('unemp', 0).v, v2: at('unempN', 0) && at('labour', 0) && at('unempN', 0).p === at('unemp', 0).p ? Math.round(at('unempN', 0).v / at('labour', 0).v * 10000) / 100 : null } : null,
     ppiMoM: mom('ppi'), corePpiMoM: mom('corePpi'),
   } : { error: res?.message?.[0] || res?.error || 'BLS unavailable' };
   // Cache for 6h once data is in; retry sooner if BLS failed.

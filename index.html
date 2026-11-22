@@ -286,6 +286,7 @@ h3{margin:18px 0 8px;font-size:15px;font-weight:700}
 .evn{font-size:18px;font-weight:700;margin-top:5px;line-height:1.25}
 .ev.key .evn{font-size:20px;font-variation-settings:"wdth" 106}
 .evhint{font-size:13px;color:var(--muted);margin-top:3px}
+.evsrc{font-size:11px;color:var(--muted);margin-top:3px}
 .evx{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px;color:var(--muted);margin-top:9px}
 .evx b{color:var(--ink);font-variant-numeric:tabular-nums}
 .empty{padding:28px 10px;text-align:center;color:var(--muted);background:var(--surface);border-radius:18px}
@@ -839,17 +840,32 @@ let ACT={data:null,at:0,key:''},REACT=store.get('wd.react',{}),showEarlier=false
 const ACT_MAP=[[/core cpi m\/m/i,['coreCpiMoM']],[/core cpi y\/y/i,['coreCpiYoY']],[/^cpi m\/m/i,['cpiMoM']],[/^cpi y\/y/i,['cpiYoY']],[/^cpi and core cpi/i,['coreCpiMoM','cpiYoY']],
  [/non-farm payrolls and unemployment/i,['nfp','unemp']],[/non-farm employment change/i,['nfp']],[/^unemployment rate/i,['unemp']],[/core ppi m\/m/i,['corePpiMoM']],[/^ppi m\/m|^ppi \(/i,['ppiMoM']]];
 const ACT_LABEL={coreCpiMoM:['Core CPI m/m','%','infl'],coreCpiYoY:['Core CPI y/y','%','infl'],cpiMoM:['CPI m/m','%','infl'],cpiYoY:['CPI y/y','%','infl'],nfp:['Jobs added','K','jobs'],unemp:['Unemployment','%','unemp'],ppiMoM:['PPI m/m','%','infl'],corePpiMoM:['Core PPI m/m','%','infl']};
+/* Cleveland Fed inflation nowcasts: 2-decimal expectations (and unrounded actuals) for CPI and PCE */
+let NOWC={data:null,at:0};
+const NOW_MAP=[[/^cpi and core cpi/i,[['CPI','mom','cpi'],['Core','mom','coreCpi'],['CPI y/y','yoy','cpi'],['Core y/y','yoy','coreCpi']]],
+ [/core cpi m\/m/i,[['','mom','coreCpi']]],[/core cpi y\/y/i,[['','yoy','coreCpi']]],[/^cpi m\/m/i,[['','mom','cpi']]],[/^cpi y\/y/i,[['','yoy','cpi']]],
+ [/core pce price index m\/m/i,[['','mom','corePce']]],[/core pce price index y\/y/i,[['','yoy','corePce']]],[/^core pce price index \(/i,[['Core','mom','corePce'],['Core y/y','yoy','corePce']]],
+ [/^pce price index m\/m/i,[['','mom','pce']]],[/^pce price index y\/y/i,[['','yoy','pce']]]];
+async function loadNowcast(){if(NOWC.data&&Date.now()-NOWC.at<60*60e3)return;try{const j=await fetch('/.netlify/functions/nowcast').then(r=>r.json());if(j&&j.months){NOWC={data:j,at:Date.now()};renderNewsTab();}}catch(e){NOWC.at=Date.now();}}
+const prevMonthKey=k=>{const [y,m]=k.split('-').map(Number);const d=new Date(Date.UTC(y,m-2,1));return d.toISOString().slice(0,7);};
+function nowcastFor(e){if(e.country!=='USD'||!NOWC.data)return null;const m=NOW_MAP.find(([rx])=>rx.test(e.title));if(!m)return null;
+ const k=refMonth(e.date),cur=NOWC.data.months[k],prev=NOWC.data.months[prevMonthKey(k)];
+ const items=m[1].map(([lab,kind,id])=>({lab,kind,id,exp:cur?.[kind]?.[id],act:cur?.act?.[kind]?.[id],prev:prev?.act?.[kind]?.[id]}));
+ return items.some(x=>x.exp!=null||x.prev!=null||x.act!=null)?items:null;}
 function refMonth(d){const x=new Date(d);x.setUTCDate(1);x.setUTCMonth(x.getUTCMonth()-1);return x.getUTCFullYear()+'-'+String(x.getUTCMonth()+1).padStart(2,'0');}
 function actualsFor(e){
+ if(e.country==='USD'&&/pce price index/i.test(e.title)){const nc=nowcastFor(e);if(!nc)return [];const fs=String(e.forecast||''),f=parseFloat(fs.replace(/[^0-9.\-]/g,'')),dec=(fs.split('.')[1]||'').replace(/[^0-9]/g,'').length;
+  return nc.filter(x=>x.act!=null).map((x,i,arr)=>{let tag='';if(arr.length===1&&!isNaN(f)){const d=+(x.act.toFixed(dec))-f;tag=Math.abs(d)<1e-9?'In line':d>0?'Hotter':'Cooler';}return {label:(x.lab||'PCE')+(x.kind==='mom'&&!/m\/m|y\/y/.test(x.lab)?' m/m':''),val:x.act.toFixed(2)+'%',tag,multi:arr.length>1};});}
  if(e.country!=='USD'||!ACT.data)return [];const m=ACT_MAP.find(([rx])=>rx.test(e.title));if(!m)return [];
  const want=refMonth(e.date);
  return m[1].map(k=>{const a=ACT.data[k];if(!a||a.v==null||a.p!==want)return null;
-  const [label,unit,kind]=ACT_LABEL[k];const f=m[1].length===1?parseFloat(String(e.forecast).replace(/[^0-9.\-]/g,'')):NaN;
-  let tag='';if(!isNaN(f)){const d=Math.round((a.v-f)*100)/100;tag=d===0?'In line':kind==='infl'?(d>0?'Hotter':'Cooler'):kind==='jobs'?(d>0?'Stronger':'Weaker'):(d>0?'Weaker':'Stronger');}
-  return {label,val:(kind==='jobs'?(a.v>0?'+':'')+a.v+'K':a.v.toFixed(1)+unit),tag,multi:m[1].length>1};}).filter(Boolean);
+  const [label,unit,kind]=ACT_LABEL[k];const fs=String(e.forecast||''),f=m[1].length===1?parseFloat(fs.replace(/[^0-9.\-]/g,'')):NaN;
+  const dec=(fs.split('.')[1]||'').replace(/[^0-9]/g,'').length,v=k==='unemp'&&a.v2!=null?a.v2:a.v;
+  let tag='';if(!isNaN(f)){const d=+(v.toFixed(dec))-f;tag=Math.abs(d)<1e-9?'In line':kind==='infl'?(d>0?'Hotter':'Cooler'):kind==='jobs'?(d>0?'Stronger':'Weaker'):(d>0?'Weaker':'Stronger');}
+  return {label,val:(kind==='jobs'?(v>0?'+':'')+v+'K':v.toFixed(2)+unit),tag,multi:m[1].length>1};}).filter(Boolean);
 }
 async function loadActuals(){
- const now=Date.now();
+ loadNowcast();const now=Date.now();
  const rel=CAL.events.filter(e=>e.country==='USD'&&ACT_MAP.some(([rx])=>rx.test(e.title))&&new Date(e.date)<now-3*60e3&&now-new Date(e.date)<12*864e5);
  if(!rel.length)return;
  const key=rel.map(e=>e.date.slice(0,13)).sort().pop();
@@ -886,7 +902,11 @@ function evCard(e){
   <div class="evt"><b class="num">${tm}</b>${when}</div>
   <div><div class="evh"><span class="fl">${FLAGS[e.country]||''}</span>${esc(e.country)}${e.key?'<span class="mm">Market mover</span>':''}</div>
   <div class="evn">${esc(e.title)}</div>${hint?`<div class="evhint">${hint}</div>`:''}
-  ${e.forecast||e.previous?`<div class="evx">${e.forecast?`<span>Forecast <b>${esc(e.forecast)}</b></span>`:''}${e.previous?`<span>Previous <b>${esc(e.previous)}</b></span>`:''}</div>`:e.official?'<div class="evx"><span>Official date · forecasts appear in the week of release</span></div>':''}${res}</div></div>`;
+  ${(()=>{const nc=past?null:nowcastFor(e),one=nc&&nc.length===1?nc[0]:null;
+   const ncTxt=nc?nc.filter(x=>x.exp!=null).map(x=>`<span>${x.lab?esc(x.lab)+' ':''}nowcast <b>${x.exp.toFixed(2)}%</b></span>`).join(''):'';
+   const prevTxt=one&&one.prev!=null?`<span>Previous <b>${one.prev.toFixed(2)}%</b></span>`:e.previous?`<span>Previous <b>${esc(e.previous)}</b></span>`:'';
+   const fc=e.forecast?`<span>Consensus <b>${esc(e.forecast)}</b></span>`:'';
+   return ncTxt||fc||prevTxt?`<div class="evx">${ncTxt}${fc}${prevTxt}</div>${ncTxt?'<div class="evsrc">Nowcast: Cleveland Fed model, updated daily</div>':''}`:e.official?'<div class="evx"><span>Official date · forecasts appear in the week of release</span></div>':'';})()}${res}</div></div>`;
 }
 function renderNewsTab(){
  if(activeTab!=='news')return;const box=$('newsBox');
