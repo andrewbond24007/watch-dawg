@@ -17,7 +17,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,300..800&display=swap" rel="stylesheet">
 <style>
 :root{
-  --newc:#2f7bf6;
+  --newc:#2f7bf6; --mgrow:#16a34a; --mmod:#e0a400; --mdec:#dc2626;
   --bg:#ece7fb; --surface:#faf8ff; --ink:#1f1838; --muted:#6c6489; --rule:#ddd5f2; --accent:#6a4fd8;
   --up:#0ca30c; --down:#d03b3b; --upbg:#e0f5e0; --downbg:#fbe3e3; --upink:#087a08; --downink:#b42828;
   --pre:#cfc4ef; --reg:#0ca30c; --post:#cfc4ef; --shut:#e3ddf5; --night:#a9c8f0; --fut:#1f9e8f;
@@ -371,6 +371,19 @@ footer{margin-top:28px;font-size:11.5px;line-height:1.55;color:var(--muted)}
 .upi.seen .t{font-weight:500}
 .flash{animation:flash 1.6s ease}
 @keyframes flash{0%,40%{box-shadow:0 0 0 3px var(--newc)}100%{box-shadow:0 0 0 3px transparent}}
+.maplegend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--muted);margin:2px 0 10px}
+.maplegend span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px;background:var(--c)}
+.mapbox{background:var(--surface);border-radius:18px;padding:10px;box-shadow:var(--shadow)}
+.mapbox svg{width:100%;height:auto;display:block;max-height:62vh}
+.mapbox path{stroke:var(--surface);stroke-width:.8;stroke-linejoin:round;cursor:pointer;transition:opacity .2s}
+.mapbox path.sel{stroke:var(--ink);stroke-width:2}
+.mapinfo{min-height:44px;margin:10px 2px;font-size:14px}
+.mapinfo b{font-size:16px}.mapinfo small{color:var(--muted);display:block;font-size:12px}
+.mrow{display:grid;grid-template-columns:12px 1fr auto auto;gap:10px;align-items:center;width:100%;border:0;background:none;text-align:left;padding:9px 2px;border-top:1px solid var(--rule);font-size:13.5px;font-variant-numeric:tabular-nums;color:var(--ink)}
+.mrow i{width:10px;height:10px;border-radius:3px;background:var(--c)}
+.mrow .p{color:var(--muted)}
+.mrow.sel{background:color-mix(in srgb,var(--accent) 8%,transparent);border-radius:8px}
+.mapbtn{border:0;background:var(--bg);color:var(--accent);font-weight:700;font-size:12px;border-radius:999px;padding:4px 10px;margin-left:6px;white-space:nowrap}
 .hgroup{font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:18px 2px 8px}
 .hgroup:first-of-type{margin-top:4px}
 .hsub{display:flex;justify-content:space-between;align-items:center;margin:22px 0 10px}
@@ -519,6 +532,19 @@ footer{margin-top:28px;font-size:11.5px;line-height:1.55;color:var(--muted)}
 </div>
 
 <!-- edit sheet -->
+<div class="sheet" id="mapSheet" hidden>
+  <button class="scrim" data-close aria-label="Close"></button>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="mapTitle">
+    <div class="grab"></div>
+    <div class="phead"><h2 id="mapTitle">House prices</h2><button class="close" data-close aria-label="Close">✕</button></div>
+    <div class="seg" id="mapSeg" role="group" aria-label="Map" style="display:inline-flex;margin-bottom:10px" hidden></div>
+    <div class="maplegend" id="mapLegend"><span style="--c:var(--mgrow)">Growth (3%+)</span><span style="--c:var(--mmod)">Moderate (0–3%)</span><span style="--c:var(--mdec)">Decline</span><span style="--c:var(--shut)">No data</span></div>
+    <div class="mapbox" id="mapBox"><div class="empty">Loading map…</div></div>
+    <div class="mapinfo" id="mapInfo" aria-live="polite"></div>
+    <div id="mapList"></div>
+    <p class="hint" id="mapSrc" style="margin-top:10px;line-height:1.5"></p>
+  </div>
+</div>
 <div class="sheet" id="editSheet" hidden>
   <button class="scrim" data-close aria-label="Close"></button>
   <div class="panel" role="dialog" aria-modal="true" aria-labelledby="edTitle">
@@ -1367,7 +1393,8 @@ function medTable(rows,pre){
 }
 function regionCard(r){
  const ms=(r.metrics||[]).filter(m=>!m.hidden);
- return `<div class="card hreg"><div class="hh"><span class="fl">${r.flag}</span><h3>${esc(r.name)}</h3><span class="sig ${r.signal}">${SIG_WORD[r.signal]||''}</span></div>
+ const mapA=hSec==='housing'?{us:'us',uk:'uk',ie:'ie',med:'med'}[r.id]:null;
+ return `<div class="card hreg"><div class="hh"><span class="fl">${r.flag}</span><h3>${esc(r.name)}</h3><span class="sig ${r.signal}">${SIG_WORD[r.signal]||''}</span>${mapA?`<button class="mapbtn" data-map="${mapA}" aria-label="Map of ${esc(r.name)} house prices">Map</button>`:''}</div>
   ${r.why?`<div class="why">${esc(r.why.charAt(0).toUpperCase()+r.why.slice(1))}.</div>`:''}
   ${ms.map(m=>metricRow(m,hSec+'/'+r.id+'/'+m.id)).join('')}${r.table?medTable(r.table,hSec+'/'+r.id+'/'):''}${r.dd&&r.stocks&&r.stocks.length?`<div class="hnote" style="font-weight:600;color:var(--ink);margin-top:14px">Office landlord shares</div>${avgBoxes(r.avg)}${ddList(r.stocks)}`:chipRow(r.stocks)}${r.note?`<div class="hnote">${esc(r.note)}</div>`:''}</div>`;
 }
@@ -1429,6 +1456,37 @@ async function loadHealth(force){
 $('healthOv').addEventListener('click',e=>{const b=e.target.closest('button');if(!b||b.dataset.s===hSec)return;HFRESH.clear();hSec=b.dataset.s;store.set('wd.hsec',hSec);hMore=false;buzz();renderHealth();loadHealthNews();});
 $('healthMore').addEventListener('click',()=>{hMore=!hMore;buzz();renderHealthNews();});
 $('healthRefresh').addEventListener('click',async e=>{const b=e.currentTarget;b.classList.remove('spin');void b.offsetWidth;b.classList.add('spin');buzz();await Promise.all([loadHealth(true),loadHealthNews(true),loadCal(true)]);toast('Market health refreshed');});
+
+/* ---------- house price maps ---------- */
+const MAPS={us:{title:'US house prices by state'},uk:{title:'UK house prices by region',seg:[['uk','UK regions'],['ni','Northern Ireland']]},ni:{title:'Northern Ireland house prices by council area',seg:[['uk','UK regions'],['ni','Northern Ireland']]},ie:{title:'Ireland house prices by region'},med:{title:'Mediterranean house prices by country'}};
+const MAPCACHE={};let mapArea='uk',mapSel=null;
+const mClass=y=>y==null?'none':y>=3?'grow':y>=0?'mod':'dec';
+const mColor=y=>({grow:'var(--mgrow)',mod:'var(--mmod)',dec:'var(--mdec)',none:'var(--shut)'})[mClass(y)];
+const mWord=y=>({grow:'Growth',mod:'Moderate',dec:'Decline',none:'No data'})[mClass(y)];
+async function mapData(a){if(MAPCACHE[a]&&Date.now()-MAPCACHE[a].at<30*60e3)return MAPCACHE[a];
+ const [shape,data]=await Promise.all([fetch('/maps/'+a+'.json').then(r=>r.json()),fetch('/.netlify/functions/housemap?area='+a).then(r=>r.json())]);
+ return MAPCACHE[a]={shape,data,at:Date.now()};}
+function fmtMoney(v,c){return v==null?'':c+(v>=1e6?(v/1e6).toFixed(2)+'m':v>=1e3?Math.round(v/1e3)+'k':v);}
+function fmtPeriod(s){if(!s)return '';if(/^\d{4}-\d{2}$/.test(s))return new Date(s+'-01T12:00:00Z').toLocaleDateString('en-GB',{month:'long',year:'numeric',timeZone:'UTC'});if(/^\d{4}-Q\d$/.test(s))return s.replace(/(\d{4})-(Q\d)/,'$2 $1');return s;}
+async function openMap(a){mapArea=a;mapSel=null;openSheet('mapSheet');await renderMap();}
+async function renderMap(){
+ const cfg=MAPS[mapArea];$('mapTitle').textContent=cfg.title;
+ const seg=$('mapSeg');seg.hidden=!cfg.seg;if(cfg.seg)seg.innerHTML=cfg.seg.map(([k,l])=>`<button data-a="${k}" class="${k===mapArea?'on':''}">${l}</button>`).join('');
+ if(!MAPCACHE[mapArea]){$('mapBox').innerHTML='<div class="empty">Loading map…</div>';$('mapInfo').innerHTML='';$('mapList').innerHTML='';$('mapSrc').textContent='';}
+ let m;try{m=await mapData(mapArea);}catch(e){$('mapBox').innerHTML='<div class="empty">Couldn’t load this map. Try again shortly.</div>';return;}
+ if(m.data.error){delete MAPCACHE[mapArea];$('mapBox').innerHTML=`<div class="empty">The price data didn’t load (${esc(m.data.error)}). Try again shortly.</div>`;return;}
+ const by=Object.fromEntries(m.data.areas.map(x=>[x.id,x]));
+ $('mapBox').innerHTML=`<svg viewBox="0 0 ${m.shape.w} ${m.shape.h}" role="img" aria-label="${esc(cfg.title)}">${m.shape.areas.map(s=>{const x=by[s.id];return `<path d="${s.d}" data-id="${esc(s.id)}" fill="${mColor(x?.yoy)}" class="${s.id===mapSel?'sel':''}"><title>${esc(s.name)}${x?.yoy!=null?`: ${x.yoy>0?'+':''}${x.yoy}% on a year ago`:''}</title></path>`;}).join('')}</svg>`;
+ const sp=$('mapBox').querySelector('path.sel');if(sp)sp.parentNode.appendChild(sp);
+ const list=m.data.areas.slice().sort((a,b)=>(b.yoy??-999)-(a.yoy??-999));
+ $('mapList').innerHTML=`<div class="hgroup" style="margin-top:4px">Change on a year ago${m.data.noPrice?'':', with average price'}</div>`+list.map(x=>`<button class="mrow${x.id===mapSel?' sel':''}" data-id="${esc(x.id)}"><i style="--c:${mColor(x.yoy)}"></i><span>${esc(x.name)}</span><span class="p">${fmtMoney(x.price,m.data.cur)}</span><b style="color:${x.yoy==null?'var(--muted)':mColor(x.yoy)}">${x.yoy==null?'—':(x.yoy>0?'+':'')+x.yoy.toFixed(1)+'%'}</b></button>`).join('');
+ const sel=mapSel&&by[mapSel];
+ $('mapInfo').innerHTML=sel?`<b>${esc(sel.name)}</b> · ${mWord(sel.yoy)}<small>${sel.price!=null?'Average price '+fmtMoney(sel.price,m.data.cur)+' · ':''}${sel.yoy!=null?(sel.yoy>0?'+':'')+sel.yoy.toFixed(1)+'% on a year ago':'No recent figure'}</small>`:'<small>Tap an area to see its average price and change on a year ago.</small>';
+ $('mapSrc').textContent=`${m.data.src}, ${fmtPeriod(m.data.date)}.${m.data.noPrice?' Average prices aren’t published for these areas, so the map shows growth only.':''} Growth means prices are 3% or more higher than a year ago, moderate 0–3%, decline below zero.`;
+}
+$('mapSheet').addEventListener('click',e=>{const p=e.target.closest('[data-id]');if(p&&$('mapSheet').contains(p)){mapSel=p.dataset.id===mapSel?null:p.dataset.id;buzz();renderMap();return;}
+ const b=e.target.closest('#mapSeg button');if(b&&b.dataset.a!==mapArea){mapArea=b.dataset.a;mapSel=null;buzz();renderMap();}});
+$('healthBox').addEventListener('click',e=>{const b=e.target.closest('[data-map]');if(b){buzz();openMap(b.dataset.map);}});
 
 /* ---------- tabs ---------- */
 $('recap').addEventListener('click',()=>{switchTab('park');setTimeout(()=>$('movers').scrollIntoView({behavior:'smooth',block:'start'}),350);});
