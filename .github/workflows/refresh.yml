@@ -1,0 +1,35 @@
+name: Refresh data
+on:
+  schedule:
+    - cron: '7,37 * * * *'   # every 30 minutes (GitHub may run a few minutes late)
+  workflow_dispatch:
+concurrency:
+  group: refresh
+  cancel-in-progress: false
+permissions:
+  contents: write
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Check out the data branch
+        run: |
+          git fetch origin data --depth=1 && git worktree add data-branch origin/data && (cd data-branch && git switch -c data) \
+            || (git worktree add --detach data-branch && cd data-branch && git switch --orphan data && git rm -rfq . || true)
+      - run: node scripts/refresh.mjs data-branch
+      - name: Save
+        working-directory: data-branch
+        run: |
+          git config user.name "watchdawg-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet && exit 0
+          git commit -qm "Data refresh $(date -u +%FT%TZ)"
+          git push -q origin data

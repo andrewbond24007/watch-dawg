@@ -2,6 +2,7 @@
 // Official data from the Federal Reserve, Freddie Mac, FHFA, the BIS, the Bank of England
 // and the ECB (FRED blocks cloud servers, so it isn't used), plus share prices from Yahoo.
 import * as XLSX from 'xlsx';
+import { loadHistory, mergeHistory } from '../../lib/history.mjs';
 const UA = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36' };
 const T = (ms) => AbortSignal.timeout(ms);
 const START = '2019-01-01';
@@ -121,29 +122,36 @@ const plain = (h) => h.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style
 // Published Trepp readings (office CMBS delinquency, and the all-property rate including performing matured
 // loans), used only for months the live reports no longer list. Sources: Trepp via Connect CRE, Scotsman Guide, CRE Daily.
 const TREPP_SEED = { office: [['2025-09-01', 11.13], ['2025-10-01', 11.76], ['2026-01-01', 12.34], ['2026-09-01', 12.16]], matured: [['2026-08-01', 9.81]] };
+// one Trepp monthly delinquency report (plain text) -> { date, overall, office, matured }
+export function parseTrepp(t) {
+  const start = t.search(/The Trepp (commercial mortgage-backed securities \(CMBS\) |CMBS )?delinquency rate/i);
+  if (start < 0) return null;
+  const b = t.slice(start, start + 6000);
+  const mo = new RegExp(`in (${MONTHS.join('|')}) (\\d{4})`).exec(b);
+  if (!mo) return null;
+  const out = { date: `${mo[2]}-${String(MONTHS.indexOf(mo[1]) + 1).padStart(2, '0')}-01`, overall: null, office: null, matured: null };
+  const all = /delinquency rate[^%]{0,90}?(\d{1,2}\.\d{1,2})%/i.exec(b);
+  if (all) out.overall = +all[1];
+  // the office reading: "office ... to 12.33%", "the office delinquency rate ... 12.33%"
+  for (const m of b.matchAll(/\boffice\b([^%]{0,110}?)(\d{1,2}\.\d{1,2})%/gi)) {
+    if (/retail|multifamily|lodging|hotel|industrial|mixed-use|overall/i.test(m[1])) continue;
+    if (/loan|tower|portfolio|building|propert/i.test(m[1]) && !/rate|basis points|bps/i.test(m[1])) continue;
+    const v = +m[2]; if (v >= 4 && v <= 30) { out.office = v; break; }
+  }
+  const mb = /(?:matured balloon|beyond (?:their|the) maturity|past (?:their|the) maturity)[^%]{0,220}?(\d{1,2}\.\d{1,2})%/i.exec(b);
+  if (mb && +mb[1] > 4) out.matured = +mb[1];
+  return out;
+}
 async function trepp() {
   const h = await fetch('https://www.trepp.com/trepptalk/topic/cmbs-delinquencies', { headers: UA, signal: T(8000) }).then((r) => r.text());
   const links = [...new Set([...h.matchAll(/href="(https:\/\/www\.trepp\.com\/trepptalk\/[a-z0-9-]+)"/g)].map((m) => m[1]))]
     .filter((l) => /delinquency-(rate|report)|cmbs-delinquenc/.test(l)).slice(0, 4);
   const posts = await Promise.all(links.map((l) => fetch(l, { headers: UA, signal: T(8000) }).then((r) => r.text()).then(plain).catch(() => '')));
   const office = [], matured = [], overall = [];
-  posts.forEach((t, i) => {
-    const start = t.search(/The Trepp (commercial mortgage-backed securities \(CMBS\) |CMBS )?delinquency rate/i);
-    if (start < 0) return;
-    const b = t.slice(start, start + 6000);
-    const mo = new RegExp(`in (${MONTHS.join('|')}) (\\d{4})`).exec(b);
-    if (!mo) return;
-    const d = `${mo[2]}-${String(MONTHS.indexOf(mo[1]) + 1).padStart(2, '0')}-01`;
-    const all = /delinquency rate[^%]{0,90}?(\d{1,2}\.\d{1,2})%/i.exec(b);
-    if (all) overall.push([d, +all[1]]);
-    // the office reading: "office ... to 12.33%", "the office delinquency rate ... 12.33%"
-    for (const m of b.matchAll(/\boffice\b([^%]{0,110}?)(\d{1,2}\.\d{1,2})%/gi)) {
-      if (/retail|multifamily|lodging|hotel|industrial|mixed-use|overall/i.test(m[1])) continue;
-      if (/loan|tower|portfolio|building|propert/i.test(m[1]) && !/rate|basis points|bps/i.test(m[1])) continue;
-      const v = +m[2]; if (v >= 4 && v <= 30) { office.push([d, v]); break; }
-    }
-    const mb = /(?:matured balloon|beyond (?:their|the) maturity|past (?:their|the) maturity)[^%]{0,220}?(\d{1,2}\.\d{1,2})%/i.exec(b);
-    if (mb && +mb[1] > 4) matured.push([d, +mb[1]]);
+  posts.map(parseTrepp).filter(Boolean).forEach((x) => {
+    if (x.overall != null) overall.push([x.date, x.overall]);
+    if (x.office != null) office.push([x.date, x.office]);
+    if (x.matured != null) matured.push([x.date, x.matured]);
   });
   const merge = (live, seed) => { const m = new Map(seed); live.forEach(([d, v]) => m.set(d, v)); return [...m.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1)); };
   if (!office.length && !overall.length) throw new Error('Trepp: no readings found');
@@ -151,12 +159,14 @@ async function trepp() {
 }
 // Kastle weekly office occupancy (10 big US cities, share of pre-pandemic attendance).
 async function kastle() {
-  const t = plain(await fetch('https://www.kastle.com/safety-wellness/getting-america-back-to-work/', { headers: UA, signal: T(8000) }).then((r) => r.text()));
+  return parseKastle(plain(await fetch('https://www.kastle.com/safety-wellness/getting-america-back-to-work/', { headers: UA, signal: T(8000) }).then((r) => r.text())));
+}
+export function parseKastle(t, now = new Date()) {
   const m = /national average occupancy of (\d{2}\.\d)%(?:,? (up|down) (\d+(?:\.\d)?) points?)?/i.exec(t);
   if (!m) throw new Error('Kastle: figure not found');
   const v = +m[1], ch = m[3] ? (m[2].toLowerCase() === 'up' ? 1 : -1) * +m[3] : null;
   const peak = /peak day nationally[^%]{0,120}?(\d{2}\.\d)%/i.exec(t);
-  const wk = new Date(); wk.setUTCDate(wk.getUTCDate() - ((wk.getUTCDay() + 6) % 7) - 7);
+  const wk = new Date(now); wk.setUTCDate(wk.getUTCDate() - ((wk.getUTCDay() + 6) % 7) - 7);
   return { value: v, prev: ch == null ? null : +(v - ch).toFixed(1), peak: peak ? +peak[1] : null, date: wk.toISOString().slice(0, 10) };
 }
 // ---------- rental yields ----------
@@ -222,12 +232,15 @@ async function lrPrice(region) {
 }
 // Numbeo gross rental yields by country (crowd-sourced survey, refreshed twice a year).
 async function numbeo() {
-  const t = await fetch('https://www.numbeo.com/property-investment/rankings_by_country.jsp', { headers: UA, signal: T(8000) }).then((r) => r.text());
+  return parseNumbeo(await fetch('https://www.numbeo.com/property-investment/rankings_by_country.jsp', { headers: UA, signal: T(8000) }).then((r) => r.text()));
+}
+export function parseNumbeo(t) {
   const per = /<title>[^<]*?(\d{4})(\s*Mid-Year)?/i.exec(t);
   const out = { period: per ? (per[2] ? 'Mid-' : 'Early ') + per[1] : '', date: per ? `${per[1]}-${per[2] ? '07' : '01'}-01` : null, c: {} };
   for (const m of t.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/g)) {
     const c = [...m[1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)].map((x) => x[1].replace(/<[^>]+>/g, '').trim());
-    if (c.length >= 5) { const name = c.find((x) => /[A-Za-z]/.test(x)); const nums = c.filter((x) => /^[\d.]+$/.test(x)).map(Number); if (name && nums.length >= 4) out.c[name] = { centre: nums[nums.length >= 7 ? 1 : 0], outside: nums[nums.length >= 7 ? 2 : 1] }; }
+    // columns after the country name: price-to-income, gross yield (centre), gross yield (outside), ...
+    if (c.length >= 5) { const i = c.findIndex((x) => /[A-Za-z]/.test(x)); const nums = i < 0 ? [] : c.slice(i + 1).filter((x) => /^[\d.]+$/.test(x)).map(Number); if (nums.length >= 3) out.c[c[i]] = { centre: nums[1], outside: nums[2] }; }
   }
   if (!Object.keys(out.c).length) throw new Error('Numbeo: table not found');
   return out;
@@ -556,7 +569,10 @@ export default async (req) => {
     ],
     errors,
   };
+  // trend lines for snapshot-only figures come from the stored history (skipped when building it)
+  if (!new URL(req.url).searchParams.has('nohist')) mergeHistory(body, await loadHistory());
   return new Response(JSON.stringify(body), {
     headers: { 'content-type': 'application/json', 'cache-control': 'public, max-age=600', 'netlify-cdn-cache-control': 'public, s-maxage=1800, stale-while-revalidate=21600', 'access-control-allow-origin': '*' },
   });
 };
+export { csv, qDate, yoy };
