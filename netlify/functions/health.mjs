@@ -269,7 +269,10 @@ async function csoSales() {
   const q = { jsonrpc: '2.0', method: 'PxStat.Data.Cube_API.ReadDataset', params: { class: 'query', id: ['STATISTIC', 'C03349V04063', 'C03346V04033', 'C03341V04028', 'C03344V04031'],
     dimension: { STATISTIC: { category: { index: ['HPM04C01'] } }, C03349V04063: { category: { index: ['-'] } }, C03346V04033: { category: { index: ['-'] } }, C03341V04028: { category: { index: ['02'] } }, C03344V04031: { category: { index: ['-'] } } },
     extension: { pivot: null, codes: true, language: { code: 'en' }, format: { type: 'JSON-stat', version: '2.0' }, matrix: 'HPM04' }, version: '2.0' } };
-  const j = await fetch('https://ws.cso.ie/public/api.jsonrpc?data=' + encodeURIComponent(JSON.stringify(q)), { headers: UA, signal: T(12000) }).then((r) => r.json());
+  const url = 'https://ws.cso.ie/public/api.jsonrpc?data=' + encodeURIComponent(JSON.stringify(q));
+  let j = null;
+  for (let i = 0; i < 2 && !j; i++) j = await fetch(url, { headers: UA, signal: T(15000) }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+  if (!j?.result) throw new Error('CSO sales unavailable');
   const ds = j.result, kT = ds.id.find((k) => /TLIST/.test(k)), times = ds.dimension[kT].category.index;
   const s = times.map((t, i) => [`${t.slice(0, 4)}-${t.slice(4, 6)}-01`, ds.value[i]]).filter((p) => typeof p[1] === 'number');
   if (!s.length) throw new Error('CSO: no sales');
