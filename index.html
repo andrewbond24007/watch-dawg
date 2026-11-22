@@ -395,6 +395,60 @@ footer{margin-top:28px;font-size:11.5px;line-height:1.55;color:var(--muted)}
 .hgroup:first-of-type{margin-top:4px}
 .hsub{display:flex;justify-content:space-between;align-items:center;margin:22px 0 10px}
 .hsub .day{margin:0}
+
+/* health v2 layout */
+.hkey{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;font-size:11.5px;color:var(--muted);margin:10px 2px 4px}
+.hkey span::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;background:currentColor;vertical-align:0}
+.hkey .green{color:var(--upink)}.hkey .amber{color:#a86f00}.hkey .red{color:var(--downink)}.hkey em{font-style:normal;margin-left:auto}
+.brief{background:var(--surface);border-radius:18px;box-shadow:var(--shadow);padding:14px 16px;margin:12px 0 14px;border-left:4px solid var(--accent)}
+.brief .bh{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.brief p{margin:8px 0 0;font-size:16px;font-weight:650;line-height:1.35;color:var(--ink)}
+.brief ul{margin:10px 0 0;padding:0;list-style:none;display:grid;gap:5px}
+.brief li{font-size:13px;color:var(--muted);line-height:1.35;padding-left:14px;position:relative}
+.brief li::before{content:"";position:absolute;left:2px;top:7px;width:5px;height:5px;border-radius:50%;background:var(--rule)}
+.brief li b{color:var(--ink);font-weight:650;margin-right:3px}
+.hreg .hh h3{font-size:17px;letter-spacing:-.01em}
+.hm{display:block;padding:0;border-top:1px solid var(--rule)}
+.hm:first-of-type{margin-top:0}
+.hmb{display:grid;grid-template-columns:1fr 92px;grid-template-rows:auto auto;gap:2px 12px;align-items:center;width:100%;border:0;background:none;text-align:left;padding:11px 0;color:var(--ink);font:inherit;cursor:pointer}
+.hmb .ml{grid-column:1;font-size:13px;color:var(--muted);font-weight:600}
+.hmb .mvl{grid-column:1;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.hmb .mv{font-size:21px;font-weight:800;font-variation-settings:"wdth" 108;line-height:1.15;white-space:nowrap}
+.hmb .mc{font-size:12px;color:var(--muted);white-space:nowrap}
+.hmb .mc b.up{color:var(--upink)}.hmb .mc b.down{color:var(--downink)}
+.hmb .spk{grid-column:2;grid-row:1/3;display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+.hmb .spk svg{width:92px;height:30px;display:block}
+.hmb .spk small{font-size:10px;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
+.hm .md{font-size:12px;color:var(--muted);line-height:1.5;padding:0 0 11px}
+.hm .md b{color:var(--ink);font-weight:600}
+.hm.open .hmb .ml::after{content:" ▴";font-size:10px}
+.hm.isnew{background:color-mix(in srgb,var(--newc) 7%,transparent);margin:0 -10px;padding:0 10px;border-radius:10px}
+.mom{margin:10px 0 4px;padding:10px;border-radius:14px;background:var(--bg)}
+.mom .momh{margin:0 2px 8px;padding:0;border:0}
+.mtiles{display:grid;grid-template-columns:repeat(var(--n),1fr);gap:6px}
+.mt{border:0;background:var(--surface);border-radius:10px;padding:8px 8px 7px;text-align:left;display:flex;flex-direction:column;gap:1px;min-width:0;color:var(--ink);font:inherit;cursor:pointer}
+.mt small{font-size:11px;color:var(--muted);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mt b{font-size:18px;font-weight:800;font-variation-settings:"wdth" 108}
+.mt span{font-size:10.5px;color:var(--muted);white-space:nowrap}
+.mt span b{font-size:10.5px;font-weight:700}.mt span b.up{color:var(--upink)}.mt span b.down{color:var(--downink)}
+.mt.isnew{box-shadow:inset 0 0 0 2px var(--newc)}
+.subh{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:16px 0 2px}
+.more .subh:first-child{margin-top:8px}
+.morebtn{display:flex;justify-content:center;align-items:center;gap:6px;width:100%;margin-top:10px;border:0;border-radius:12px;background:var(--bg);color:var(--accent);font-weight:700;font-size:13px;padding:10px}
+.morebtn .ch{transition:transform .2s}.morebtn[aria-expanded="true"] .ch{transform:rotate(180deg)}
+.mrows{margin-top:8px}
+.mr{padding:10px 0;border-top:1px solid var(--rule)}
+.mrn{font-size:14px;font-weight:650;margin-bottom:6px}
+.mrs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.mrs span{display:flex;flex-direction:column;gap:1px}
+.mrs small{font-size:10.5px;color:var(--muted)}
+.mrs b{font-size:14px;font-variant-numeric:tabular-nums}.mrs b.up{color:var(--upink)}.mrs b.down{color:var(--downink)}
+.how{margin-top:16px;background:var(--surface);border-radius:14px;padding:10px 14px;box-shadow:var(--shadow)}
+.how summary{font-size:13px;font-weight:700;cursor:pointer;color:var(--ink)}
+.how p{margin:8px 0 2px}
+.mapbox.zoom{overflow:auto;-webkit-overflow-scrolling:touch}
+.mapbox.zoom svg{width:240%;max-height:none}
+.mapzoom{border:0;background:var(--surface);box-shadow:var(--shadow);border-radius:999px;font-size:12px;font-weight:700;padding:6px 12px;color:var(--accent);margin-left:auto;margin-right:8px}
 </style>
 </head>
 <body>
@@ -492,12 +546,13 @@ footer{margin-top:28px;font-size:11.5px;line-height:1.55;color:var(--muted)}
       <div class="pstatus" id="healthStatus"></div>
       <div class="card upd" id="healthUpd" hidden></div>
       <div class="hov" id="healthOv" role="tablist" aria-label="Market health area"></div>
+      <div class="hkey"><span class="green">Healthy</span><span class="amber">Mixed</span><span class="red">Under strain</span><em>Green figures are good for that market</em></div>
       <div id="healthBox"><div class="empty" style="margin-top:12px">Loading market health…</div></div>
       <div class="hsub"><div class="day" id="healthCalH">Coming up</div></div>
       <div id="healthCal"></div>
       <div class="hsub"><div class="day">In the news</div><button class="linkbtn" id="healthMore" hidden>Show more</button></div>
       <div class="posts" id="healthNews"><div class="empty">Loading headlines…</div></div>
-      <p class="hint" id="healthHint" style="margin-top:12px;line-height:1.5"></p>
+      <details class="how"><summary>How the ratings work</summary><p class="hint" id="healthHint" style="line-height:1.5"></p></details>
     </section>
   </div>
 
@@ -543,7 +598,7 @@ footer{margin-top:28px;font-size:11.5px;line-height:1.55;color:var(--muted)}
   <button class="scrim" data-close aria-label="Close"></button>
   <div class="panel" role="dialog" aria-modal="true" aria-labelledby="mapTitle">
     <div class="grab"></div>
-    <div class="phead"><h2 id="mapTitle">House prices</h2><button class="close" data-close aria-label="Close">✕</button></div>
+    <div class="phead"><h2 id="mapTitle">House prices</h2><button class="mapzoom" id="mapZoom" hidden>Zoom in</button><button class="close" data-close aria-label="Close">✕</button></div>
     <div class="seg" id="mapSeg" role="group" aria-label="Map" style="display:inline-flex;margin-bottom:10px" hidden></div>
     <div class="mapkey" id="mapLegend"><div class="mk-row"></div><div class="mk-lab"></div><div class="mk-cap"><span>Falling</span><span>Change on a year ago</span><span>Rising</span></div></div>
     <div class="mapbox" id="mapBox"><div class="empty">Loading map…</div></div>
@@ -1376,37 +1431,85 @@ function renderUpdates(unseen){
 }
 function goToUpdate(e){
  hUpdOpen=false;if(e.sec!==hSec){HFRESH.clear();hSec=e.sec;store.set('wd.hsec',hSec);hMore=false;loadHealthNews();}
- HFRESH.add(e.k);renderHealth();buzz();
+ HFRESH.add(e.k);HEXP.add(e.k.split('/').slice(0,2).join('/'));renderHealth();buzz();
  const el=document.querySelector(`#healthBox [data-k="${CSS.escape(e.k)}"]`)||document.querySelector(`#healthBox [data-k="${CSS.escape(e.k.replace(/_(yld|rent)$/,''))}"]`);
  if(el){el.scrollIntoView({behavior:reduce?'auto':'smooth',block:'center'});el.classList.remove('flash');void el.offsetWidth;el.classList.add('flash');}
 }
 $('healthStatus').addEventListener('click',e=>{if(!e.target.closest('#upBtn'))return;hUpdOpen=!hUpdOpen;buzz();renderHealth();});
 $('healthUpd').addEventListener('click',e=>{if(e.target.closest('#upClear')){HLOG=[];store.set('wd.hlog',HLOG);hUpdOpen=false;renderHealth();return;}
  const b=e.target.closest('.upi');if(b)goToUpdate(HLOG[+b.dataset.i]);});
-function metricRow(m,key){
- const t=m.trend||0,ref=m.yr??m.prev,ch=ref!=null?m.value-ref:null;
- const when=m.yr!=null?'on a year ago':m.freq==='W'?'on the week':m.freq==='Q'?'on the quarter':'on the month';
- const base=ch==null||m.vs0?'':`<b class="${tcls(t)}">${m.kind==='growth'||m.kind==='change'||m.unit==='%'?hSigned(ch,'%').replace('%',' pts'):hSigned(ch,m.unit)}</b> ${when}`;
- const chTxt=base+(m.extra?(base?' · ':'')+esc(m.extra):'');
- const isNew=key&&HFRESH.has(key);
- return `<div class="hm${isNew?' isnew':''}" data-k="${esc(key||'')}"><div class="ml">${esc(m.label)}${isNew?'<span class="newtag">New</span>':''}</div>
-  <div class="mv num">${m.kind==='growth'||m.kind==='change'?hSigned(m.value,m.unit):hVal(m.value,m.unit)}</div>
-  <div class="mc">${chTxt?chTxt+'<br>':''}${hDate(m)} · ${esc(m.src||'')}</div>
-  <svg viewBox="0 0 100 26" preserveAspectRatio="none" aria-hidden="true" data-sp="${esc(m.id)}" data-v="${t>0?'--up':t<0?'--down':'--muted'}"></svg></div>`;
-}
 function chipRow(st){return st&&st.length?`<div class="chips">${st.map(x=>`<span class="chip">${esc(x.name)} <b class="${tcls(x.m3)}">${x.m3==null?'—':fmtPct(x.m3)}</b></span>`).join('')}</div><div class="hnote" style="margin-top:6px">Share prices over the last 3 months.</div>`:'';}
+/* ---------- health cards (v2 layout) ---------- */
+// short labels for the compact rows; the full label, source and notes show when a row is tapped
+const SL={us_dq:'Mortgage arrears',us_rate:'30-year mortgage rate',us_yield:'Rental yield',us_rent:'Rents',us_hpi:'House prices',us_pend:'Pending sales',us_sales:'Completed sales',us_cut:'Listings cut in price',us_dtp:'Days to sell',us_inv:'Homes for sale',
+ uk_2y:'2-year fixed rate',uk_appr:'Mortgage approvals',uk_yield:'UK rental yield',uk_rent:'UK rents',ni_yield:'NI rental yield',ni_rent:'NI rents',uk_hpi:'House prices',uk_tx:'UK sales',ni_tx:'NI sales (3 months)',
+ ie_rate:'Mortgage rate',ie_yield:'Rental yield',ie_rent:'Rents',ie_hpi:'House prices',ie_tx:'Sales (3 months)',ea_rate:'Euro-area mortgage rate',
+ off_dq:'Office loan arrears',off_dy:'Dividend yield',off_occ:'Office attendance',offeu_dy:'London dividend yield',us_cre_dq:'Bank arrears, all types',us_cre_px:'Prices, all types',reit_dy:'REIT dividend yield',ukc_dy:'Dividend yield',cmbs_mat:'Loans past maturity'};
+const TL={us_pend:'Pending sales',us_sales:'Sales',us_cut:'Price cuts',us_dtp:'Days to sell',us_inv:'For sale',uk_tx:'UK sales',uk_appr:'Approvals',ni_tx:'NI sales',ie_tx:'Sales'};
+const KEYS={'housing/us':['us_hpi','us_rate','us_dq'],'housing/uk':['uk_hpi','uk_2y','uk_yield'],'housing/ie':['ie_hpi','ie_rate','ie_yield'],'housing/med':['ea_rate'],
+ 'cre/off_us':['off_dq','off_occ','off_dy'],'cre/us':['us_cre_dq','us_cre_px','reit_dy']};
+const TILES={'housing/us':['us_pend','us_sales','us_cut'],'housing/uk':['uk_tx','ni_tx','uk_appr']};
+const HEXP=new Set();
+const perWord=m=>m.yr!=null?'y/y':m.freq==='W'?'w/w':m.freq==='Q'?'q/q':m.freq==='D'?'':'m/m';
+function mChange(m){const ref=m.yr??m.prev;if(ref==null||m.vs0)return '';const ch=m.value-ref,pts=m.kind==='growth'||m.kind==='change'||m.unit==='%';
+ return `<b class="${tcls(m.trend||0)}">${pts?hSigned(ch,'%').replace('%',' pts'):hSigned(ch,m.unit)}</b> ${perWord(m)}`;}
+const mVal=m=>m.kind==='growth'||m.kind==='change'?hSigned(m.value,m.unit):hVal(m.value,m.unit);
+function mRange(m){const v=(m.series||[]).map(p=>p[1]).filter(x=>x!=null);if(v.length<4)return '';const lo=Math.min(...v),hi=Math.max(...v);
+ const f=x=>m.unit==='days'?Math.round(x):m.unit==='k'?x.toFixed(0)+'k':m.kind==='growth'||m.kind==='change'?(x>0?'+':'')+x.toFixed(Math.abs(x)<10?1:0)+'%':m.unit==='%'?x.toFixed(1)+'%':x.toFixed(1);
+ return `${f(lo)} to ${f(hi)}`;}
+function metricRow(m,key){
+ const isNew=key&&HFRESH.has(key),t=m.trend||0,ch=mChange(m),rng=mRange(m);
+ return `<div class="hm${isNew?' isnew':''}" data-k="${esc(key||'')}"><button class="hmb" aria-expanded="false">
+  <span class="ml">${esc(SL[m.id]||m.short||m.label)}${isNew?'<span class="newtag">New</span>':''}</span>
+  <span class="mvl"><span class="mv num">${mVal(m)}</span>${ch?`<span class="mc">${ch}</span>`:''}</span>
+  <span class="spk"><svg viewBox="0 0 100 26" preserveAspectRatio="none" aria-hidden="true" data-sp="${esc(m.id)}" data-v="${t>0?'--up':t<0?'--down':'--muted'}"></svg>${rng?`<small>${rng}</small>`:''}</span></button>
+  <div class="md" hidden><b>${esc(m.label)}</b><br>${hDate(m)} · ${esc(m.src||'')}${m.extra?`<br>${esc(m.extra)}`:''}${m.noscore?'<br><i>Shown for context; doesn’t count towards the rating.</i>':''}</div></div>`;
+}
+function momStrip(r,ms,key){
+ const mm=ms.filter(m=>m.grp==='mom');if(!mm.length)return '';
+ const order=TILES[key]||[],tiles=[...order.map(id=>mm.find(m=>m.id===id)).filter(Boolean),...mm.filter(m=>!order.includes(m.id))].slice(0,3);
+ const MW={up:['↗','Picking up','green'],flat:['→','Steady','amber'],down:['↘','Slowing','red']},w=MW[r.momentum]||null;
+ return `<div class="mom"><div class="momh"><span>Momentum</span>${w?`<span class="sig ${w[2]}">${w[0]} ${w[1]}</span>`:''}</div><div class="mtiles" style="--n:${tiles.length}">${tiles.map(m=>{const k=key+'/'+m.id,nw=HFRESH.has(k);
+  return `<button class="mt${nw?' isnew':''}" data-jump="${esc(k)}"><small>${esc(TL[m.id]||SL[m.id]||m.short)}${nw?' <span class="newtag">New</span>':''}</small><b class="num">${mVal(m)}</b><span>${mChange(m)||esc(hDate(m))}</span></button>`;}).join('')}</div></div>`;
+}
 function medTable(rows,pre){
- return `<table class="htab"><thead><tr><th>Country</th><th>Mortgage</th><th>Prices y/y</th><th>Rent yield</th><th>Rents y/y</th></tr></thead><tbody>${rows.map(r=>{
-  const rt=r.rate!=null&&r.rateYr!=null?(r.rate<r.rateYr-.1?'up':r.rate>r.rateYr+.1?'down':''):'';
-  return `<tr data-k="${esc(pre+r.cc)}"><td>${r.flag} ${esc(r.name)}${HFRESH.has(pre+r.cc)||HFRESH.has(pre+r.cc+'_yld')||HFRESH.has(pre+r.cc+'_rent')?'<span class="newtag">New</span>':''}</td><td>${r.rate==null?'—':`<b class="${rt}">${r.rate.toFixed(2)}%</b>`}</td><td>${r.px==null?'—':`<b class="${r.px>0?'up':r.px<0?'down':''}">${hSigned(r.px,'%')}</b>`}</td><td>${r.yld==null?'—':r.yld.toFixed(1)+'%'}</td><td>${r.rent==null?'—':`<b class="${r.rent>0?'up':r.rent<0?'down':''}">${hSigned(r.rent,'%')}</b>`}</td></tr>`;}).join('')}</tbody></table>`;
+ const cell=(lab,v,cls)=>`<span><small>${lab}</small><b class="${cls||''}">${v}</b></span>`;
+ return `<div class="mrows">${rows.map(r=>{const rt=r.rate!=null&&r.rateYr!=null?(r.rate<r.rateYr-.1?'up':r.rate>r.rateYr+.1?'down':''):'';const nw=HFRESH.has(pre+r.cc)||HFRESH.has(pre+r.cc+'_yld')||HFRESH.has(pre+r.cc+'_rent');
+  return `<div class="mr" data-k="${esc(pre+r.cc)}"><div class="mrn">${r.flag} ${esc(r.name)}${nw?' <span class="newtag">New</span>':''}</div><div class="mrs">${cell('Prices',r.px==null?'—':hSigned(r.px,'%'),r.px>0?'up':r.px<0?'down':'')}${cell('Mortgage',r.rate==null?'—':r.rate.toFixed(2)+'%',rt)}${cell('Rent yield',r.yld==null?'—':r.yld.toFixed(1)+'%')}${cell('Rents',r.rent==null?'—':hSigned(r.rent,'%'),r.rent>0?'up':r.rent<0?'down':'')}</div></div>`;}).join('')}</div><div class="hnote">Prices and rents are year on year; mortgage colour compares with a year ago (green = lower).</div>`;
 }
 function regionCard(r){
- const ms0=(r.metrics||[]).filter(m=>!m.hidden),ms=[...ms0.filter(m=>m.grp!=='mom'),...ms0.filter(m=>m.grp==='mom')];
- const MW={up:['Picking up','green'],flat:['Steady','amber'],down:['Slowing','red']};
+ const key=hSec+'/'+r.id,ms=(r.metrics||[]).filter(m=>!m.hidden);
+ const kids=KEYS[key]||ms.filter(m=>m.grp!=='mom'&&!m.noscore).slice(0,3).map(m=>m.id);
+ const keyM=kids.map(id=>ms.find(m=>m.id===id)).filter(Boolean);
+ const rest=ms.filter(m=>!keyM.includes(m));
+ const groups=[['Momentum',rest.filter(m=>m.grp==='mom')],['Rents and yields',rest.filter(m=>m.grp!=='mom'&&m.noscore)],['More figures',rest.filter(m=>m.grp!=='mom'&&!m.noscore)]].filter(g=>g[1].length);
+ const hasDd=r.dd&&r.stocks&&r.stocks.length,moreN=rest.length+(hasDd?r.stocks.length:0);
+ const open=HEXP.has(key)||rest.some(m=>HFRESH.has(key+'/'+m.id));
  const mapA=hSec==='housing'?{us:'us',uk:'uk',ie:'ie',med:'med'}[r.id]:null;
- return `<div class="card hreg"><div class="hh"><span class="fl">${r.flag}</span><h3>${esc(r.name)}</h3><span class="sig ${r.signal}">${SIG_WORD[r.signal]||''}</span>${mapA?`<button class="mapbtn" data-map="${mapA}" aria-label="Map of ${esc(r.name)} house prices">Map</button>`:''}</div>
+ const more=moreN?`<div class="more"${open?'':' hidden'}>${groups.map(([h,list])=>`<div class="subh">${h}</div>${list.map(m=>metricRow(m,key+'/'+m.id)).join('')}`).join('')}${hasDd?`<div class="subh">Each landlord</div>${ddList(r.stocks)}`:''}${r.note?`<div class="hnote">${esc(r.note)}</div>`:''}</div>
+  <button class="morebtn" data-exp="${esc(key)}" aria-expanded="${open}">${open?'Show fewer':`Show all ${moreN+keyM.length} figures`}<span class="ch">▾</span></button>`:r.note?`<div class="hnote">${esc(r.note)}</div>`:'';
+ return `<div class="card hreg" data-card="${esc(key)}"><div class="hh"><span class="fl">${r.flag}</span><h3>${esc(r.name)}</h3><span class="sig ${r.signal}">${SIG_WORD[r.signal]||''}</span>${mapA?`<button class="mapbtn" data-map="${mapA}" aria-label="Map of ${esc(r.name)} house prices">Map</button>`:''}</div>
   ${r.why?`<div class="why">${esc(r.why.charAt(0).toUpperCase()+r.why.slice(1))}.</div>`:''}
-  ${ms.map((m,i)=>(m.grp==='mom'&&ms[i-1]?.grp!=='mom'?`<div class="momh"><span>Momentum</span>${r.momentum?`<span class="sig ${MW[r.momentum][1]}">${MW[r.momentum][0]}</span>`:''}</div>`:'')+metricRow(m,hSec+'/'+r.id+'/'+m.id)).join('')}${r.table?medTable(r.table,hSec+'/'+r.id+'/'):''}${r.dd&&r.stocks&&r.stocks.length?`<div class="hnote" style="font-weight:600;color:var(--ink);margin-top:14px">Office landlord shares</div>${avgBoxes(r.avg)}${ddList(r.stocks)}`:chipRow(r.stocks)}${r.note?`<div class="hnote">${esc(r.note)}</div>`:''}</div>`;
+  ${momStrip(r,ms,key)}${keyM.map(m=>metricRow(m,key+'/'+m.id)).join('')}${r.table?medTable(r.table,key+'/'):''}${hasDd?`<div class="subh">Office landlord shares</div>${avgBoxes(r.avg)}`:chipRow(r.stocks)}${more}</div>`;
+}
+/* section briefing: one plain-English line plus a reason per area */
+const RNAME={us:'US',uk:'UK and NI',ie:'Ireland',med:'Mediterranean',off_us:'US offices',off_eu:'UK and Europe offices'};
+const listJoin=a=>a.length<2?a.join(''):a.slice(0,-1).join(', ')+' and '+a.at(-1);
+const sigLow=s=>({green:'healthy',amber:'mixed',red:'under strain',none:'unclear'})[s];
+function sectionBrief(sec){
+ const R=sec.regions,bul=R.filter(r=>r.why).slice(0,4).map(r=>`<li><b>${esc(RNAME[r.id]||r.name)}</b> ${esc(r.why)}</li>`);let head='';
+ if(sec.id==='housing'){const dn=R.filter(r=>r.momentum==='down').map(r=>RNAME[r.id]),up=R.filter(r=>r.momentum==='up').map(r=>RNAME[r.id]);
+  const px=R.map(r=>{const m=(r.metrics||[]).find(x=>/_hpi$/.test(x.id)&&!x.hidden);return m?[RNAME[r.id],m.value]:r.table?[RNAME[r.id],r.table.filter(t=>t.px!=null).reduce((a,t,_,arr)=>a+t.px/arr.length,0)]:null;}).filter(Boolean);
+  const fall=px.filter(p=>p[1]<0).map(p=>p[0]);
+  const sales=dn.length?`Sales are slowing in ${listJoin(dn)}`:up.length?`Sales are picking up in ${listJoin(up)}`:'Sales are holding steady';
+  head=sales+(fall.length?`${dn.length?' and':', but'} prices are falling in ${listJoin(fall)}.`:`${dn.length?', but':' and'} prices are still rising everywhere tracked.`);}
+ else if(sec.id==='cre'){const o=R.find(r=>r.id==='off_us'),e=R.find(r=>r.id==='off_eu'),oth=R.filter(r=>r.group!=='Offices'),os=overallSig({regions:oth});
+  const dq=o?.metrics?.find(m=>m.id==='off_dq');
+  head=`US offices are ${sigLow(o?.signal||'none')}${dq?` (${dq.value.toFixed(1)}% of office loans in arrears)`:''}, London and European offices are ${sigLow(e?.signal||'none')}, and other commercial property is ${sigLow(os)}.`;}
+ else if(sec.id==='ai'){const r=R[0],a=r.avg||{},st=(r.stocks||[]).filter(x=>x.offHigh!=null).sort((x,y)=>x.offHigh-y.offHigh);
+  head=`AI shares are on average ${Math.abs(a.offHigh||0).toFixed(0)}% below their 12-month highs${a.m3!=null?` and ${a.m3<0?'down':'up'} ${Math.abs(a.m3).toFixed(0)}% over 3 months`:''}.`;
+  bul.length=0;if(st.length)bul.push(`<li><b>Hardest hit</b> ${st.slice(0,3).map(x=>`${esc(x.name)} ${pc1(x.offHigh,0)}`).join(', ')}</li>`,`<li><b>Holding up best</b> ${st.slice(-3).reverse().map(x=>`${esc(x.name)} ${pc1(x.offHigh,0)}`).join(', ')}</li>`);}
+ return `<div class="brief"><div class="bh"><span>${sec.icon} ${esc(sec.id==='cre'?'Commercial property':sec.id==='ai'?'AI bubble':sec.title)} in brief</span><span class="sig ${overallSig(sec)}">${SIG_WORD[overallSig(sec)]}</span></div><p>${esc(head)}</p>${bul.length?`<ul>${bul.join('')}</ul>`:''}</div>`;
 }
 function ddList(st){
  return st.slice().sort((x,y)=>(x.offHigh??0)-(y.offHigh??0)).map(x=>{const off=Math.min(100,Math.abs(x.offHigh??0));const c=off>=30?'var(--down)':off>=12?'#d99a00':'var(--up)';
@@ -1415,7 +1518,7 @@ function ddList(st){
 function avgBoxes(a){return a?`<div class="aiavg"><div><b class="num">${pc1(a.offHigh,0)}</b><small>vs 12-month high</small></div><div><b class="num" style="color:var(--${a.m3>0?'upink':a.m3<0?'downink':'ink'})">${pc1(a.m3,0)}</b><small>3 months</small></div><div><b class="num" style="color:var(--${a.y1>0?'upink':a.y1<0?'downink':'ink'})">${pc1(a.y1,0)}</b><small>1 year</small></div></div>`:'';}
 function aiCard(r){
  const a=r.avg||{},st=(r.stocks||[]).slice().sort((x,y)=>(x.offHigh??0)-(y.offHigh??0));
- return `<div class="card hreg"><div class="hh"><span class="fl">🤖</span><h3>AI shares</h3><span class="sig ${r.signal}">${r.signal==='red'?'Deflating':r.signal==='amber'?'Wobbling':r.signal==='green'?'Still inflating':'No data'}</span></div>
+ return `<div class="card hreg"><div class="hh"><span class="fl">🤖</span><h3>AI shares</h3><span class="sig ${r.signal}">${SIG_WORD[r.signal]||''}</span></div>
   ${r.why?`<div class="why">${esc(r.why)}.</div>`:''}
   ${avgBoxes(a)}${ddList(st)}
   <div class="hnote">The bar shows how far each share is below its 12-month high. Green under 12%, amber to 30%, red beyond. Signal is based on the average drop.</div></div>`;
@@ -1427,15 +1530,15 @@ function renderHealth(){
  else{
   if(!d.sections.some(s=>s.id===hSec))hSec=d.sections[0].id;
   const unseenAll=hUnseen();hMarkSeen(hSec);const unseen=updateHealthDot();renderUpdates(unseenAll);
-  $('healthOv').innerHTML=d.sections.map(s=>{const g=overallSig(s);return `<button role="tab" aria-selected="${s.id===hSec}" class="${s.id===hSec?'on':''}" data-s="${s.id}">${unseen[s.id]?'<i class="ndot" aria-label="New updates"></i>':''}<span class="ic">${s.icon}</span><b>${esc(s.id==='cre'?'Commercial property':s.id==='ai'?'AI bubble':s.title)}</b><span class="sig ${g}">${s.id==='ai'?{red:'Deflating',amber:'Wobbling',green:'Inflating',none:'No data'}[g]:SIG_WORD[g]}</span></button>`;}).join('');
+  $('healthOv').innerHTML=d.sections.map(s=>{const g=overallSig(s);return `<button role="tab" aria-selected="${s.id===hSec}" class="${s.id===hSec?'on':''}" data-s="${s.id}">${unseen[s.id]?'<i class="ndot" aria-label="New updates"></i>':''}<span class="ic">${s.icon}</span><b>${esc(s.id==='cre'?'Commercial property':s.id==='ai'?'AI bubble':s.title)}</b><span class="sig ${g}">${SIG_WORD[g]}</span></button>`;}).join('');
   const sec=d.sections.find(s=>s.id===hSec);
   let grp='';
-  $('healthBox').innerHTML=`<div class="day">${sec.icon} ${esc(sec.title)}</div>`+(sec.id==='ai'?sec.regions.map(aiCard).join(''):sec.regions.map(r=>{const h=r.group&&r.group!==grp?`<div class="hgroup">${esc(r.group)}</div>`:'';grp=r.group||grp;return h+regionCard(r);}).join(''));
+  $('healthBox').innerHTML=sectionBrief(sec)+(sec.id==='ai'?sec.regions.map(aiCard).join(''):sec.regions.map(r=>{const h=r.group&&r.group!==grp?`<div class="hgroup">${esc(r.group)}</div>`:'';grp=r.group||grp;return h+regionCard(r);}).join(''));
   const all=Object.fromEntries(sec.regions.flatMap(r=>r.metrics||[]).map(m=>[m.id,m]));
   $('healthBox').querySelectorAll('svg[data-sp]').forEach(s=>{const m=all[s.dataset.sp];spark(s,(m?.series||[]).map(p=>p[1]),s.dataset.v);});
  }
  renderHealthCal();renderHealthNews();
- $('healthHint').textContent='Rental and dividend yields are shown for context and don’t count towards the traffic lights: higher yields mean cheaper property but usually follow falling prices. Each area gets a traffic light from its key figures compared with a year ago (rising arrears and mortgage rates count against it; rising prices, approvals and share prices count for it), with arrears weighted double as the early warning. Data: Federal Reserve, Freddie Mac, FHFA, Bank of England, ECB and BIS, plus share prices from Yahoo. Official figures are monthly or quarterly, so they change slowly; share prices update through the day.';
+ $('healthHint').textContent='Each area is rated from its key figures compared with a year ago: rising arrears, mortgage rates and price cuts count against it; rising prices, sales, approvals and share prices count for it. Arrears and pending sales count double as early warnings. Rents and yields are shown for context only. Tap any figure for its source and date. Official figures are monthly or quarterly; share prices update through the day.';
 }
 function renderHealthCal(){
  const cfg=H_NEWS[hSec],now=Date.now();$('healthCalH').textContent=cfg.calH;
@@ -1463,7 +1566,12 @@ async function loadHealth(force){
  try{const j=await fetch('/.netlify/functions/health?v='+HEALTH_V).then(r=>r.json());if(Array.isArray(j.sections)){HEALTH.data=j;HEALTH.at=Date.now();HEALTH.err=false;store.set('wd.health',j);}else HEALTH.err=true;}catch(e){HEALTH.err=true;}
  HEALTH.busy=false;renderHealth();updateHealthDot();
 }
-$('healthOv').addEventListener('click',e=>{const b=e.target.closest('button');if(!b||b.dataset.s===hSec)return;HFRESH.clear();hSec=b.dataset.s;store.set('wd.hsec',hSec);hMore=false;buzz();renderHealth();loadHealthNews();});
+$('healthBox').addEventListener('click',e=>{
+ const hb=e.target.closest('.hmb');if(hb){const md=hb.nextElementSibling;md.hidden=!md.hidden;hb.setAttribute('aria-expanded',!md.hidden);hb.parentNode.classList.toggle('open',!md.hidden);buzz();return;}
+ const mb=e.target.closest('.morebtn');if(mb){const k=mb.dataset.exp;HEXP.has(k)?HEXP.delete(k):HEXP.add(k);buzz();renderHealth();if(!HEXP.has(k))document.querySelector(`[data-card="${CSS.escape(k)}"]`)?.scrollIntoView({block:'nearest',behavior:reduce?'auto':'smooth'});return;}
+ const mt=e.target.closest('.mt[data-jump]');if(mt){const k=mt.dataset.jump,card=k.split('/').slice(0,2).join('/');HEXP.add(card);buzz();renderHealth();const el=document.querySelector(`#healthBox [data-k="${CSS.escape(k)}"]`);if(el){el.scrollIntoView({block:'center',behavior:reduce?'auto':'smooth'});el.classList.remove('flash');void el.offsetWidth;el.classList.add('flash');}}
+});
+$('healthOv').addEventListener('click',e=>{const b=e.target.closest('button');if(!b||b.dataset.s===hSec)return;HFRESH.clear();HEXP.clear();hSec=b.dataset.s;store.set('wd.hsec',hSec);hMore=false;buzz();renderHealth();loadHealthNews();});
 $('healthMore').addEventListener('click',()=>{hMore=!hMore;buzz();renderHealthNews();});
 $('healthRefresh').addEventListener('click',async e=>{const b=e.currentTarget;b.classList.remove('spin');void b.offsetWidth;b.classList.add('spin');buzz();await Promise.all([loadHealth(true),loadHealthNews(true),loadCal(true)]);toast('Market health refreshed');});
 
@@ -1485,7 +1593,7 @@ function fmtMoney(v,c){return v==null?'':c+(v>=1e6?(v/1e6).toFixed(2)+'m':v>=1e3
 function fmtPeriod(s){if(!s)return '';if(/^\d{4}-\d{2}$/.test(s))return new Date(s+'-01T12:00:00Z').toLocaleDateString('en-GB',{month:'long',year:'numeric',timeZone:'UTC'});if(/^\d{4}-Q\d$/.test(s))return s.replace(/(\d{4})-(Q\d)/,'$2 $1');return s;}
 async function openMap(a){mapArea=a;mapSel=null;openSheet('mapSheet');await renderMap();}
 async function renderMap(){
- const cfg=MAPS[mapArea];$('mapTitle').textContent=cfg.title;
+ const cfg=MAPS[mapArea];$('mapTitle').textContent=cfg.title;const zb=$('mapZoom');zb.hidden=mapArea!=='us';if(mapArea!=='us')$('mapBox').classList.remove('zoom');zb.textContent=$('mapBox').classList.contains('zoom')?'Zoom out':'Zoom in';
  const seg=$('mapSeg');seg.hidden=!cfg.seg;seg.style.display=cfg.seg?'inline-flex':'none';if(cfg.seg)seg.innerHTML=cfg.seg.map(([k,l])=>`<button data-a="${k}" class="${k===mapArea?'on':''}">${l}</button>`).join('');
  if(!MAPCACHE[mapArea]){$('mapBox').innerHTML='<div class="empty">Loading map…</div>';$('mapInfo').innerHTML='';$('mapList').innerHTML='';$('mapSrc').textContent='';}
  $('mapLegend').querySelector('.mk-row').innerHTML=MBINS.map(b=>`<i style="--c:${b.c}"></i>`).join('')+'<i style="--c:var(--shut)"></i>';
@@ -1509,6 +1617,7 @@ async function renderMap(){
  $('mapInfo').innerHTML=sel?`<b>${esc(sel.name)}</b> · ${mWord(sel.yoy)}<small>${sel.price!=null?'Average price '+fmtMoney(sel.price,m.data.cur)+' · ':''}${sel.yoy!=null?fmtY(sel.yoy)+' on a year ago':'No recent figure'}</small>`:'<small>Tap an area to see its average price and change on a year ago.</small>';
  $('mapSrc').textContent=`${m.data.src}, ${fmtPeriod(m.data.date)}.${m.data.noPrice?' Average prices aren’t published for these areas, so the map shows growth only.':''} Colours show the change in average price on a year ago: deeper green for faster rises, deeper red for faster falls. Small areas are labelled at the side.`;
 }
+$('mapZoom').addEventListener('click',()=>{const b=$('mapBox'),on=b.classList.toggle('zoom');$('mapZoom').textContent=on?'Zoom out':'Zoom in';if(on)requestAnimationFrame(()=>{b.scrollLeft=b.scrollWidth*0.55;});buzz();});
 $('mapSheet').addEventListener('click',e=>{const p=e.target.closest('[data-id]');if(p&&$('mapSheet').contains(p)){mapSel=p.dataset.id===mapSel?null:p.dataset.id;buzz();renderMap();return;}
  const b=e.target.closest('#mapSeg button');if(b&&b.dataset.a!==mapArea){mapArea=b.dataset.a;mapSel=null;buzz();renderMap();}});
 $('healthBox').addEventListener('click',e=>{const b=e.target.closest('[data-map]');if(b){buzz();openMap(b.dataset.map);}});
