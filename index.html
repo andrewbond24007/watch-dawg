@@ -1458,7 +1458,7 @@ $('healthMore').addEventListener('click',()=>{hMore=!hMore;buzz();renderHealthNe
 $('healthRefresh').addEventListener('click',async e=>{const b=e.currentTarget;b.classList.remove('spin');void b.offsetWidth;b.classList.add('spin');buzz();await Promise.all([loadHealth(true),loadHealthNews(true),loadCal(true)]);toast('Market health refreshed');});
 
 /* ---------- house price maps ---------- */
-const MAPS={us:{title:'US house prices by state'},uk:{title:'UK house prices by region',seg:[['uk','UK regions'],['ni','Northern Ireland']]},ni:{title:'Northern Ireland house prices by council area',seg:[['uk','UK regions'],['ni','Northern Ireland']]},ie:{title:'Ireland house prices by region'},med:{title:'Mediterranean house prices by country'}};
+const MAPS={us:{title:'US house prices by state'},uk:{title:'UK house prices by region',seg:[['uk','UK regions'],['ni','Northern Ireland']]},ni:{title:'NI house prices by council',seg:[['uk','UK regions'],['ni','Northern Ireland']]},ie:{title:'Ireland house prices by region'},med:{title:'Mediterranean house prices by country'}};
 const MAPCACHE={};let mapArea='uk',mapSel=null;
 const mClass=y=>y==null?'none':y>=3?'grow':y>=0?'mod':'dec';
 const mColor=y=>({grow:'var(--mgrow)',mod:'var(--mmod)',dec:'var(--mdec)',none:'var(--shut)'})[mClass(y)];
@@ -1471,7 +1471,7 @@ function fmtPeriod(s){if(!s)return '';if(/^\d{4}-\d{2}$/.test(s))return new Date
 async function openMap(a){mapArea=a;mapSel=null;openSheet('mapSheet');await renderMap();}
 async function renderMap(){
  const cfg=MAPS[mapArea];$('mapTitle').textContent=cfg.title;
- const seg=$('mapSeg');seg.hidden=!cfg.seg;if(cfg.seg)seg.innerHTML=cfg.seg.map(([k,l])=>`<button data-a="${k}" class="${k===mapArea?'on':''}">${l}</button>`).join('');
+ const seg=$('mapSeg');seg.hidden=!cfg.seg;seg.style.display=cfg.seg?'inline-flex':'none';if(cfg.seg)seg.innerHTML=cfg.seg.map(([k,l])=>`<button data-a="${k}" class="${k===mapArea?'on':''}">${l}</button>`).join('');
  if(!MAPCACHE[mapArea]){$('mapBox').innerHTML='<div class="empty">Loading map…</div>';$('mapInfo').innerHTML='';$('mapList').innerHTML='';$('mapSrc').textContent='';}
  let m;try{m=await mapData(mapArea);}catch(e){$('mapBox').innerHTML='<div class="empty">Couldn’t load this map. Try again shortly.</div>';return;}
  if(m.data.error){delete MAPCACHE[mapArea];$('mapBox').innerHTML=`<div class="empty">The price data didn’t load (${esc(m.data.error)}). Try again shortly.</div>`;return;}
