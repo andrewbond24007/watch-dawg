@@ -371,8 +371,13 @@ footer{margin-top:28px;font-size:11.5px;line-height:1.55;color:var(--muted)}
 .upi.seen .t{font-weight:500}
 .flash{animation:flash 1.6s ease}
 @keyframes flash{0%,40%{box-shadow:0 0 0 3px var(--newc)}100%{box-shadow:0 0 0 3px transparent}}
-.maplegend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--muted);margin:2px 0 10px}
-.maplegend span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px;background:var(--c)}
+.mapkey{margin:2px 0 12px}
+.mk-row{display:grid;grid-template-columns:repeat(7,1fr) 0.7fr;gap:2px}
+.mk-row i{height:12px;background:var(--c)}.mk-row i:first-child{border-radius:6px 0 0 6px}.mk-row i:nth-child(7){border-radius:0 6px 6px 0}.mk-row i:last-child{border-radius:6px;margin-left:6px}
+.mk-lab{display:grid;grid-template-columns:repeat(7,1fr) 0.7fr;gap:2px;font-size:10.5px;color:var(--muted);text-align:center;margin-top:3px;font-variant-numeric:tabular-nums}
+.mk-cap{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:2px}
+.mapbox text{font-weight:800;pointer-events:none;paint-order:stroke;stroke-linejoin:round}
+.mapbox line{stroke:var(--muted);stroke-width:1;pointer-events:none}
 .mapbox{background:var(--surface);border-radius:18px;padding:10px;box-shadow:var(--shadow)}
 .mapbox svg{width:100%;height:auto;display:block;max-height:62vh}
 .mapbox path{stroke:var(--surface);stroke-width:.8;stroke-linejoin:round;cursor:pointer;transition:opacity .2s}
@@ -538,7 +543,7 @@ footer{margin-top:28px;font-size:11.5px;line-height:1.55;color:var(--muted)}
     <div class="grab"></div>
     <div class="phead"><h2 id="mapTitle">House prices</h2><button class="close" data-close aria-label="Close">✕</button></div>
     <div class="seg" id="mapSeg" role="group" aria-label="Map" style="display:inline-flex;margin-bottom:10px" hidden></div>
-    <div class="maplegend" id="mapLegend"><span style="--c:var(--mgrow)">Growth (3%+)</span><span style="--c:var(--mmod)">Moderate (0–3%)</span><span style="--c:var(--mdec)">Decline</span><span style="--c:var(--shut)">No data</span></div>
+    <div class="mapkey" id="mapLegend"><div class="mk-row"></div><div class="mk-lab"></div><div class="mk-cap"><span>Falling</span><span>Change on a year ago</span><span>Rising</span></div></div>
     <div class="mapbox" id="mapBox"><div class="empty">Loading map…</div></div>
     <div class="mapinfo" id="mapInfo" aria-live="polite"></div>
     <div id="mapList"></div>
@@ -1460,9 +1465,13 @@ $('healthRefresh').addEventListener('click',async e=>{const b=e.currentTarget;b.
 /* ---------- house price maps ---------- */
 const MAPS={us:{title:'US house prices by state'},uk:{title:'UK house prices by region',seg:[['uk','UK regions'],['ni','Northern Ireland']]},ni:{title:'NI house prices by council',seg:[['uk','UK regions'],['ni','Northern Ireland']]},ie:{title:'Ireland house prices by region'},med:{title:'Mediterranean house prices by country'}};
 const MAPCACHE={};let mapArea='uk',mapSel=null;
-const mClass=y=>y==null?'none':y>=3?'grow':y>=0?'mod':'dec';
-const mColor=y=>({grow:'var(--mgrow)',mod:'var(--mmod)',dec:'var(--mdec)',none:'var(--shut)'})[mClass(y)];
-const mWord=y=>({grow:'Growth',mod:'Moderate',dec:'Decline',none:'No data'})[mClass(y)];
+/* graded scale: deeper green the faster prices are rising, deeper red the faster they're falling */
+const MBINS=[{max:-5,c:'#7f1d1d',ink:'#fff',w:'Sharp decline',lab:'≤−5'},{max:-2,c:'#dc2626',ink:'#fff',w:'Decline',lab:'−5 to −2'},{max:0,c:'#fca5a5',ink:'#3b0d0d',w:'Slight decline',lab:'−2 to 0'},
+ {max:2,c:'#bbf7d0',ink:'#0b3d1c',w:'Little change',lab:'0 to 2'},{max:4,c:'#4ade80',ink:'#0b3d1c',w:'Moderate growth',lab:'2 to 4'},{max:7,c:'#16a34a',ink:'#fff',w:'Growth',lab:'4 to 7'},{max:Infinity,c:'#14532d',ink:'#fff',w:'Strong growth',lab:'7+'}];
+const mBin=y=>y==null?null:MBINS.find(b=>y<b.max)||MBINS.at(-1);
+const mColor=y=>mBin(y)?.c||'var(--shut)';
+const mWord=y=>mBin(y)?.w||'No data';
+const fmtY=y=>(y>0?'+':y<0?'−':'')+Math.abs(y).toFixed(1)+'%';
 async function mapData(a){if(MAPCACHE[a]&&Date.now()-MAPCACHE[a].at<30*60e3)return MAPCACHE[a];
  const [shape,data]=await Promise.all([fetch('/maps/'+a+'.json').then(r=>r.json()),fetch('/.netlify/functions/housemap?area='+a).then(r=>r.json())]);
  return MAPCACHE[a]={shape,data,at:Date.now()};}
@@ -1473,16 +1482,25 @@ async function renderMap(){
  const cfg=MAPS[mapArea];$('mapTitle').textContent=cfg.title;
  const seg=$('mapSeg');seg.hidden=!cfg.seg;seg.style.display=cfg.seg?'inline-flex':'none';if(cfg.seg)seg.innerHTML=cfg.seg.map(([k,l])=>`<button data-a="${k}" class="${k===mapArea?'on':''}">${l}</button>`).join('');
  if(!MAPCACHE[mapArea]){$('mapBox').innerHTML='<div class="empty">Loading map…</div>';$('mapInfo').innerHTML='';$('mapList').innerHTML='';$('mapSrc').textContent='';}
+ $('mapLegend').querySelector('.mk-row').innerHTML=MBINS.map(b=>`<i style="--c:${b.c}"></i>`).join('')+'<i style="--c:var(--shut)"></i>';
+ $('mapLegend').querySelector('.mk-lab').innerHTML=MBINS.map(b=>`<span>${b.lab}</span>`).join('')+'<span>No data</span>';
  let m;try{m=await mapData(mapArea);}catch(e){$('mapBox').innerHTML='<div class="empty">Couldn’t load this map. Try again shortly.</div>';return;}
  if(m.data.error){delete MAPCACHE[mapArea];$('mapBox').innerHTML=`<div class="empty">The price data didn’t load (${esc(m.data.error)}). Try again shortly.</div>`;return;}
  const by=Object.fromEntries(m.data.areas.map(x=>[x.id,x]));
- $('mapBox').innerHTML=`<svg viewBox="0 0 ${m.shape.w} ${m.shape.h}" role="img" aria-label="${esc(cfg.title)}">${m.shape.areas.map(s=>{const x=by[s.id];return `<path d="${s.d}" data-id="${esc(s.id)}" fill="${mColor(x?.yoy)}" class="${s.id===mapSel?'sel':''}"><title>${esc(s.name)}${x?.yoy!=null?`: ${x.yoy>0?'+':''}${x.yoy}% on a year ago`:''}</title></path>`;}).join('')}</svg>`;
+ const W=m.shape.w,H=m.shape.h,fs=Math.max(9,9.5*W/330),inside=[],out=[];
+ m.shape.areas.forEach(s=>{const x=by[s.id];if(x?.yoy==null)return;const L=Math.sqrt(s.a||0)/3.3;(L>=fs?inside:out).push({s,x,f:Math.min(fs*1.25,L)});});
+ out.sort((a,b)=>a.s.cy-b.s.cy);let yPos=-Infinity;out.forEach(o=>{yPos=Math.max(o.s.cy,yPos+fs*1.25);o.y=yPos;});
+ const over=out.length?Math.max(0,(out.at(-1)?.y||0)+fs-H):0,extra=out.length?fs*3.6+14:0;
+ const lab=(t,x,y,f,fill,stroke)=>`<text x="${x}" y="${y}" font-size="${f.toFixed(1)}" fill="${fill}" stroke="${stroke}" stroke-width="${(f/5).toFixed(1)}" text-anchor="middle" dominant-baseline="central">${t}</text>`;
+ $('mapBox').innerHTML=`<svg viewBox="0 0 ${(W+extra).toFixed(0)} ${(H+over).toFixed(0)}" role="img" aria-label="${esc(cfg.title)}">${m.shape.areas.map(s=>{const x=by[s.id];return `<path d="${s.d}" data-id="${esc(s.id)}" fill="${mColor(x?.yoy)}" class="${s.id===mapSel?'sel':''}"><title>${esc(s.name)}${x?.yoy!=null?`: ${fmtY(x.yoy)} on a year ago`:''}</title></path>`;}).join('')}
+  ${inside.map(o=>{const b=mBin(o.x.yoy);return lab(fmtY(o.x.yoy),o.s.cx,o.s.cy,o.f,b.ink,b.c);}).join('')}
+  ${out.map(o=>`<line x1="${o.s.cx}" y1="${o.s.cy}" x2="${W+4}" y2="${o.y}"/>`+`<text x="${W+8}" y="${o.y}" font-size="${(fs*0.95).toFixed(1)}" fill="var(--ink)" stroke="var(--surface)" stroke-width="${(fs/6).toFixed(1)}" dominant-baseline="central">${fmtY(o.x.yoy)}</text>`).join('')}</svg>`;
  const sp=$('mapBox').querySelector('path.sel');if(sp)sp.parentNode.appendChild(sp);
  const list=m.data.areas.slice().sort((a,b)=>(b.yoy??-999)-(a.yoy??-999));
- $('mapList').innerHTML=`<div class="hgroup" style="margin-top:4px">Change on a year ago${m.data.noPrice?'':', with average price'}</div>`+list.map(x=>`<button class="mrow${x.id===mapSel?' sel':''}" data-id="${esc(x.id)}"><i style="--c:${mColor(x.yoy)}"></i><span>${esc(x.name)}</span><span class="p">${fmtMoney(x.price,m.data.cur)}</span><b style="color:${x.yoy==null?'var(--muted)':mColor(x.yoy)}">${x.yoy==null?'—':(x.yoy>0?'+':'')+x.yoy.toFixed(1)+'%'}</b></button>`).join('');
+ $('mapList').innerHTML=`<div class="hgroup" style="margin-top:4px">Change on a year ago${m.data.noPrice?'':', with average price'}</div>`+list.map(x=>`<button class="mrow${x.id===mapSel?' sel':''}" data-id="${esc(x.id)}"><i style="--c:${mColor(x.yoy)}"></i><span>${esc(x.name)}</span><span class="p">${fmtMoney(x.price,m.data.cur)}</span><b style="color:${x.yoy==null?'var(--muted)':x.yoy>=0?'var(--upink)':'var(--downink)'}">${x.yoy==null?'—':fmtY(x.yoy)}</b></button>`).join('');
  const sel=mapSel&&by[mapSel];
- $('mapInfo').innerHTML=sel?`<b>${esc(sel.name)}</b> · ${mWord(sel.yoy)}<small>${sel.price!=null?'Average price '+fmtMoney(sel.price,m.data.cur)+' · ':''}${sel.yoy!=null?(sel.yoy>0?'+':'')+sel.yoy.toFixed(1)+'% on a year ago':'No recent figure'}</small>`:'<small>Tap an area to see its average price and change on a year ago.</small>';
- $('mapSrc').textContent=`${m.data.src}, ${fmtPeriod(m.data.date)}.${m.data.noPrice?' Average prices aren’t published for these areas, so the map shows growth only.':''} Growth means prices are 3% or more higher than a year ago, moderate 0–3%, decline below zero.`;
+ $('mapInfo').innerHTML=sel?`<b>${esc(sel.name)}</b> · ${mWord(sel.yoy)}<small>${sel.price!=null?'Average price '+fmtMoney(sel.price,m.data.cur)+' · ':''}${sel.yoy!=null?fmtY(sel.yoy)+' on a year ago':'No recent figure'}</small>`:'<small>Tap an area to see its average price and change on a year ago.</small>';
+ $('mapSrc').textContent=`${m.data.src}, ${fmtPeriod(m.data.date)}.${m.data.noPrice?' Average prices aren’t published for these areas, so the map shows growth only.':''} Colours show the change in average price on a year ago: deeper green for faster rises, deeper red for faster falls. Small areas are labelled at the side.`;
 }
 $('mapSheet').addEventListener('click',e=>{const p=e.target.closest('[data-id]');if(p&&$('mapSheet').contains(p)){mapSel=p.dataset.id===mapSel?null:p.dataset.id;buzz();renderMap();return;}
  const b=e.target.closest('#mapSeg button');if(b&&b.dataset.a!==mapArea){mapArea=b.dataset.a;mapSel=null;buzz();renderMap();}});
