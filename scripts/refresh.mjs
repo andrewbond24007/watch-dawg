@@ -12,7 +12,19 @@ const dir = process.argv[2] || 'data-branch';
 fs.mkdirSync(dir, { recursive: true });
 const read = (f, d) => { try { return JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')); } catch { return d; } };
 const write = (f, o) => fs.writeFileSync(path.join(dir, f), JSON.stringify(o));
-const call = async (fn, url) => { const r = await fn(new Request(url)); return r.json(); };
+// Sources are fetched by the live app on Vercel (some, like Land Registry, refuse GitHub's servers);
+// if Vercel can't be reached the same code runs here instead.
+const BASE = process.env.APP_URL || 'https://watch-dawg-78h1.vercel.app';
+const call = async (fn, url, remotePath) => {
+  if (remotePath) {
+    try {
+      const r = await fetch(`${BASE}${remotePath}${remotePath.includes('?') ? '&' : '?'}t=${Date.now()}`, { signal: AbortSignal.timeout(60000) });
+      if (r.ok) return await r.json();
+      console.warn(`remote ${remotePath} -> ${r.status}, building here instead`);
+    } catch (e) { console.warn(`remote ${remotePath} failed (${e.message}), building here instead`); }
+  }
+  const r = await fn(new Request(url)); return r.json();
+};
 
 const hist = read('history.json', {});
 const errors = {};
@@ -20,7 +32,7 @@ const t0 = Date.now();
 
 // health: built without history, history extended, then merged back in
 try {
-  const h = await call(health, 'https://watchdawg.local/?nohist=1');
+  const h = await call(health, 'https://watchdawg.local/?nohist=1', '/.netlify/functions/health?nohist=1');
   if (!Array.isArray(h.sections)) throw new Error('no sections');
   const nErr = Object.keys(h.errors || {}).length;
   if (nErr > 10 && fs.existsSync(path.join(dir, 'health.json'))) { Object.assign(errors, h.errors); throw new Error(`${nErr} sources failed; keeping the last good copy`); }
@@ -35,12 +47,12 @@ try {
 // maps one at a time (Land Registry rate-limits bursts)
 for (const a of ['uk', 'ni', 'us', 'ie', 'med']) {
   try {
-    const m = await call(housemap, `https://watchdawg.local/?area=${a}`);
+    const m = await call(housemap, `https://watchdawg.local/?area=${a}`, `/.netlify/functions/housemap?area=${a}`);
     if (m.error) throw new Error(m.error);
     write(`housemap-${a}.json`, m);
   } catch (e) { errors[`map:${a}`] = String(e.message || e); }
 }
-try { const n = await call(nowcast, 'https://watchdawg.local/'); if (n.error) throw new Error(n.error); write('nowcast.json', n); }
+try { const n = await call(nowcast, 'https://watchdawg.local/', '/.netlify/functions/nowcast'); if (n.error) throw new Error(n.error); write('nowcast.json', n); }
 catch (e) { errors.nowcast = String(e.message || e); }
 
 write('history.json', hist);
