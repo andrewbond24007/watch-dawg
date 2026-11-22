@@ -401,7 +401,7 @@ footer{margin-top:28px;font-size:11.5px;line-height:1.55;color:var(--muted)}
 /* health v2 layout */
 .hkey{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;font-size:11.5px;color:var(--muted);margin:10px 2px 4px}
 .hkey span::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;background:currentColor;vertical-align:0}
-.hkey .green{color:var(--upink)}.hkey .amber{color:#a86f00}.hkey .red{color:var(--downink)}.hkey em{font-style:normal;margin-left:auto}
+.hkey .green{color:var(--upink)}.hkey .amber{color:#a86f00}.hkey .red{color:var(--downink)}.hkey em{font-style:normal;flex-basis:100%;margin-top:-2px}
 .brief{background:var(--surface);border-radius:18px;box-shadow:var(--shadow);padding:14px 16px;margin:12px 0 14px;border-left:4px solid var(--accent)}
 .brief .bh{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
 .brief p{margin:8px 0 0;font-size:16px;font-weight:650;line-height:1.35;color:var(--ink)}
@@ -1477,7 +1477,7 @@ function momStrip(r,ms,key){
 function medTable(rows,pre){
  const cell=(lab,v,cls)=>`<span><small>${lab}</small><b class="${cls||''}">${v}</b></span>`;
  return `<div class="mrows">${rows.map(r=>{const rt=r.rate!=null&&r.rateYr!=null?(r.rate<r.rateYr-.1?'up':r.rate>r.rateYr+.1?'down':''):'';const nw=HFRESH.has(pre+r.cc)||HFRESH.has(pre+r.cc+'_yld')||HFRESH.has(pre+r.cc+'_rent');
-  return `<div class="mr" data-k="${esc(pre+r.cc)}"><div class="mrn">${r.flag} ${esc(r.name)}${nw?' <span class="newtag">New</span>':''}</div><div class="mrs">${cell('Prices',r.px==null?'—':hSigned(r.px,'%'),r.px>0?'up':r.px<0?'down':'')}${cell('Mortgage',r.rate==null?'—':r.rate.toFixed(2)+'%',rt)}${cell('Rent yield',r.yld==null?'—':r.yld.toFixed(1)+'%')}${cell('Rents',r.rent==null?'—':hSigned(r.rent,'%'),r.rent>0?'up':r.rent<0?'down':'')}</div></div>`;}).join('')}</div><div class="hnote">Prices and rents are year on year; mortgage colour compares with a year ago (green = lower).</div>`;
+  return `<div class="mr" data-k="${esc(pre+r.cc)}"><div class="mrn">${r.flag} ${esc(r.name)}${nw?' <span class="newtag">New</span>':''}</div><div class="mrs">${cell('Prices',r.px==null?'—':pc1(r.px),r.px>0?'up':r.px<0?'down':'')}${cell('Mortgage',r.rate==null?'—':r.rate.toFixed(2)+'%',rt)}${cell('Rent yield',r.yld==null?'—':r.yld.toFixed(1)+'%')}${cell('Rents',r.rent==null?'—':pc1(r.rent),r.rent>0?'up':r.rent<0?'down':'')}</div></div>`;}).join('')}</div><div class="hnote">Prices and rents are year on year; mortgage colour compares with a year ago (green = lower).</div>`;
 }
 function regionCard(r){
  const key=hSec+'/'+r.id,ms=(r.metrics||[]).filter(m=>!m.hidden);
@@ -1501,7 +1501,7 @@ const PROPER=/^(Spain|Portugal|Italy|Greece|NI|UK|US|Ireland|London|Europe|AI|CR
 const lowWhy=w=>w.split(', ').map(x=>PROPER.test(x)?x:x.charAt(0).toLowerCase()+x.slice(1)).join(', ');
 const sigLow=s=>({green:'healthy',amber:'mixed',red:'under strain',none:'unclear'})[s];
 function sectionBrief(sec){
- const R=sec.regions,bul=R.filter(r=>r.why).slice(0,4).map(r=>`<li><b>${esc(RNAME[r.id]||r.name)}</b> ${esc(lowWhy(r.why))}</li>`);let head='';
+ const R=sec.regions,bul=R.filter(r=>r.why).slice(0,4).map(r=>`<li><b>${esc(sec.id==='housing'?RNAME[r.id]||r.name:r.name)}</b> ${esc(lowWhy(r.why))}</li>`);let head='';
  const THE={us:'the US',uk:'the UK',ie:'Ireland',med:'the Mediterranean'};
  if(sec.id==='housing'){const dn=R.filter(r=>r.momentum==='down').map(r=>THE[r.id]),up=R.filter(r=>r.momentum==='up').map(r=>THE[r.id]);
   const px=R.map(r=>{const m=(r.metrics||[]).find(x=>/_hpi$/.test(x.id)&&!x.hidden);return m?[THE[r.id],m.value]:r.table?[THE[r.id],r.table.filter(t=>t.px!=null).reduce((a,t,_,arr)=>a+t.px/arr.length,0)]:null;}).filter(Boolean);
@@ -1514,7 +1514,7 @@ function sectionBrief(sec){
  else if(sec.id==='ai'){const r=R[0],a=r.avg||{},st=(r.stocks||[]).filter(x=>x.offHigh!=null).sort((x,y)=>x.offHigh-y.offHigh);
   head=`AI shares are on average ${Math.abs(a.offHigh||0).toFixed(0)}% below their 12-month highs${a.m3!=null?` and ${a.m3<0?'down':'up'} ${Math.abs(a.m3).toFixed(0)}% over 3 months`:''}.`;
   bul.length=0;if(st.length)bul.push(`<li><b>Hardest hit</b> ${st.slice(0,3).map(x=>`${esc(x.name)} ${pc1(x.offHigh,0)}`).join(', ')}</li>`,`<li><b>Holding up best</b> ${st.slice(-3).reverse().map(x=>`${esc(x.name)} ${pc1(x.offHigh,0)}`).join(', ')}</li>`);}
- return `<div class="brief"><div class="bh"><span>${sec.icon} ${esc(sec.id==='cre'?'Commercial property':sec.id==='ai'?'AI bubble':sec.title)} in brief</span><span class="sig ${overallSig(sec)}">${SIG_WORD[overallSig(sec)]}</span></div><p>${esc(head)}</p>${bul.length?`<ul>${bul.join('')}</ul>`:''}</div>`;
+ return `<div class="brief"><div class="bh"><span>${sec.icon} In brief</span><span class="sig ${overallSig(sec)}">${SIG_WORD[overallSig(sec)]}</span></div><p>${esc(head)}</p>${bul.length?`<ul>${bul.join('')}</ul>`:''}</div>`;
 }
 function ddList(st){
  return st.slice().sort((x,y)=>(x.offHigh??0)-(y.offHigh??0)).map(x=>{const off=Math.min(100,Math.abs(x.offHigh??0));const c=off>=30?'var(--down)':off>=12?'#d99a00':'var(--up)';
