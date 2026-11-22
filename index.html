@@ -858,7 +858,10 @@ function actualsFor(e){
   return nc.filter(x=>x.act!=null).map((x,i,arr)=>{let tag='';if(arr.length===1&&!isNaN(f)){const d=+(x.act.toFixed(dec))-f;tag=Math.abs(d)<1e-9?'In line':d>0?'Hotter':'Cooler';}return {label:(x.lab||'PCE')+(x.kind==='mom'&&!/m\/m|y\/y/.test(x.lab)?' m/m':''),val:x.act.toFixed(2)+'%',tag,multi:arr.length>1};});}
  if(e.country!=='USD'||!ACT.data)return [];const m=ACT_MAP.find(([rx])=>rx.test(e.title));if(!m)return [];
  const want=refMonth(e.date);
- return m[1].map(k=>{const a=ACT.data[k];if(!a||a.v==null||a.p!==want)return null;
+ const NC_ID={cpiMoM:['mom','cpi'],coreCpiMoM:['mom','coreCpi'],cpiYoY:['yoy','cpi'],coreCpiYoY:['yoy','coreCpi']};
+ return m[1].map(k=>{let a=ACT.data[k];
+  if((!a||a.v==null)&&NC_ID[k]){const v=NOWC.data?.months?.[want]?.act?.[NC_ID[k][0]]?.[NC_ID[k][1]];if(v!=null)a={p:want,v};}
+  if(!a||a.v==null||a.p!==want)return null;
   const [label,unit,kind]=ACT_LABEL[k];const fs=String(e.forecast||''),f=m[1].length===1?parseFloat(fs.replace(/[^0-9.\-]/g,'')):NaN;
   const dec=(fs.split('.')[1]||'').replace(/[^0-9]/g,'').length,v=k==='unemp'&&a.v2!=null?a.v2:a.v;
   let tag='';if(!isNaN(f)){const d=+(v.toFixed(dec))-f;tag=Math.abs(d)<1e-9?'In line':kind==='infl'?(d>0?'Hotter':'Cooler'):kind==='jobs'?(d>0?'Stronger':'Weaker'):(d>0?'Weaker':'Stronger');}
