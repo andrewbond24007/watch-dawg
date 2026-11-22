@@ -27,13 +27,17 @@ function hUnseen(){const d=HEALTH.data,by={};if(!d)return by;const idx=hIndex(d)
  if(!HSEEN){HSEEN={};HVAL={};for(const k in idx){HSEEN[k]=idx[k].sig;HVAL[k]=idx[k].val;}store.set('wd.hseen',HSEEN);store.set('wd.hval',HVAL);return by;}
  let logged=false;
  let base=false;
- for(const [k,x] of Object.entries(idx)){if(HSEEN[k]===undefined){HSEEN[k]=x.sig;HVAL[k]=x.val;base=true;continue;}if(HSEEN[k]===x.sig)continue;(by[x.sec]||=[]).push(k);
+ const isDate=v=>/^\d{4}-\d{2}-\d{2}/.test(v||'');
+ for(const [k,x] of Object.entries(idx)){if(HSEEN[k]===undefined){HSEEN[k]=x.sig;HVAL[k]=x.val;base=true;continue;}if(HSEEN[k]===x.sig)continue;
+  // only a newer release counts as new; an older one coming back (e.g. a source hiccup) is ignored
+  if(isDate(x.sig)&&isDate(HSEEN[k])&&x.sig<HSEEN[k])continue;(by[x.sec]||=[]).push(k);
   if(!HLOG.some(e=>e.k===k&&e.sig===x.sig)){HLOG.unshift({k,sig:x.sig,sec:x.sec,icon:x.icon,region:x.region,label:x.label,from:HVAL[k]&&HVAL[k]!==x.val?HVAL[k]:null,to:x.val,when:x.when,at:Date.now()});HVAL[k]=x.val;logged=true;}}
  if(base){store.set('wd.hseen',HSEEN);store.set('wd.hval',HVAL);}
  if(logged){HLOG=HLOG.slice(0,30);store.set('wd.hlog',HLOG);store.set('wd.hval',HVAL);}
  return by;}
 function hMarkSeen(sec){const d=HEALTH.data;if(!d||!HSEEN)return;const k=hKeys(d);let ch=false;
- Object.entries(k).forEach(([key,sig])=>{if(key.startsWith(sec+'/')&&HSEEN[key]!==sig){HFRESH.add(key);HSEEN[key]=sig;ch=true;}});if(ch)store.set('wd.hseen',HSEEN);}
+ const isDate=v=>/^\d{4}-\d{2}-\d{2}/.test(v||'');
+ Object.entries(k).forEach(([key,sig])=>{if(key.startsWith(sec+'/')&&HSEEN[key]!==sig&&!(isDate(sig)&&isDate(HSEEN[key])&&sig<HSEEN[key])){HFRESH.add(key);HSEEN[key]=sig;ch=true;}});if(ch)store.set('wd.hseen',HSEEN);}
 function updateHealthDot(){const u=hUnseen(),n=Object.values(u).reduce((a,x)=>a+x.length,0),tab=document.querySelector('.tab[data-tab="health"]');let dot=tab.querySelector('.ndot');
  if(n&&!dot){dot=document.createElement('i');dot.className='ndot';tab.appendChild(dot);}else if(!n&&dot)dot.remove();
  tab.setAttribute('aria-label','Health'+(n?`, ${n} new update${n>1?'s':''}`:''));return u;}

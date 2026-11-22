@@ -40,3 +40,10 @@ test('weekly figures seed last week from the reported change', () => {
   appendHistory(doc(56.5, '2026-11-09', { freq: 'W', prev: 56.4 }), h);
   assert.deepEqual(h['cre/off_us/off_occ'], [['2026-11-02', 56.4], ['2026-11-09', 56.5]]);
 });
+test('a figure never steps back to an older release than the history holds', () => {
+  const h = { 'cre/off_us/off_occ': [['2026-08-01', 6.0], ['2026-09-01', 6.2]] };
+  const d = doc(6.1, '2026-08-01', { freq: 'M' });
+  mergeHistory(d, h);
+  const m = d.sections[0].regions[0].metrics[0];
+  assert.equal(m.date, '2026-09-01'); assert.equal(m.value, 6.2); assert.equal(m.prev, 6.0);
+});
