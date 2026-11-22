@@ -84,7 +84,8 @@ function syncPark(){
    n.el.style.setProperty('--ring',colorVar(i.c));
    n.el.setAttribute('aria-label',`${i.name}: ${i.pct==null?'no data':fmtPct(i.pct)}. Open chart`);
    n.el.querySelector('.spr').innerHTML=dobie(n.kind,n.level);
-   n.el.querySelector('.tag').innerHTML=`${esc(i.label)}<span>${i.pct==null?'zzz':fmtPct(i.pct)}</span>`;
+   const ex=i.item.kind==='stock'?extFor(i.item):null;
+   n.el.querySelector('.tag').innerHTML=`${esc(i.label)}<span>${i.pct==null?'zzz':fmtPct(i.pct)}</span>${ex?`<small class="ah">${ex.session==='pre'?'PM':'AH'} ${fmtPct(ex.chg)}</small>`:''}`;
   }
   return n;
  });
@@ -202,7 +203,7 @@ function renderMovers(items){
  const known=items.filter(i=>i.pct!=null).sort((a,b)=>b.pct-a.pct);
  const box=$('movers');
  if(!known.length){box.hidden=true;return;}box.hidden=false;
- box.innerHTML=known.map((i,ix)=>{const top=Math.abs(i.pct)>=1.5?pickReason(whyFor(i.item).direct):null;return `<button class="mv" data-ix="${ix}" style="--c:${colorVar(i.c)}"><i></i><span class="mvn"><b>${esc(i.name)}</b>${i.label!==i.name?`<small>${esc(i.label)}</small>`:''}${top?`<em class="why">${esc(splitTag(top.text).body.split('\n')[0])}</em>`:''}</span><span class="p num ${i.pct>0?'up':i.pct<0?'down':''}">${fmtPct(i.pct)}</span></button>`;}).join('');
+ box.innerHTML=known.map((i,ix)=>{const top=Math.abs(i.pct)>=1.5?pickReason(whyFor(i.item).direct):null;return `<button class="mv" data-ix="${ix}" style="--c:${colorVar(i.c)}"><i></i><span class="mvn"><b>${esc(i.name)}</b>${i.label!==i.name?`<small>${esc(i.label)}</small>`:''}${(ex=>ex?`<em class="why ahl">${extLabel(ex)} <b class="${ex.chg>0?'up':ex.chg<0?'down':''}">${fmtPct(ex.chg)}</b> · ${money(ex.price)}</em>`:'')(i.item.kind==='stock'?extFor(i.item):null)}${top?`<em class="why">${esc(splitTag(top.text).body.split('\n')[0])}</em>`:''}</span><span class="p num ${i.pct>0?'up':i.pct<0?'down':''}">${fmtPct(i.pct)}</span></button>`;}).join('');
  box.querySelectorAll('.mv').forEach(b=>b.addEventListener('click',()=>openChart(known[+b.dataset.ix].item)));
  const need=known.filter(i=>Math.abs(i.pct)>=1.5).map(i=>i.item).filter(it=>{const c=ASSETNEWS[assetKey(it)];return !c||(!c.busy&&Date.now()-c.at>8*60e3);}).slice(0,6);
  if(need.length&&Date.now()-moverFetch>20e3){moverFetch=Date.now();Promise.all(need.map(it=>loadAssetNews(it))).then(()=>{if(activeTab==='park')renderMovers(parkItems());});}

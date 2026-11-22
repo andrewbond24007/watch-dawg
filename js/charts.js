@@ -6,7 +6,7 @@ function openChart(it){
  $('chTitle').textContent=it.kind==='crypto'?`${it.n} (${it.s})`:(it.name||it.n);
  let meta='';
  if(it.kind==='crypto'){const d=cryptoData[it.id];if(d)meta=`<b>${money(d.price)}</b> · ${fmtPct(d.pct)} in 24h`;}
- else{const pc=pctFor(it);if(pc!=null)meta=`${fmtPct(pc)} vs previous close`;if(it.sym.startsWith('FOREXCOM:'))meta+=(meta?' · ':'')+'Chart follows the 24h futures-tracking contract';}
+ else{const pc=pctFor(it);if(pc!=null)meta=`${fmtPct(pc)} vs previous close`;const ex=it.kind==='stock'?extFor(it):null;if(ex)meta+=`${meta?' · ':''}${extLabel(ex).toLowerCase()} ${fmtPct(ex.chg)} at ${money(ex.price)}`;if(it.sym.startsWith('FOREXCOM:'))meta+=(meta?' · ':'')+'Chart follows the 24h futures-tracking contract';}
  $('chMeta').innerHTML=meta;$('chMeta').hidden=!meta;
  openSheet('chartSheet');
  $('chNews').innerHTML='';setTimeout(()=>{drawChart();renderSymbolNews(it);},120);

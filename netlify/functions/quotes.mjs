@@ -16,8 +16,14 @@ export default async (req) => {
       const prev = m.chartPreviousClose ?? m.previousClose ?? null;
       const closes = (res.indicators?.quote?.[0]?.close || []).filter(x => x != null);
       const last = closes.length ? closes[closes.length - 1] : price;
+      // extended hours: if the latest trade is outside the regular session, report it against the regular close
+      const ts = res.timestamp || [], cl = res.indicators?.quote?.[0]?.close || [];
+      let li = cl.length - 1; while (li >= 0 && cl[li] == null) li--;
+      const tp = m.currentTradingPeriod || {}, lt = li >= 0 ? ts[li] : null;
+      const sess = lt == null || !tp.regular ? null : lt >= tp.regular.end ? 'post' : lt < tp.regular.start ? 'pre' : 'regular';
+      const ext = sess === 'post' || sess === 'pre' ? { session: sess, price: +cl[li].toFixed(4), chg: price ? +((cl[li] / price - 1) * 100).toFixed(2) : null, time: lt } : null;
       out[s] = {
-        price, prev, last,
+        price, prev, last, ext,
         pct: prev ? (price / prev - 1) * 100 : null,
         lastPct: prev ? (last / prev - 1) * 100 : null,
         state: m.marketState || null,

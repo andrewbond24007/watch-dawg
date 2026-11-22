@@ -116,6 +116,27 @@ async function loadQuotes(force){
  qBusy=false;
  renderKeyStatus();updateMetalsLive();renderRecap();if(activeTab==='park')syncPark();
 }
+/* extended hours (pre-market / after hours) for US stocks, from Yahoo via the site's quotes helper.
+   Twelve Data's free plan only gives regular-session prices. */
+let extQ=store.get('wd.ext',{}),extAt=0;
+const extSyms=()=>[...new Set(W.stocks.filter(s=>s.y&&!s.sym.startsWith('FOREXCOM:')).map(s=>s.y))];
+function extSession(){const {ymd,mins}=etParts(new Date());if(!isTradingDay(ymd))return null;const c=closeMin(ymd);return mins>=240&&mins<570?'pre':mins>=c&&mins<(c===960?1200:1020)?'post':null;}
+async function loadExtended(force){
+ const syms=extSyms();if(!syms.length||location.protocol==='file:'){renderExt();return;}
+ const every=usOpen()?30*60e3:extSession()?3*60e3:30*60e3;
+ if(!force&&Date.now()-extAt<every){renderExt();return;}
+ extAt=Date.now();
+ try{const j=await fetch('/.netlify/functions/quotes?s='+encodeURIComponent(syms.join(','))).then(r=>r.json());
+  for(const k of syms){const v=j[k];if(!v||v.error)continue;if(v.ext)extQ[k]={...v.ext,close:v.price};else delete extQ[k];}
+  store.set('wd.ext',extQ);
+ }catch(e){}
+ renderExt();if(activeTab==='park')syncPark();
+}
+// shown only while the regular session is shut, and only for trades in the last 4 days
+function extFor(it){if(!it||usOpen())return null;const e=extQ[it.y];if(!e||e.chg==null||Date.now()/1000-e.time>4*86400)return null;return e;}
+const extLabel=e=>e.session==='pre'?'Pre-market':'After hours';
+function renderExt(){document.querySelectorAll('[data-ext]').forEach(el=>{const s=W.stocks.find(x=>x.sym===el.dataset.ext),e=extFor(s);el.hidden=!e;
+ if(e)el.innerHTML=`${extLabel(e)} <b class="${e.chg>0?'up':e.chg<0?'down':''}">${fmtPct(e.chg)}</b> <span>${money(e.price)}</span>`;});}
 /* live metals: free gold-api.com spot price vs Twelve Data's previous close */
 const metalCode=q=>{const m=/^(XAU|XAG|XPD|XPT)\/USD$/.exec(q||'');return m?m[1]:null;};
 async function loadMetalsLive(){
@@ -181,7 +202,7 @@ function rowFor(item,kind,left){
  mini(r.querySelector('.w'),item.sym,item.c,item.name||item.n);
  return r;
 }
-function buildStocks(){const b=$('stocks');b.innerHTML='';if(!W.stocks.length)b.innerHTML='<div class="hint">No stocks yet. Tap the pencil to add some.</div>';W.stocks.forEach(s=>b.appendChild(rowFor(s,'stock',stockBadge(s))));}
+function buildStocks(){const b=$('stocks');b.innerHTML='';if(!W.stocks.length)b.innerHTML='<div class="hint">No stocks yet. Tap the pencil to add some.</div>';W.stocks.forEach(s=>{const r=rowFor(s,'stock',stockBadge(s));if(!s.sym.startsWith('FOREXCOM:'))r.insertAdjacentHTML('beforeend',`<div class="ext" data-ext="${esc(s.sym)}" hidden></div>`);b.appendChild(r);});renderExt();}
 function buildMetals(){const b=$('metals');b.innerHTML='';if(!W.metals.length)b.innerHTML='<div class="hint">No metals yet. Tap the pencil to add some.</div>';W.metals.forEach(m=>b.appendChild(rowFor(m,'metal',`<div class="metal">${ingots()}<b>${esc(m.n)}</b></div>`)));}
 const tvCrypto=c=>c.tv||('BINANCE:'+c.s.toUpperCase()+'USDT');
 function buildTape(){
