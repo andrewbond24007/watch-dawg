@@ -11,7 +11,7 @@ function buildCrypto(){
   d.innerHTML=`<div class="mark" aria-hidden="true">${coinMark(c)}</div>
    <div><span class="nm">${esc(c.n)}</span><span class="tk">${esc(c.s)}</span></div>
    <div class="px num">—</div>
-   <svg viewBox="0 0 100 26" preserveAspectRatio="none" aria-hidden="true"></svg>
+   <svg class="spk" viewBox="0 0 100 26" preserveAspectRatio="none" aria-hidden="true"></svg>
    <div class="pill num">…</div>`;
   d.addEventListener('click',()=>openChart({kind:'crypto',...c}));
   box.appendChild(d);
@@ -36,7 +36,7 @@ function paint(id,price,ch,sp){
  }
  prev[id]=price;px.textContent=money(price);
  t.querySelector('.pill').textContent=(ch>0?'▲ ':ch<0?'▼ ':'')+fmtPct(ch);
- if(sp)spark(t.querySelector('svg'),sp,sp[sp.length-1]>=sp[0]?'--up':'--down');
+ if(sp)spark(t.querySelector('svg.spk'),sp,sp[sp.length-1]>=sp[0]?'--up':'--down');
 }
 async function fromCoinGecko(ids){
  const r=await fetch(`https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${encodeURIComponent(ids.join(','))}&sparkline=true&price_change_percentage=24h`);
