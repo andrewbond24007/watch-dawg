@@ -593,3 +593,6 @@ footer{margin-top:28px;font-size:11.5px;line-height:1.55;color:var(--muted)}
 .stl .tt{font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums;padding-top:1px}
 .stl .dt{width:8px;height:8px;border-radius:50%;margin-top:5px}
 .stl b{font-weight:700}
+
+.post .pt{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:9;overflow:hidden}
+.post.big .pt{-webkit-line-clamp:7}
