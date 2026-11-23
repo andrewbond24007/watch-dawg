@@ -87,34 +87,32 @@ async function loadFng(){
 /* ---------- Twelve Data quotes (dog park) ---------- */
 let qBusy=false,qRetryAt=0,liveMetal={},metalAt=0;
 function usOpen(){const {ymd,mins}=etParts(new Date());return isTradingDay(ymd)&&mins>=570&&mins<closeMin(ymd);}
-function quoteEvery(){const n=[...W.stocks,...W.metals].filter(x=>x.q).length;return usOpen()?(n<=8?5:10)*60e3:60*60e3;}
+// time slot shared by every device: a 5-minute slot while Wall Street is open, otherwise the last session's close
+function lastSessionYmd(){const {ymd,mins}=etParts(new Date());if(isTradingDay(ymd)&&mins>=closeMin(ymd))return ymd;for(let n=1;n<=10;n++){const k=ymdAdd(ymd,-n);if(isTradingDay(k))return k;}return ymd;}
+function quoteBucket(){return usOpen()?'o'+Math.floor(Date.now()/300e3):'c'+lastSessionYmd();}
+let qBucket=store.get('wd.qbucket','');
+// a Twelve Data price is stale when Wall Street is open and it's more than 12 minutes old; Yahoo stands in
+const tdStale=q=>{const v=quotes[q];return !v||(usOpen()&&Date.now()-(v.at||quotesAt)>12*60e3);};
 async function loadQuotes(force){
- if(!tdKey){qStatus='';renderKeyStatus();return;}
- const now=Date.now();
+ const now=Date.now(),b=quoteBucket();
  if(qBusy||now<qRetryAt)return;
- if(!force&&now-quotesAt<quoteEvery()){renderKeyStatus();return;}
- if(force&&now-quotesAt<60e3)return;
- const syms=[...new Set([...W.stocks,...W.metals].map(x=>x.q).filter(Boolean))];
+ const syms=[...new Set([...W.stocks,...W.metals].map(x=>x.q).filter(Boolean))].sort();
  if(!syms.length)return;
+ if(b===qBucket&&syms.every(k=>quotes[k])){renderKeyStatus();return;}
  qBusy=true;
  try{
-  const j=await fetch(`https://api.twelvedata.com/quote?symbol=${encodeURIComponent(syms.join(','))}&apikey=${encodeURIComponent(tdKey)}`).then(r=>r.json());
-  const top=j&&j.status==='error'&&!j[syms[0]];
-  if(top){
-   if(j.code===429){qRetryAt=Date.now()+65e3;qStatus='Twelve Data’s per-minute limit was hit, retrying in a minute';}
-   else qStatus=j.message||'The data key was rejected';
-  }else{
-   const map=syms.length===1?{[syms[0]]:j}:j;let ok=0,miss=[];
-   syms.forEach(k=>{const v=map[k];
-    if(v&&v.status!=='error'&&v.percent_change!=null&&!isNaN(+v.percent_change)){quotes[k]={pct:+v.percent_change,price:+v.close,prev:+v.previous_close||null,open:!!v.is_market_open};ok++;}
-    else if(v&&v.code===429){qRetryAt=Date.now()+65e3;miss.push(k);}
-    else miss.push(k);});
+  const k=tdKey&&tdKey!==DEFAULT_TD_KEY?'&k='+encodeURIComponent(tdKey):'';
+  const j=await fetch(`/.netlify/functions/td?s=${encodeURIComponent(syms.join(','))}&b=${b}${k}`).then(r=>r.json());
+  if(j.error){qRetryAt=Date.now()+65e3;qStatus=j.code===429?'Twelve Data’s limit was hit, using Yahoo prices for now':j.error;}
+  else{let ok=0,miss=[],lim=false;
+   syms.forEach(s=>{const v=j.quotes[s];if(v&&!v.error){quotes[s]={...v,at:j.at};ok++;}else{miss.push(s);if(v&&v.code===429)lim=true;}});
    quotesAt=Date.now();store.set('wd.quotes',quotes);store.set('wd.quotesAt',quotesAt);
-   qStatus=!ok?'No prices came back. Check the key':miss.length?'Not covered on the free plan: '+miss.join(', '):'';
-  }
- }catch(e){qStatus='Couldn’t reach Twelve Data. Will retry';}
+   if(!lim){qBucket=b;store.set('wd.qbucket',b);}else qRetryAt=Date.now()+65e3;
+   qStatus=lim?'Twelve Data’s limit was hit, using Yahoo prices for now':!ok?'No prices came back. Check the key':miss.length?'Not covered on the free plan: '+miss.join(', '):'';}
+ }catch(e){qStatus='Couldn’t reach Twelve Data. Using Yahoo prices';qRetryAt=Date.now()+65e3;}
  qBusy=false;
  renderKeyStatus();updateMetalsLive();renderRecap();if(activeTab==='park')syncPark();
+ if(syms.some(tdStale))loadYahoo();
 }
 /* extended hours (pre-market / after hours) for US stocks, from Yahoo via the site's quotes helper.
    Twelve Data's free plan only gives regular-session prices. */
@@ -146,11 +144,11 @@ async function loadMetalsLive(){
  if(any){metalAt=Date.now();updateMetalsLive();renderRecap();if(activeTab==='park')syncPark();}
 }
 function updateMetalsLive(){for(const q in liveMetal){const p=quotes[q]?.prev;liveMetal[q].pct=p&&liveMetal[q].price?(liveMetal[q].price/p-1)*100:null;}}
-function pctFor(it){const q=it.q,l=liveMetal[q];if(q&&l&&l.pct!=null&&Date.now()-l.at<10*60e3)return l.pct;if(q&&quotes[q])return quotes[q].pct;const y=yq[it.y];return y&&y.pct!=null?y.pct:null;}
+function pctFor(it){const q=it.q,l=liveMetal[q];if(q&&l&&l.pct!=null&&Date.now()-l.at<10*60e3)return l.pct;const y=yq[it.y];if(q&&quotes[q]&&!tdStale(q))return quotes[q].pct;if(y&&y.pct!=null)return y.pct;return q&&quotes[q]?quotes[q].pct:null;}
 /* Yahoo prices via the site's own helper (/.netlify/functions/quotes) */
 let yq=store.get('wd.yq',{}),yAt=0;
 async function loadYahoo(){
- const syms=[...new Set([...W.stocks,...W.metals].filter(x=>x.y&&!(x.q&&quotes[x.q])).map(x=>x.y))];
+ const syms=[...new Set([...W.stocks,...W.metals].filter(x=>x.y&&!(x.q&&!tdStale(x.q))).map(x=>x.y))];
  if(!syms.length||location.protocol==='file:')return;
  try{const j=await fetch('/.netlify/functions/quotes?s='+encodeURIComponent(syms.join(','))).then(r=>r.json());
   let any=false;for(const k in j){if(j[k]&&j[k].pct!=null){yq[k]=j[k];any=true;}}
