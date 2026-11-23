@@ -1,6 +1,6 @@
 /* ---------- news + big events (own cards) ---------- */
 let NEWS={items:[],at:0,busy:false,err:false},CAL={events:[],at:0,busy:false,err:false},newsMode='calendar';
-const SRC={WatcherGuru:{n:'Watcher Guru',c:'#d99a00',i:'WG'},WalterBloomberg:{n:'Walter Bloomberg',c:'#2f6fde',i:'WB'}};
+const SRC={WatcherGuru:{n:'Watcher Guru',c:'#d99a00',i:'WG'},WalterBloomberg:{n:'Walter Bloomberg',c:'#2f6fde',i:'WB'},financialjuice:{n:'FinancialJuice',c:'#e2462f',i:'FJ'},marketfeed:{n:'Market Feed',c:'#15806b',i:'MF'},unfolded:{n:'Unfolded',c:'#8a4fd8',i:'UF'},bwenews:{n:'BWEnews',c:'#c2410c',i:'BW'},cointelegraph:{n:'Cointelegraph',c:'#3d8f3d',i:'CT'}};
 const CRYPTO_RX=/\$(BTC|ETH|SOL|XRP|DOGE|BNB|ADA|USDT|USDC|LKY)\b|bitcoin|ethereum|solana|luckycoin|crypto|stablecoin|binance|coinbase|blockchain|memecoin|tokeni[sz]/i;
 function timeAgo(t){const s=(Date.now()-new Date(t))/1000;if(s<60)return 'just now';if(s<3600)return Math.floor(s/60)+'m ago';if(s<86400)return Math.floor(s/3600)+'h ago';return Math.floor(s/86400)+'d ago';}
 function richText(t){return esc(t).replace(/(\$[A-Z]{2,6})\b/g,'<b class="cash">$1</b>').replace(/([+\-−]?\d[\d,]*(?:\.\d+)?%)/g,'<b>$1</b>').replace(/\n/g,'<br>');}
@@ -119,13 +119,14 @@ const NCAT_RX={crypto:CRYPTO_RX,
  metals:/\b(gold|silver|platinum|palladium|copper|bullion|precious metals?|XAU|XAG)\b/i,
  property:/\b(housing|home ?sales|home prices|house prices|homebuilders?|mortgages?|real estate|property|properties|REITs?|rents?|landlords?|office (space|market|buildings?|loans?)|CMBS)\b/i};
 let newsCat=store.get('wd.newscat','all');
-const inCat=(p,c)=>c==='all'||NCAT_RX[c].test(p.text);
+const inCat=(p,c)=>c==='all'||(p.cats||[]).includes(c)||NCAT_RX[c].test(p.text);
+let newsShown=40;
 function renderNewsCats(){
  const el=$('newsCats');if(!el)return;el.hidden=newsMode!=='headlines';if(el.hidden)return;
  const day2=Date.now()-48*3600e3,recent=NEWS.items.filter(p=>new Date(p.time)>day2);
  el.innerHTML=NCATS.map(([k,l])=>{const n=k==='all'?recent.length:recent.filter(p=>inCat(p,k)).length;return `<button data-c="${k}" class="${k===newsCat?'on':''}" aria-pressed="${k===newsCat}">${l}${n?` <span>${n}</span>`:''}</button>`;}).join('');
 }
-$('newsCats').addEventListener('click',e=>{const b=e.target.closest('button');if(!b||b.dataset.c===newsCat)return;newsCat=b.dataset.c;store.set('wd.newscat',newsCat);buzz();renderNewsTab();});
+$('newsCats').addEventListener('click',e=>{const b=e.target.closest('button');if(!b||b.dataset.c===newsCat)return;newsCat=b.dataset.c;newsShown=40;store.set('wd.newscat',newsCat);buzz();renderNewsTab();});
 function renderNewsTab(){
  if(activeTab!=='news')return;const box=$('newsBox');renderNewsCats();
  if(newsMode==='calendar'){
@@ -145,16 +146,17 @@ function renderNewsTab(){
   const eb=$('earlierBtn');if(eb)eb.onclick=()=>{showEarlier=!showEarlier;buzz();renderNewsTab();};
   loadActuals();loadReactions();
  }else{
-  $('newsHint').textContent='The latest posts from Watcher Guru and Walter Bloomberg, taken from their public Telegram channels (which mirror their X posts). Updates every 2 minutes. Tap a post to open it.';
+  $('newsHint').textContent='The last 48 hours from fast news accounts (Walter Bloomberg, Watcher Guru, FinancialJuice and others, via their public Telegram channels) and headlines from CNBC, Reuters, Bloomberg, the FT, MarketWatch, BBC, CoinDesk, HousingWire and more. Repeats of the same story are merged. Updates every 2 minutes. Tap one to open it.';
   const items=NEWS.items.filter(p=>inCat(p,newsCat)),label=NCATS.find(c=>c[0]===newsCat)?.[1]||'All';
   if(!NEWS.items.length){box.innerHTML=`<div class="empty">${NEWS.err?'News can’t load in this viewer.':'Loading news…'}</div>`;return;}
   if(!items.length){box.innerHTML=`<div class="empty">No ${esc(label.toLowerCase())} news in the latest posts.</div>`;return;}
   const day=Date.now()-24*3600e3;
   let big=items.filter(p=>new Date(p.time)>day&&/^\s*breaking/i.test(p.text));
-  if(big.length<3)big=big.concat(items.filter(p=>new Date(p.time)>day&&p.img&&!big.includes(p)).slice(0,3-big.length));
+  if(big.length<3)big=big.concat(items.filter(p=>new Date(p.time)>day&&p.img&&p.kind!=='headline'&&!big.includes(p)).slice(0,3-big.length));
   big=big.slice(0,4);const ids=new Set(big.map(p=>p.id));
   box.innerHTML=(big.length?`<div class="day">Biggest today${newsCat==='all'?'':' in '+esc(label.toLowerCase())}</div><div class="posts">${big.map(p=>postCard(p,true)).join('')}</div>`:'')+
-   `<div class="day">Latest</div><div class="posts">${items.filter(p=>!ids.has(p.id)).slice(0,40).map(p=>postCard(p,false)).join('')}</div>`;
+   (()=>{const rest=items.filter(p=>!ids.has(p.id)),more=rest.length-newsShown;return `<div class="day">Latest</div><div class="posts">${rest.slice(0,newsShown).map(p=>postCard(p,false)).join('')}</div>`+(more>0?`<button class="linkbtn earlier" id="newsMore">Show more (${more} left)</button>`:'');})();
+  const nm=$('newsMore');if(nm)nm.onclick=()=>{newsShown+=40;buzz();renderNewsTab();};
  }
 }
 $('newsSeg').addEventListener('click',e=>{const b=e.target.closest('button');if(!b||b.dataset.n===newsMode)return;newsMode=b.dataset.n;[...$('newsSeg').children].forEach(x=>x.classList.toggle('on',x===b));buzz();renderNewsTab();window.scrollTo({top:0,behavior:'smooth'});});

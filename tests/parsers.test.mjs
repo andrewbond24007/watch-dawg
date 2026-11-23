@@ -36,3 +36,21 @@ test('Numbeo: gross yields by country and survey period', () => {
   assert.equal(n.period, 'Mid-2026'); assert.equal(n.date, '2026-07-01');
   assert.deepEqual(n.c['United Kingdom'], { centre: 5.0, outside: 5.1 });
 });
+
+// news feed parsers
+import { parseRss, parseTg } from '../netlify/functions/news.mjs';
+test('RSS: Google News item keeps the publisher and drops its suffix', () => {
+  const x = `<rss><channel><item><title>Gold hits record as dollar slides - Reuters</title><link>https://news.google.com/x</link><pubDate>Sun, 22 Nov 2026 21:00:00 GMT</pubDate><source url="https://reuters.com">Reuters</source></item></channel></rss>`;
+  const [p] = parseRss(x, 'Reuters', 'metals');
+  assert.equal(p.text, 'Gold hits record as dollar slides'); assert.equal(p.source, 'Reuters'); assert.deepEqual(p.cats, ['metals']); assert.equal(p.kind, 'headline');
+});
+test('RSS: CDATA titles and Atom entries', () => {
+  const x = `<feed><entry><title><![CDATA[Fed&#8217;s Powell speaks]]></title><link href="https://a.b/c"/><updated>2026-11-22T10:00:00Z</updated></entry></feed>`;
+  const [p] = parseRss(x, 'X');
+  assert.equal(p.text, 'Fed’s Powell speaks'); assert.equal(p.link, 'https://a.b/c');
+});
+test('Telegram: post text, time and link', () => {
+  const h = `<div class="tgme_widget_message_wrap"><div data-post="financialjuice/123"><div class="tgme_widget_message_text js-message_text">US CPI &amp; core<br/>beat</div><time datetime="2026-11-22T10:00:00+00:00"></time></div></div>`;
+  const [p] = parseTg(h, 'financialjuice');
+  assert.equal(p.text, 'US CPI & core\nbeat'); assert.equal(p.link, 'https://t.me/financialjuice/123');
+});
