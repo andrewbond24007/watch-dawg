@@ -37,7 +37,7 @@ function fitCountdown(el){if(!el||!el.style)return;el.style.fontSize='';const ma
 let fitTimer=null;if(typeof window!=='undefined')window.addEventListener('resize',()=>{clearTimeout(fitTimer);fitTimer=setTimeout(()=>fitCountdown(document.getElementById('countdown')),150);});
 function clock(){
  const now=new Date(),{ymd,mins}=etParts(now),trading=isTradingDay(ymd),close=closeMin(ymd),early=!!US_EARLY[ymd];
- const lm=now.getHours()*60+now.getMinutes()+now.getSeconds()/60;let off=lm-mins;if(off>720)off-=1440;if(off<-720)off+=1440;
+ const lm=now.getHours()*60+now.getMinutes()+now.getSeconds()/60;const off=lm-mins; // exact: ET minutes since its midnight vs your minutes since yours (dates may differ near midnight)
  const band=$('band');band.innerHTML='';
  // draw each New York day's own sessions (none on weekends and holidays) across your local day
  [-1,0,1].forEach(dd=>sessionsFor(ymdAdd(ymd,dd)).forEach(([a,b,v])=>{const s=Math.max(0,a+off+dd*1440),e=Math.min(1440,b+off+dd*1440);

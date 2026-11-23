@@ -37,3 +37,14 @@ test('Day after Thanksgiving: early close at 1pm New York (18:00 UK)', () => {
 test('Christmas Day: futures shut all day', () => {
   assert.doesNotMatch(clockAt('2026-12-25T15:00:00Z').sess, /Futures (trading|pause)/);
 });
+test('Just after UK midnight on Sunday night: bar still shows Monday sessions', () => {
+  // band children are created via document.createElement; count them through a stub
+  process.env.TZ = 'Europe/London';
+  const code2 = fs.readFileSync(new URL('../js/clock.js', import.meta.url), 'utf8');
+  const Real = Date, fixed = new Real('2026-11-23T00:31:00Z').getTime();
+  class D extends Real { constructor(...a) { super(...(a.length ? a : [fixed])); } static now() { return fixed; } }
+  const kids = []; const els = {}; const $ = (id) => (els[id] ||= { innerHTML: '', textContent: '', className: '', appendChild(c) { if (id === 'band') kids.push(c); }, querySelector() { return null; } });
+  new Function('Date', '$', 'document', 'getComputedStyle', 'window', `${code2}; clock();`)(D, $, { createElement: () => ({ style: {} }), getElementById: () => null });
+  const open = kids.find((k) => k.style.background === 'var(--reg)');
+  assert.ok(open, 'regular session drawn'); assert.equal(open.style.left, (870 / 14.4) + '%'); // 14:30 UK
+});
