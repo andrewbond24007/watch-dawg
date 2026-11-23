@@ -149,6 +149,17 @@
     </section>
   </div>
 
+  <!-- RATES & MONEY -->
+  <div class="view" id="v-rates">
+    <section style="margin-top:16px">
+      <div class="sh"><h2>Rates and money</h2><button class="iconbtn" id="ratesRefresh" aria-label="Refresh rates"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v5h-5"/></svg></button></div>
+      <div class="pstatus" id="ratesStatus"></div>
+      <div class="hkey"><span class="green">Falling</span><span class="amber">On hold</span><span class="red">Rising</span><em>Green means cheaper borrowing</em></div>
+      <div id="ratesBox"><div class="empty" style="margin-top:12px">Loading rates…</div></div>
+      <details class="how"><summary>Where these figures come from</summary><p class="hint" style="line-height:1.5">Policy rates: New York Fed (Fed funds target and effective rate), Bank of England (Bank Rate), ECB (deposit facility rate). Market expectations: CME fed funds futures. Yields: US Treasury par yield curve, Bank of England (10-year gilt), ECB (AAA euro-area curve); the US 10- and 30-year also update live from market prices. Mortgages: Freddie Mac weekly survey; Bank of England quoted rates. Inflation: BLS, ONS and Eurostat. Currencies: live market prices. Meeting and release dates are the official published schedules. Tap any figure for its date and source.</p></details>
+    </section>
+  </div>
+
   <!-- NEWS -->
   <div class="view" id="v-news">
     <section style="margin-top:16px">
@@ -169,6 +180,7 @@
   <button class="tab" role="tab" data-tab="markets" aria-selected="true"><svg viewBox="0 0 24 24"><path d="M3 17l5-5 4 3 8-9"/><path d="M15 6h5v5"/></svg>Markets</button>
   <button class="tab" role="tab" data-tab="park" aria-selected="false"><svg viewBox="0 0 24 24"><circle cx="7" cy="9" r="2"/><circle cx="12" cy="6" r="2"/><circle cx="17" cy="9" r="2"/><path d="M12 12c-3.5 0-6 3.4-6 5.6 0 1.6 1.4 2.4 3 2.1 1.4-.3 2-.7 3-.7s1.6.4 3 .7c1.6.3 3-.5 3-2.1 0-2.2-2.5-5.6-6-5.6z"/></svg>Dog park</button>
   <button class="tab" role="tab" data-tab="health" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M12 20s-7.5-4.4-7.5-10.2A4.3 4.3 0 0 1 12 7a4.3 4.3 0 0 1 7.5 2.8C19.5 15.6 12 20 12 20z"/><path d="M3 12h4l2-3 3 6 2-3h7"/></svg>Health</button>
+  <button class="tab" role="tab" data-tab="rates" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M3 21h18"/><path d="M5 21V10M10 21V10M14 21V10M19 21V10"/><path d="M2.5 9 12 3l9.5 6z"/></svg>Rates</button>
   <button class="tab" role="tab" data-tab="news" aria-selected="false"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9h10M7 13h10M7 17h6"/></svg>News</button>
 </nav>
 
@@ -236,6 +248,7 @@
 <script src="/js/charts.js" defer></script>
 <script src="/js/dogpark.js" defer></script>
 <script src="/js/health.js" defer></script>
+<script src="/js/rates.js" defer></script>
 <script src="/js/ui.js" defer></script>
 <script src="/js/clock.js" defer></script>
 <script src="/js/start.js" defer></script>

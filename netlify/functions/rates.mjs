@@ -42,7 +42,7 @@ function dstNY(ymd) {
 // ---------- sources ----------
 // Fed target range and the effective rate, daily, from the New York Fed
 async function fed() {
-  const j = JSON.parse(await get('https://markets.newyorkfed.org/api/rates/unsecured/effr/last/1000.json'));
+  const j = JSON.parse(await get(`https://markets.newyorkfed.org/api/rates/unsecured/effr/search.json?startDate=${START}&endDate=${new Date(Date.now() + 864e5).toISOString().slice(0, 10)}`, 15000));
   const rows = (j.refRates || []).map((r) => ({ d: r.effectiveDate, effr: +r.percentRate, lo: +r.targetRateFrom, hi: +r.targetRateTo })).filter((r) => r.d >= START).sort((a, b) => (a.d < b.d ? -1 : 1));
   if (!rows.length) throw new Error('no Fed data');
   return rows;
@@ -115,6 +115,16 @@ async function ukCpi() {
   const nr = j.description?.nextRelease; const t = nr ? Date.parse(nr + ' 07:00 GMT') : NaN;
   return { series: s, next: isNaN(t) ? null : new Date(t).toISOString() };
 }
+// Euro-area inflation: the ECB's own series, or Eurostat's via DBnomics when the ECB copy is behind
+async function euroInflation() {
+  const fresh = (s) => s?.length && Date.now() - Date.parse(s.at(-1)[0]) < 100 * 864e5;
+  const a = await ecbSeries('ICP', 'M.U2.N.000000.4.ANR').catch(() => null);
+  if (fresh(a)) return a;
+  const j = JSON.parse(await get('https://api.db.nomics.world/v22/series/Eurostat/prc_hicp_manr/M.RCH_A.CP00.EA?observations=1', 12000));
+  const d = j.series?.docs?.[0], b = d ? d.period.map((p, i) => [p + '-01', d.value[i]]).filter((x) => x[0] >= START && typeof x[1] === 'number') : null;
+  if (fresh(b)) return b;
+  throw new Error('euro-area inflation is out of date at source');
+}
 // Fed funds futures (CME, via Yahoo): monthly average rate the market expects = 100 - price
 const MCODE = 'FGHJKMNQUVXZ';
 async function fedFutures(months) {
@@ -159,15 +169,7 @@ function decisions(series) { // [[date, value]] daily -> list of changes
 }
 const safe = async (p, errs, name) => { try { return await p; } catch (e) { errs.push(name + ': ' + String(e.message || e).slice(0, 80)); return null; } };
 
-export default async (req) => {
-  const pu = new URL(req.url);
-  if (pu.searchParams.get('probe')) {
-    const out = {};
-    try { const t = await get('https://data-api.ecb.europa.eu/service/data/ICP/M..N.000000.4.ANR?format=csvdata&detail=dataonly&lastNObservations=1', 20000, { Accept: 'text/csv' }); out.areas = t.split(/\r?\n/).slice(1).map((l) => l.split(',')).map((c) => c[2] + ':' + c[7] + '=' + c[8]).join(' '); } catch (e) { out.areas = String(e); }
-    try { const j = JSON.parse(await get('https://markets.newyorkfed.org/api/rates/unsecured/effr/last/500.json')); const r = j.refRates; out.ny = r.length + ' first ' + r[0].effectiveDate + ' last ' + r.at(-1).effectiveDate; } catch (e) { out.ny = String(e); }
-    try { const j = JSON.parse(await get('https://markets.newyorkfed.org/api/rates/unsecured/effr/search.json?startDate=2022-01-01&endDate=2026-12-31')); const r = j.refRates; out.ny2 = r.length + ' first ' + r[0].effectiveDate + ' last ' + r.at(-1).effectiveDate + ' ' + JSON.stringify(r[0]); } catch (e) { out.ny2 = String(e); }
-    return new Response(JSON.stringify(out, null, 1), { headers: { 'content-type': 'application/json' } });
-  }
+export default async () => {
   const errs = [], now = Date.now();
   const fomcLeft = FOMC.filter((d) => Date.parse(d) > now);
   const futMonths = []; { const d = new Date(); for (let i = 0; i < 9; i++) { const x = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + i, 1)); futMonths.push([x.getUTCFullYear(), x.getUTCMonth() + 1]); } }
@@ -175,7 +177,7 @@ export default async (req) => {
     safe(fed(), errs, 'fed'), safe(boeDaily('IUDBEDR'), errs, 'boe'), safe(ecbSeries('FM', 'D.U2.EUR.4F.KR.DFR.LEV'), errs, 'ecb'),
     safe(treasury(), errs, 'treasury'), safe(freddie(), errs, 'freddie'), safe(boeMonthly(['IUMBV34', 'IUMBV42']), errs, 'boe_mortgage'),
     safe(boeDaily('IUDMNPY'), errs, 'gilts'), safe(ecbSeries('YC', 'B.U2.EUR.4F.G_N_A.SV_C_YM.SR_10Y'), errs, 'ecb_yield'),
-    safe(usCpi(), errs, 'bls'), safe(ukCpi(), errs, 'ons'), safe(ecbSeries('ICP', 'M.U2.N.000000.4.ANR'), errs, 'ecb_hicp'), safe(fedFutures(futMonths), errs, 'futures'),
+    safe(usCpi(), errs, 'bls'), safe(ukCpi(), errs, 'ons'), safe(euroInflation(), errs, 'hicp'), safe(fedFutures(futMonths), errs, 'futures'),
   ]);
   const banks = [];
   if (F) {

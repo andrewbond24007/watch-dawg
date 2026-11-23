@@ -16,3 +16,4 @@ $('parkRefresh').addEventListener('click',async e=>{const b=e.currentTarget;b.cl
 setInterval(()=>{clock();fresh();},1000);
 setInterval(()=>{if(activeTab==='markets')marketBrief();},60000);setTimeout(marketBrief,3000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden){loadCrypto();loadQuotes();loadFng();loadMetalsLive();loadYahoo();loadExtended();}});
+setInterval(tickRates,1000);setInterval(()=>{if(activeTab==='rates')loadRatesLive();},120e3);setTimeout(()=>loadRates(),6000);setInterval(()=>loadRates(),30*60e3);
