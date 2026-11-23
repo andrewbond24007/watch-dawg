@@ -115,7 +115,7 @@ function evCard(e){
 const NCATS=[['all','All'],['crypto','Crypto'],['stocks','Stocks'],['economy','Economy'],['metals','Metals'],['property','Property']];
 const NCAT_RX={crypto:CRYPTO_RX,
  stocks:/\b(stocks?|shares|earnings|equit(y|ies)|S&P|Nasdaq|Dow|IPO|market cap|Wall Street|Apple|Tesla|Microsoft|Nvidia|Amazon|Alphabet|Google|Meta|Oracle|Broadcom|AMD|Intel|Netflix|Anthropic|OpenAI|TSMC|Palantir)\b|\$[A-Z]{1,5}\b/i,
- economy:/\b(Fed|FOMC|Powell|Warsh|interest rates?|rate (cut|hike)s?|inflation|CPI|PCE|PPI|jobs|payrolls?|unemployment|jobless|GDP|recession|Treasur(y|ies)|yields?|bonds?|tariffs?|ECB|Bank of England|BoE|Lagarde|Bailey|dollar|DXY|oil|OPEC|economy|economic|deficit|debt ceiling|shutdown)\b/i,
+ economy:/\b(Fed|FOMC|Powell|Warsh|interest rates?|rate (cut|hike)s?|inflation|CPI|PCE|PPI|jobs|payrolls?|unemployment|jobless|GDP|recession|Treasur(y|ies)|yields?|bond (market|yields?|sell-?off)|bonds\b|gilts?|tariffs?|ECB|Bank of England|BoE|Lagarde|Bailey|dollar|DXY|oil|OPEC|economy|economic|deficit|debt ceiling|shutdown)\b/i,
  metals:/\b(gold|silver|platinum|palladium|copper|bullion|precious metals?|XAU|XAG)\b/i,
  property:/\b(housing|home ?sales|home prices|house prices|homebuilders?|mortgages?|real estate|property|properties|REITs?|rents?|landlords?|office (space|market|buildings?|loans?)|CMBS)\b/i};
 let newsCat=store.get('wd.newscat','all');
