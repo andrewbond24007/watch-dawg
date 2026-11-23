@@ -4,17 +4,38 @@ const SRC={WatcherGuru:{n:'Watcher Guru',c:'#d99a00',i:'WG'},WalterBloomberg:{n:
 const CRYPTO_RX=/\$(BTC|ETH|SOL|XRP|DOGE|BNB|ADA|USDT|USDC|LKY)\b|bitcoin|ethereum|solana|luckycoin|crypto|stablecoin|binance|coinbase|blockchain|memecoin|tokeni[sz]/i;
 function timeAgo(t){const s=(Date.now()-new Date(t))/1000;if(s<60)return 'just now';if(s<3600)return Math.floor(s/60)+'m ago';if(s<86400)return Math.floor(s/3600)+'h ago';return Math.floor(s/86400)+'d ago';}
 function richText(t){return esc(t).replace(/(\$[A-Z]{2,6})\b/g,'<b class="cash">$1</b>').replace(/([+\-−]?\d[\d,]*(?:\.\d+)?%)/g,'<b>$1</b>').replace(/\n/g,'<br>');}
-// shouty ALL-CAPS headlines -> Title Case for quoting (acronyms and tickers stay upper case)
-const KEEPUP=new Set(['US','UK','EU','AI','VIX','S&P','ETF','ETFS','CPI','GDP','PCE','PPI','ECB','BOE','IPO','CEO','CFO','SEC','IMF','OPEC','NFP','FOMC','NYSE','USD','GBP','EUR','BTC','ETH','SOL','NVDA','ANT','TSMC','AMD','QQQ','SPY','DXY','LKY','XRP','UAE','NATO','IRS']);
+// shouty ALL-CAPS posts -> sentence case (acronyms, tickers and well-known names keep their capitals)
+const KEEPUP=new Set(['US','UK','EU','AI','VIX','S&P','ETF','ETFS','CPI','GDP','PCE','PPI','ECB','BOE','BOJ','PBOC','RBA','SNB','IPO','CEO','CFO','SEC','IMF','OPEC','OPEC+','NFP','FOMC','NYSE','USD','GBP','EUR','JPY','CNY','BTC','ETH','SOL','NVDA','ANT','TSMC','TSM','AMD','QQQ','SPY','DXY','LKY','XRP','UAE','NATO','IRS','NOC','LNG','WTI','API','EIA','ISM','PMI','ADP','JOLTS','GOP','DOJ','FBI','CFTC','FDIC','UN','WHO','M&A','Q1','Q2','Q3','Q4','YOY','MOM','BPD','BN','TN']);
+const PROPER=new Map(['fed','powell','warsh','trump','biden','vance','bessent','lagarde','bailey','xi','putin','zelensky','netanyahu','musk','huang','altman','buffett','dimon','china','chinese','japan','japanese','india','iran','iranian','israel','israeli','russia','russian','ukraine','ukrainian','libya','libyan','europe','european','germany','german','france','french','italy','spain','britain','british','canada','canadian','mexico','brazil','taiwan','korea','korean','saudi','arabia','qatar','turkey','gaza','hormuz','benghazi','sharara','washington','london','beijing','tokyo','moscow','brussels','frankfurt','wall','street','treasury','treasuries','congress','senate','house','white','nasdaq','dow','nikkei','ftse','dax','hang','seng','bitcoin','ethereum','solana','tether','coinbase','binance','blackrock','nvidia','apple','tesla','google','alphabet','microsoft','amazon','meta','oracle','intel','netflix','openai','anthropic','goldman','sachs','jpmorgan','morgan','stanley','citi','citigroup','bloomberg','reuters','monday','tuesday','wednesday','thursday','friday','saturday','sunday','january','february','march','april','june','july','august','september','october','november','december','christmas','thanksgiving','republican','republicans','democrat','democrats','dems'].map(w=>[w,w.charAt(0).toUpperCase()+w.slice(1)]));
+['iphone:iPhone','openai:OpenAI','jpmorgan:JPMorgan','blackrock:BlackRock','coinbase:Coinbase','s&p:S&P'].forEach(x=>{const[k,v]=x.split(':');PROPER.set(k,v);});
 function calm(t){const L=t.replace(/[^A-Za-z]/g,''),U=t.replace(/[^A-Z]/g,'');if(L.length<8||U.length/L.length<0.7)return t;
- return t.toLowerCase().replace(/[a-z&$][a-z&'.$]*/g,w=>{const u=w.toUpperCase().replace(/[.'$]+$/,'');return w[0]==='$'||KEEPUP.has(u)?w.toUpperCase():w.charAt(0).toUpperCase()+w.slice(1);});}
+ let out=t.toLowerCase().replace(/[a-z&$][a-z&'’.$+]*/g,w=>{if(w[0]==='$')return w.toUpperCase();
+  const core=w.replace(/[.'’]+$/,''),poss=/['’]s$/.test(core),stem=poss?core.slice(0,-2):core,tail=poss?core.slice(-2):'',U=stem.toUpperCase();
+  if(KEEPUP.has(U))return w.replace(core,U+tail);if(PROPER.has(stem))return w.replace(core,PROPER.get(stem)+tail);return w;});
+ // capital letter at the start and after full stops, question marks, colons and line breaks
+ return out.replace(/(^\s*|[.!?:]\s+|\n\s*)([a-z])/g,(m,p,c)=>p+c.toUpperCase());}
 function splitTag(t){const m=/^\s*(BREAKING|JUST IN)\s*:?\s*/i.exec(t);return m?{tag:m[1].toUpperCase(),body:t.slice(m[0].length)}:{tag:'',body:t};}
-function postCard(p,big){
- const s=SRC[p.src]||{n:p.source||p.src,c:'#7a7396',i:(p.source||'N').replace(/^the /i,'').split(/\s+/).map(w=>w[0]).join('').slice(0,2).toUpperCase()};const h=splitTag(p.text);
- return `<a class="post${big?' big':''}" href="${esc(p.link)}" target="_blank" rel="noopener">
-  <div class="ph"><span class="av" style="background:${s.c}">${s.i}</span><b>${esc(s.n)}</b><span class="ago">${timeAgo(p.time)}</span>${h.tag?`<span class="flag${h.tag==='BREAKING'?' brk':''}">${h.tag==='BREAKING'?'Breaking':'Just in'}</span>`:''}</div>
-  ${p.img&&big?`<img src="${esc(p.img)}" alt="" loading="lazy" onerror="this.remove()">`:''}
-  <div class="pt">${richText(calm(h.body))}</div></a>`;
+const srcOf=p=>SRC[p.src]||{n:p.source||p.src,c:'#7a7396',i:(p.source||'N').replace(/^the /i,'').split(/\s+/).map(w=>w[0]).join('').slice(0,2).toUpperCase()};
+function postCard(p,big,story){
+ const s=srcOf(p),h=splitTag(p.text),thumb=!big&&p.img;
+ const head=`<div class="ph"><span class="av" style="background:${s.c}">${s.i}</span><b>${esc(s.n)}</b><span class="ago">${timeAgo(p.time)}</span>${h.tag?`<span class="flag${h.tag==='BREAKING'?' brk':''}">${h.tag==='BREAKING'?'Breaking':'Just in'}</span>`:''}</div>`;
+ const main=`${head}${p.img&&big?`<img src="${esc(p.img)}" alt="" loading="lazy" onerror="this.remove()">`:''}<div class="pbody"><div class="pt">${richText(calm(h.body))}</div>${thumb?`<img class="th" src="${esc(p.img)}" alt="" loading="lazy" onerror="this.remove()">`:''}</div>`;
+ if(!story||story.length<2)return `<a class="post${big?' big':''}" href="${esc(p.link)}" target="_blank" rel="noopener">${main}</a>`;
+ const others=story.filter(x=>x!==p),names=[...new Set(others.map(x=>srcOf(x).n))];
+ return `<div class="post story${big?' big':''}"><a class="pl" href="${esc(p.link)}" target="_blank" rel="noopener">${main}</a>
+  <button class="stb" aria-expanded="false"><span class="avs">${others.slice(0,4).map(x=>{const o=srcOf(x);return `<i style="background:${o.c}">${o.i}</i>`;}).join('')}</span>Also from ${esc(names.slice(0,2).join(', '))}${names.length>2?` and ${names.length-2} more`:''}<span class="ch">▾</span></button>
+  <div class="stl" hidden>${story.slice().sort((x,y)=>Date.parse(x.time)-Date.parse(y.time)).map(x=>{const o=srcOf(x);return `<a href="${esc(x.link)}" target="_blank" rel="noopener"><span class="tt">${new Date(x.time).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}</span><span class="dt" style="background:${o.c}"></span><span><b>${esc(o.n)}</b> ${esc(calm(splitTag(x.text).body).slice(0,160))}</span></a>`;}).join('')}</div></div>`;
+}
+/* same-story grouping: headlines sharing most of their key words within 12 hours become one card */
+const STOP=new Set('the a an and or of to in on for at by with from as is are was were be been it its this that after over into amid says said say will would could may new more than about up down out off his her their they we you not but has have had just breaking report reports reportedly per via sources source us'.split(' '));
+const toks=t=>new Set(calm(splitTag(t).body).toLowerCase().replace(/https?:\S+/g,'').match(/[a-z0-9$%.]+/g)?.map(w=>w.replace(/\.$/,'')).filter(w=>(w.length>2||/\d/.test(w))&&!STOP.has(w))||[]);
+function groupStories(items){
+ const groups=[];
+ for(const p of items){const tk=toks(p.text),t=Date.parse(p.time);let hit=null;
+  if(tk.size>=3)for(const g of groups){if(Math.abs(g.t-t)>12*3600e3)continue;let n=0;for(const w of tk)if(g.tk.has(w))n++;
+   if(n>=3&&n/Math.min(tk.size,g.tk.size)>=0.55){hit=g;break;}}
+  if(hit)hit.items.push(p);else groups.push({lead:p,items:[p],tk,t});}
+ return groups;
 }
 async function loadNews(force){
  if(NEWS.busy)return;if(!force&&NEWS.at&&Date.now()-NEWS.at<90e3){renderAllNews();return;}
@@ -151,12 +172,18 @@ function renderNewsTab(){
   if(!NEWS.items.length){box.innerHTML=`<div class="empty">${NEWS.err?'News can’t load in this viewer.':'Loading news…'}</div>`;return;}
   if(!items.length){box.innerHTML=`<div class="empty">No ${esc(label.toLowerCase())} news in the latest posts.</div>`;return;}
   const day=Date.now()-24*3600e3;
-  let big=items.filter(p=>new Date(p.time)>day&&/^\s*breaking/i.test(p.text));
-  if(big.length<3)big=big.concat(items.filter(p=>new Date(p.time)>day&&p.img&&p.kind!=='headline'&&!big.includes(p)).slice(0,3-big.length));
-  big=big.slice(0,4);const ids=new Set(big.map(p=>p.id));
-  box.innerHTML=(big.length?`<div class="day">Biggest today${newsCat==='all'?'':' in '+esc(label.toLowerCase())}</div><div class="posts">${big.map(p=>postCard(p,true)).join('')}</div>`:'')+
-   (()=>{const rest=items.filter(p=>!ids.has(p.id)),more=rest.length-newsShown;return `<div class="day">Latest</div><div class="posts">${rest.slice(0,newsShown).map(p=>postCard(p,false)).join('')}</div>`+(more>0?`<button class="linkbtn earlier" id="newsMore">Show more (${more} left)</button>`:'');})();
+  const groups=groupStories(items),gOf=new Map();groups.forEach(g=>g.items.forEach(p=>gOf.set(p,g)));
+  // biggest: breaking posts first, then the stories the most outlets are covering, then posts with pictures
+  const fresh=groups.filter(g=>g.t>day);
+  let big=fresh.filter(g=>/^\s*breaking/i.test(g.lead.text));
+  big=big.concat(fresh.filter(g=>g.items.length>=3&&!big.includes(g)).sort((a,b)=>b.items.length-a.items.length));
+  if(big.length<3)big=big.concat(fresh.filter(g=>g.lead.img&&g.lead.kind!=='headline'&&!big.includes(g)).slice(0,3-big.length));
+  big=big.slice(0,4);const bs=new Set(big);
+  const rest=groups.filter(g=>!bs.has(g)),more=rest.length-newsShown;
+  box.innerHTML=(big.length?`<div class="day">Biggest today${newsCat==='all'?'':' in '+esc(label.toLowerCase())}</div><div class="posts">${big.map(g=>postCard(g.lead,true,g.items)).join('')}</div>`:'')+
+   `<div class="day">Latest</div><div class="posts">${rest.slice(0,newsShown).map(g=>postCard(g.lead,false,g.items)).join('')}</div>`+(more>0?`<button class="linkbtn earlier" id="newsMore">Show more (${more} left)</button>`:'');
   const nm=$('newsMore');if(nm)nm.onclick=()=>{newsShown+=40;buzz();renderNewsTab();};
+  box.querySelectorAll('.stb').forEach(b=>b.onclick=()=>{const l=b.nextElementSibling,o=l.hidden;l.hidden=!o;b.setAttribute('aria-expanded',o);buzz();});
  }
 }
 $('newsSeg').addEventListener('click',e=>{const b=e.target.closest('button');if(!b||b.dataset.n===newsMode)return;newsMode=b.dataset.n;[...$('newsSeg').children].forEach(x=>x.classList.toggle('on',x===b));buzz();renderNewsTab();window.scrollTo({top:0,behavior:'smooth'});});

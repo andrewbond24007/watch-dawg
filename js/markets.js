@@ -224,10 +224,16 @@ function rowFor(item,kind,left){
 function buildStocks(){const b=$('stocks');b.innerHTML='';if(!W.stocks.length)b.innerHTML='<div class="hint">No stocks yet. Tap the pencil to add some.</div>';W.stocks.forEach(s=>{const r=rowFor(s,'stock',stockBadge(s));if(!s.sym.startsWith('FOREXCOM:'))r.insertAdjacentHTML('beforeend',`<div class="ext" data-ext="${esc(s.sym)}" hidden></div>`);b.appendChild(r);});renderExt();}
 function buildMetals(){const b=$('metals');b.innerHTML='';if(!W.metals.length)b.innerHTML='<div class="hint">No metals yet. Tap the pencil to add some.</div>';W.metals.forEach(m=>b.appendChild(rowFor(m,'metal',`<div class="metal">${ingots()}<b>${esc(m.n)}</b></div>`)));}
 const tvCrypto=c=>c.tv||('BINANCE:'+c.s.toUpperCase()+'USDT');
-function buildTape(){
- const all=[...W.stocks.map(s=>({proName:s.sym,title:s.name})),...W.crypto.filter(c=>!c.chart).map(c=>({proName:tvCrypto(c),title:c.n})),...W.metals.map(m=>({proName:m.sym,title:m.n}))];
- tv($('tape'),'embed-widget-ticker-tape.js',{symbols:all,showSymbolLogo:true,isTransparent:true,displayMode:'adaptive',colorTheme:theme(),locale:'en'});
-}
+/* the scrolling ticker under the clock: built from the app's own prices, so it shows instantly with no
+   blank gap while a third-party widget loads. Tap an item for its chart. */
+function tapePrice(o){if(o.item.kind==='crypto'){const d=cryptoData[o.item.id];return d&&d.price!=null?money(d.price):'';}
+ if(o.item.kind==='stock'){const q=o.item.q&&quotes[o.item.q],y=yq[o.item.y];const p=q&&!tdStale(o.item.q)?q.price:y?.price??q?.price;return p!=null&&!/^(S&P|NDX)/.test(o.label)?'$'+(+p).toFixed(2):'';}
+ return '';}
+function tapeItems(){return parkItems().map(o=>`<button class="tk" data-k="${esc(o.key)}"><b>${esc(o.label)}</b><span class="tp num">${tapePrice(o)}</span><em class="${o.pct>0?'upt':o.pct<0?'dnt':''}">${o.pct==null?'—':(o.pct>0?'▲':o.pct<0?'▼':'')+Math.abs(o.pct).toFixed(2)+'%'}</em></button>`).join('');}
+function buildTape(){const t=$('tape');const html=tapeItems();t.innerHTML=`<div class="track" style="--dur:${Math.max(24,parkItems().length*4.5)}s"><div class="run">${html}</div><div class="run" aria-hidden="true">${html}</div></div>`;}
+function renderTape(){const t=$('tape');if(!t.querySelector('.track')){buildTape();return;}const m=Object.fromEntries(parkItems().map(o=>[o.key,o]));
+ t.querySelectorAll('.tk').forEach(b=>{const o=m[b.dataset.k];if(!o)return;const em=b.querySelector('em'),tp=b.querySelector('.tp');const txt=o.pct==null?'—':(o.pct>0?'▲':o.pct<0?'▼':'')+Math.abs(o.pct).toFixed(2)+'%',cls=o.pct>0?'upt':o.pct<0?'dnt':'';if(em.textContent!==txt)em.textContent=txt;em.className=cls;const pr=tapePrice(o);if(tp.textContent!==pr)tp.textContent=pr;});}
+$('tape').addEventListener('click',e=>{const b=e.target.closest('.tk');if(!b)return;const o=parkItems().find(x=>x.key===b.dataset.k);if(o){buzz();openChart(o.item);}});
 $('range').addEventListener('click',e=>{const b=e.target.closest('button');if(!b||b.dataset.r===range)return;
  range=b.dataset.r;[...$('range').children].forEach(x=>x.classList.toggle('on',x===b));buildStocks();buildMetals();});
 
