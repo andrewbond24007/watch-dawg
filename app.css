@@ -462,3 +462,10 @@ footer{margin-top:28px;font-size:11.5px;line-height:1.55;color:var(--muted)}
 .dogchart{width:100%;border:0;border-radius:12px;background:var(--ink);color:var(--bg);font-weight:700;font-size:14px;padding:11px;margin-bottom:6px}
 #dogPosts h3{margin:16px 0 8px}
 .mbrief{margin:14px 0 12px}
+
+/* news categories */
+.ncats{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin:2px -16px 12px;padding:2px 16px}
+.ncats::-webkit-scrollbar{display:none}
+.ncats button{flex:none;border:0;border-radius:999px;background:var(--surface);box-shadow:var(--shadow);color:var(--ink);font-size:13px;font-weight:650;padding:7px 12px}
+.ncats button span{color:var(--muted);font-weight:600;font-size:11.5px;margin-left:2px}
+.ncats button.on{background:var(--ink);color:var(--bg)}.ncats button.on span{color:var(--bg);opacity:.7}

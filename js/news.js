@@ -30,7 +30,7 @@ async function loadCal(force){
 }
 function renderAllNews(){renderCryptoNews();renderNewsTab();marketBrief();if(activeTab==='park')renderMovers(parkItems());if(chItem)renderSymbolNews(chItem);}
 function renderCryptoNews(){
- const box=$('cryptoNews');const items=NEWS.items.filter(p=>CRYPTO_RX.test(p.text)).slice(0,5);
+ const box=$('cryptoNews');if(!box)return;const items=NEWS.items.filter(p=>CRYPTO_RX.test(p.text)).slice(0,5);
  box.innerHTML=items.length?items.map(p=>postCard(p,false)).join(''):`<div class="empty">${NEWS.err?'Headlines can’t load in this viewer.':NEWS.at?'No crypto headlines in the latest posts.':'Loading headlines…'}</div>`;
 }
 const HINTS=[[/speaks|testifies|press conference/i,'Speech: watch for hints on interest rates'],[/core pce/i,'The Fed’s preferred inflation gauge'],[/core cpi/i,'Inflation excluding food and energy'],[/\bcpi\b/i,'Consumer price inflation'],[/non-farm/i,'Jobs added last month'],[/unemployment claims/i,'Weekly jobless claims'],[/unemployment rate/i,'Share of people out of work'],[/federal funds|fomc statement/i,'Federal Reserve interest-rate decision'],[/fomc/i,'Federal Reserve'],[/\bppi\b/i,'Producer (wholesale) inflation'],[/gdp/i,'Economic growth'],[/retail sales/i,'Consumer spending'],[/official bank rate|mpc/i,'Bank of England rate decision'],[/main refinancing|ecb/i,'European Central Bank rate decision'],[/boj|policy rate/i,'Bank of Japan decision'],[/ism/i,'Business activity survey'],[/jolts/i,'Job openings']];
@@ -111,8 +111,23 @@ function evCard(e){
    const fc=e.forecast?`<span>Consensus <b>${esc(e.forecast)}</b></span>`:'';
    return ncTxt||fc||prevTxt?`<div class="evx">${ncTxt}${fc}${prevTxt}</div>${ncTxt?'<div class="evsrc">Nowcast: Cleveland Fed model, updated daily</div>':''}`:e.official?'<div class="evx"><span>Official date · forecasts appear in the week of release</span></div>':'';})()}${res}</div></div>`;
 }
+/* news categories: a post can belong to more than one */
+const NCATS=[['all','All'],['crypto','Crypto'],['stocks','Stocks'],['economy','Economy'],['metals','Metals'],['property','Property']];
+const NCAT_RX={crypto:CRYPTO_RX,
+ stocks:/\b(stocks?|shares|earnings|equit(y|ies)|S&P|Nasdaq|Dow|IPO|market cap|Wall Street|Apple|Tesla|Microsoft|Nvidia|Amazon|Alphabet|Google|Meta|Oracle|Broadcom|AMD|Intel|Netflix|Anthropic|OpenAI|TSMC|Palantir)\b|\$[A-Z]{1,5}\b/i,
+ economy:/\b(Fed|FOMC|Powell|Warsh|interest rates?|rate (cut|hike)s?|inflation|CPI|PCE|PPI|jobs|payrolls?|unemployment|jobless|GDP|recession|Treasur(y|ies)|yields?|bonds?|tariffs?|ECB|Bank of England|BoE|Lagarde|Bailey|dollar|DXY|oil|OPEC|economy|economic|deficit|debt ceiling|shutdown)\b/i,
+ metals:/\b(gold|silver|platinum|palladium|copper|bullion|precious metals?|XAU|XAG)\b/i,
+ property:/\b(housing|home ?sales|home prices|house prices|homebuilders?|mortgages?|real estate|property|properties|REITs?|rents?|landlords?|office (space|market|buildings?|loans?)|CMBS)\b/i};
+let newsCat=store.get('wd.newscat','all');
+const inCat=(p,c)=>c==='all'||NCAT_RX[c].test(p.text);
+function renderNewsCats(){
+ const el=$('newsCats');if(!el)return;el.hidden=newsMode!=='headlines';if(el.hidden)return;
+ const day2=Date.now()-48*3600e3,recent=NEWS.items.filter(p=>new Date(p.time)>day2);
+ el.innerHTML=NCATS.map(([k,l])=>{const n=k==='all'?recent.length:recent.filter(p=>inCat(p,k)).length;return `<button data-c="${k}" class="${k===newsCat?'on':''}" aria-pressed="${k===newsCat}">${l}${n?` <span>${n}</span>`:''}</button>`;}).join('');
+}
+$('newsCats').addEventListener('click',e=>{const b=e.target.closest('button');if(!b||b.dataset.c===newsCat)return;newsCat=b.dataset.c;store.set('wd.newscat',newsCat);buzz();renderNewsTab();});
 function renderNewsTab(){
- if(activeTab!=='news')return;const box=$('newsBox');
+ if(activeTab!=='news')return;const box=$('newsBox');renderNewsCats();
  if(newsMode==='calendar'){
   $('newsHint').textContent='High-impact releases and central-bank decisions in UK time. This week’s come from the Forex Factory calendar with forecasts; later dates come from the official BLS, Fed, BEA, Bank of England and ECB schedules. Highlighted cards are the big market movers.';
   const start=new Date();start.setHours(0,0,0,0);
@@ -131,19 +146,19 @@ function renderNewsTab(){
   loadActuals();loadReactions();
  }else{
   $('newsHint').textContent='The latest posts from Watcher Guru and Walter Bloomberg, taken from their public Telegram channels (which mirror their X posts). Updates every 2 minutes. Tap a post to open it.';
-  const items=NEWS.items;
-  if(!items.length){box.innerHTML=`<div class="empty">${NEWS.err?'News can’t load in this viewer.':'Loading news…'}</div>`;return;}
+  const items=NEWS.items.filter(p=>inCat(p,newsCat)),label=NCATS.find(c=>c[0]===newsCat)?.[1]||'All';
+  if(!NEWS.items.length){box.innerHTML=`<div class="empty">${NEWS.err?'News can’t load in this viewer.':'Loading news…'}</div>`;return;}
+  if(!items.length){box.innerHTML=`<div class="empty">No ${esc(label.toLowerCase())} news in the latest posts.</div>`;return;}
   const day=Date.now()-24*3600e3;
   let big=items.filter(p=>new Date(p.time)>day&&/^\s*breaking/i.test(p.text));
   if(big.length<3)big=big.concat(items.filter(p=>new Date(p.time)>day&&p.img&&!big.includes(p)).slice(0,3-big.length));
   big=big.slice(0,4);const ids=new Set(big.map(p=>p.id));
-  box.innerHTML=(big.length?`<div class="day">Biggest today</div><div class="posts">${big.map(p=>postCard(p,true)).join('')}</div>`:'')+
+  box.innerHTML=(big.length?`<div class="day">Biggest today${newsCat==='all'?'':' in '+esc(label.toLowerCase())}</div><div class="posts">${big.map(p=>postCard(p,true)).join('')}</div>`:'')+
    `<div class="day">Latest</div><div class="posts">${items.filter(p=>!ids.has(p.id)).slice(0,40).map(p=>postCard(p,false)).join('')}</div>`;
  }
 }
 $('newsSeg').addEventListener('click',e=>{const b=e.target.closest('button');if(!b||b.dataset.n===newsMode)return;newsMode=b.dataset.n;[...$('newsSeg').children].forEach(x=>x.classList.toggle('on',x===b));buzz();renderNewsTab();window.scrollTo({top:0,behavior:'smooth'});});
 $('newsRefresh').addEventListener('click',async e=>{const b=e.currentTarget;b.classList.remove('spin');void b.offsetWidth;b.classList.add('spin');buzz();await Promise.all([loadNews(true),loadCal(true)]);toast('News refreshed');});
-$('moreNews').addEventListener('click',()=>{newsMode='headlines';[...$('newsSeg').children].forEach(x=>x.classList.toggle('on',x.dataset.n==='headlines'));switchTab('news');});
 /* match breaking posts to an asset: direct words first, then broader market words */
 const ALIAS={'S&P 500':['S&P','SPX','SPY','S&P 500','Wall Street','stocks','equities','Dow'],'Nasdaq 100':['Nasdaq','NDX','QQQ','tech stocks'],
  Gold:['gold','XAU','bullion','precious metals'],Silver:['silver','XAG','precious metals'],Palladium:['palladium','PGM'],Platinum:['platinum','PGM'],Copper:['copper'],Bitcoin:['bitcoin','BTC'],Ethereum:['ethereum','ether','ETH']};
