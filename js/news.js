@@ -80,7 +80,13 @@ function buildThreads(items){
    return sc>=2||(sc>=1&&Math.abs(t.t1-c.t1)<6*3600e3&&sh.some(k=>wt(k)===1&&t.seed.has(k)));});
   if(th){th.cls.push(c);rc.forEach(k=>th.rare.add(k));th.t1=Math.max(th.t1,c.t1);th.t0=Math.min(th.t0,c.t0);c.srcs.forEach(x=>th.srcs.add(x));}
   else threads.push({cls:[c],rare:rc,t0:c.t0,t1:c.t1,srcs:new Set(c.srcs),seed:new Set([...c.ents].filter(([k,v])=>rc.has(k)&&v>=Math.max(2,c.ps.length*0.4)).sort((a,b)=>b[1]-a[1]).slice(0,3).map(x=>x[0]))});});
- threads.forEach(t=>{t.cls.sort((a,b)=>b.t1-a.t1);t.main=t.cls.slice().sort((a,b)=>b.ps.length-a.ps.length||b.t1-a.t1)[0];t.head=t.main.head;t.all=t.cls.flatMap(c=>c.ps);t.n=t.all.length;
+ // a cluster spanning several countries (data releases, e.g. flash PMIs) gets a round-up title instead of one country's headline
+ const PL={us:'US','u.s':'US',uk:'UK',eurozone:'Eurozone','euro':'Eurozone',germany:'Germany',france:'France',japan:'Japan',china:'China',india:'India',australia:'Australia',australian:'Australia',canada:'Canada',italy:'Italy',spain:'Spain'};
+ cls.forEach(c=>{if(c.ps.length<3)return;const pl=[];c.ps.forEach(p=>{const w=(hText(p).toLowerCase().match(/[a-z.]+/g)||[]).find(x=>PL[x.replace(/\.$/,'')]);if(w){const n=PL[w.replace(/\.$/,'')];if(!pl.includes(n))pl.push(n);}});
+  if(pl.length<3)return;const hw=(firstLine(hText(c.head)).match(/[A-Za-z&]+/g)||[]),lw=c.ps.map(p=>new Set((hText(p).toLowerCase().match(/[a-z&]+/g)||[])));
+  const common=hw.filter(w=>!PL[w.toLowerCase()]&&!STOP.has(w.toLowerCase())&&!/^(vs|expected|actual|forecast|prev|previous|at)$/i.test(w)&&lw.filter(x=>x.has(w.toLowerCase())).length>=c.ps.length*0.6);
+  if(common.length)c.title=`${common.join(' ').replace(/^./,x=>x.toUpperCase())} round-up: ${pl.slice(0,5).join(', ')}`;});
+ threads.forEach(t=>{t.cls.sort((a,b)=>b.t1-a.t1);t.main=t.cls.slice().sort((a,b)=>b.ps.length-a.ps.length||b.t1-a.t1)[0];t.head=t.main.head;t.title=t.main.title||null;t.all=t.cls.flatMap(c=>c.ps);t.n=t.all.length;
   t.img=(t.all.find(p=>p.img&&p.kind==='headline')||t.all.find(p=>p.img)||{}).img||null;t.cat=catOf(t.head);
   t.brk=t.all.some(p=>/^\s*\W*\s*breaking/i.test(p.text));});
  return threads;
@@ -96,7 +102,7 @@ function coverage(t){
  return `<div class="cov" hidden>${ps.map(p=>{const o=srcOf(p);return `<a href="${esc(p.link)}" target="_blank" rel="noopener"><span class="tt">${hm(p.time)}</span><span class="dt" style="background:${o.c}"></span><span><b>${esc(o.n)}</b> ${esc(firstLine(hText(p)).slice(0,150))}</span></a>`;}).join('')}</div>`;
 }
 function storyCard(t){
- const h=t.head,o=srcOf(h),txt=firstLine(hText(h)),ago=timeAgo(t.t1),ns=t.srcs.size;
+ const h=t.head,o=srcOf(h),txt=t.title||firstLine(hText(h)),ago=timeAgo(t.t1),ns=t.srcs.size;
  const devs=t.cls.length>1?t.cls.filter(c=>c!==t.main).slice(0,3).map(c=>`<li><span class="tt">${hm(c.t1)}</span>${esc(firstLine(hText(c.head)).slice(0,110))}</li>`).join(''):'';
  return `<article class="sc${t.img?' hasimg':''}">
   ${t.img?`<a class="sci" href="${esc(h.link)}" target="_blank" rel="noopener"><img src="${esc(t.img)}" alt="" onerror="this.closest('.sci').remove()"></a>`:''}
@@ -107,7 +113,7 @@ function storyCard(t){
   ${coverage(t)}</div></article>`;
 }
 function newsRow(t){
- const h=t.head,o=srcOf(h),full=hText(h),txt=firstLine(full),more=full.split('\n').filter(x=>x.trim()).slice(1).join(' ').slice(0,180),ns=t.srcs.size;
+ const h=t.head,o=srcOf(h),full=hText(h),txt=t.title||firstLine(full),more=full.split('\n').filter(x=>x.trim()).slice(1).join(' ').slice(0,180),ns=t.srcs.size;
  return `<div class="nr"><a href="${esc(h.link)}" target="_blank" rel="noopener"><span class="nt">${hm(h.time)}</span><span class="nb"><span class="ns"><i style="background:${o.c}"></i>${esc(o.n)}${t.brk?' <em class="brk">Breaking</em>':''}</span><span class="nh">${richText(txt)}</span>${more?`<span class="nm">${esc(more)}</span>`:''}</span>${h.img?`<img src="${esc(h.img)}" alt="" loading="lazy" onerror="this.remove()">`:''}</a>
   ${t.n>1?`<button class="scf mini" aria-expanded="false">${avStack(t.all,3)}<span>${ns>1?`Also ${ns-1} other source${ns>2?'s':''}`:`${t.n} updates`}</span><span class="ch">▾</span></button>${coverage(t)}`:''}</div>`;
 }
