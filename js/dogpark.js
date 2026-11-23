@@ -190,7 +190,7 @@ function tick(now){
  park.raf=activeTab==='park'?requestAnimationFrame(tick):0;
 }
 
-function renderRecap(){
+function renderRecap(){if(typeof renderTape==="function")renderTape();
  marketBrief();const el=$('recap');if(!el)return;
  const big=parkItems().filter(i=>i.pct!=null&&Math.abs(i.pct)>=2).sort((a,b)=>Math.abs(b.pct)-Math.abs(a.pct)).slice(0,3);
  if(!big.length){el.hidden=true;return;}
