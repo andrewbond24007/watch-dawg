@@ -247,7 +247,7 @@ function renderNewsTab(){
   const eb=$('earlierBtn');if(eb)eb.onclick=()=>{showEarlier=!showEarlier;buzz();renderNewsTab();};
   loadActuals();loadReactions();
  }else{
-  $('newsHint').textContent='The last 48 hours from fast news accounts (Walter Bloomberg, Watcher Guru, FinancialJuice and others, via their public Telegram channels) and headlines from CNBC, Reuters, Bloomberg, the FT, MarketWatch, BBC, CoinDesk, HousingWire and more. Repeats of the same story are merged. Updates every 2 minutes. Tap one to open it.';
+  $('newsHint').textContent='The last 48 hours from fast news accounts (Walter Bloomberg, Watcher Guru, FinancialJuice and others, via their public Telegram channels) and headlines from CNBC, Reuters, Bloomberg, the FT, MarketWatch, BBC, CoinDesk, HousingWire and more. Reports on the same story are grouped into one, with the most widely covered at the top; tap a story's sources to see who reported what, and when. Updates every 2 minutes. Tap one to open it.';
   const items=NEWS.items.filter(p=>inCat(p,newsCat)),label=NCATS.find(c=>c[0]===newsCat)?.[1]||'All';
   if(!NEWS.items.length){box.innerHTML=`<div class="empty">${NEWS.err?'News can’t load in this viewer.':'Loading news…'}</div>`;return;}
   if(!items.length){box.innerHTML=`<div class="empty">No ${esc(label.toLowerCase())} news in the latest posts.</div>`;return;}
