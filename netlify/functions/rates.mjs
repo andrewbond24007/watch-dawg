@@ -163,8 +163,11 @@ const lastOf = (s) => s?.length ? s[s.length - 1] : null;
 const before = (s, days) => { if (!s?.length) return null; const cut = Date.parse(s.at(-1)[0]) - days * 864e5; for (let i = s.length - 1; i >= 0; i--) if (Date.parse(s[i][0]) <= cut) return s[i][1]; return s[0][1]; };
 // keep one point per week for long daily series so the payload stays small
 const thin = (s, step = 7) => s.filter((_, i) => i % step === 0 || i === s.length - 1);
-function decisions(series) { // [[date, value]] daily -> list of changes
-  const out = []; for (let i = 1; i < series.length; i++) if (Math.abs(series[i][1] - series[i - 1][1]) > 1e-9) out.push({ date: series[i][0], value: series[i][1], change: +((series[i][1] - series[i - 1][1]) * 100).toFixed(0) });
+// [[date, value]] daily -> list of changes. lag = days between the decision and the day the new rate
+// first shows (Fed: next day; ECB: the following Wednesday, 6 days on; BoE: same day)
+function decisions(series, lag = 0) {
+  const shift = (d) => new Date(Date.parse(d + 'T12:00:00Z') - lag * 864e5).toISOString().slice(0, 10);
+  const out = []; for (let i = 1; i < series.length; i++) if (Math.abs(series[i][1] - series[i - 1][1]) > 1e-9) out.push({ date: shift(series[i][0]), value: series[i][1], change: +((series[i][1] - series[i - 1][1]) * 100).toFixed(0) });
   return out;
 }
 const safe = async (p, errs, name) => { try { return await p; } catch (e) { errs.push(name + ': ' + String(e.message || e).slice(0, 80)); return null; } };
@@ -177,12 +180,12 @@ export default async () => {
     safe(fed(), errs, 'fed'), safe(boeDaily('IUDBEDR'), errs, 'boe'), safe(ecbSeries('FM', 'D.U2.EUR.4F.KR.DFR.LEV'), errs, 'ecb'),
     safe(treasury(), errs, 'treasury'), safe(freddie(), errs, 'freddie'), safe(boeMonthly(['IUMBV34', 'IUMBV42']), errs, 'boe_mortgage'),
     safe(boeDaily('IUDMNPY'), errs, 'gilts'), safe(ecbSeries('YC', 'B.U2.EUR.4F.G_N_A.SV_C_YM.SR_10Y'), errs, 'ecb_yield'),
-    safe(usCpi(), errs, 'bls'), safe(ukCpi(), errs, 'ons'), safe(euroInflation(), errs, 'hicp'), safe(fedFutures(futMonths), errs, 'futures'),
+    safe(usCpi(), errs, 'bls'), safe(ukCpi(), errs, 'ons'), euroInflation().catch(() => null), safe(fedFutures(futMonths), errs, 'futures'),
   ]);
   const banks = [];
   if (F) {
     const cur = F.at(-1), mid = F.map((r) => [r.d, r.hi]);
-    const dec = decisions(mid).map((x) => ({ ...x, lo: F.find((r) => r.d === x.date)?.lo }));
+    const dec = decisions(mid, 1).map((x, i, a) => ({ ...x, lo: x.value - (cur.hi - cur.lo) }));
     const path = FUT && Object.keys(FUT).length ? fedPath(cur.effr, FUT, fomcLeft.slice(0, 4)) : [];
     banks.push({ id: 'fed', name: 'Federal Reserve', short: 'Fed', flag: '🇺🇸', what: 'Fed funds target range', lo: cur.lo, hi: cur.hi, value: cur.hi, effective: cur.effr, date: cur.d,
       decisions: dec.slice(-10), series: thin(F.map((r) => [r.d, r.hi]), 5), next: fomcLeft[0] || null, meetings: fomcLeft.slice(0, 6), path,
@@ -194,7 +197,7 @@ export default async () => {
       next: nextOf(MPC), meetings: MPC.filter((d) => Date.parse(d) > now).slice(0, 6), note: 'Announced at noon UK time with the MPC minutes.' });
   }
   if (DFR?.length) {
-    const cur = lastOf(DFR), dec = decisions(DFR);
+    const cur = lastOf(DFR), dec = decisions(DFR, 6);
     banks.push({ id: 'ecb', name: 'European Central Bank', short: 'ECB', flag: '🇪🇺', what: 'Deposit facility rate', value: cur[1], date: cur[0], decisions: dec.slice(-10), series: thin(DFR, 5),
       next: nextOf(ECBM), meetings: ECBM.filter((d) => Date.parse(d) > now).slice(0, 6), note: 'Announced at 14:15 Frankfurt time, press conference at 14:45.' });
   }
@@ -218,7 +221,7 @@ export default async () => {
   if (EAC?.length) infl.push({ id: 'eahicp', name: 'Euro-area inflation', flag: '🇪🇺', value: lastOf(EAC)[1], date: lastOf(EAC)[0], prev: EAC.at(-2)?.[1], series: EAC.slice(-36), next: null, freq: 'Monthly, flash estimate at the start of the month', src: 'Eurostat via ECB', target: 2 });
   // real rate: policy rate minus inflation
   const realOf = { fed: 'uscpi', boe: 'ukcpi', ecb: 'eahicp' };
-  banks.forEach((b) => { const i = infl.find((x) => x.id === realOf[b.id]); if (i) b.real = +(b.value - i.value).toFixed(2); });
+  banks.forEach((b) => { const i = infl.find((x) => x.id === realOf[b.id]); if (i) b.real = +((b.effective ?? b.value) - i.value).toFixed(2); });
   const body = { fetched: new Date().toISOString(), banks, yields, curve: yields.curve || null, mortgages: mort, inflation: infl, errors: errs };
   return new Response(JSON.stringify(body), {
     headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'cache-control': 'public, max-age=300', 'netlify-cdn-cache-control': 'public, s-maxage=1800, stale-while-revalidate=3600' },
