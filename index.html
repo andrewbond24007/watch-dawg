@@ -54,6 +54,7 @@
 
   <!-- MARKETS -->
   <div class="view active" id="v-markets">
+    <div class="brief mbrief" id="mBrief" hidden></div>
     <div class="clock" aria-live="polite">
       <div class="state"><span class="lamp" id="lamp"></span><span id="state"><b>Wall Street</b></span></div>
       <div class="countdown num" id="countdown">—</div>
@@ -160,6 +161,16 @@
 </div>
 
 <!-- edit sheet -->
+<div class="sheet" id="dogSheet" hidden>
+  <button class="scrim" data-close aria-label="Close"></button>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="dogTitle">
+    <div class="grab"></div>
+    <div class="phead"><h2 id="dogTitle">Dog</h2><button class="close" data-close aria-label="Close">✕</button></div>
+    <div class="dogstage" id="dogStage"></div>
+    <button class="dogchart" id="dogChart">Open chart and candles ›</button>
+    <div id="dogPosts"></div>
+  </div>
+</div>
 <div class="sheet" id="mapSheet" hidden>
   <button class="scrim" data-close aria-label="Close"></button>
   <div class="panel" role="dialog" aria-modal="true" aria-labelledby="mapTitle">

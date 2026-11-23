@@ -24,7 +24,7 @@ async function loadCal(force){
  try{const j=await fetch('/.netlify/functions/calendar').then(r=>r.json());if(Array.isArray(j.events)){CAL.events=j.events;CAL.at=Date.now();CAL.err=false;}}catch(e){CAL.err=true;}
  CAL.busy=false;renderNewsTab();if(activeTab==='health')renderHealthCal();
 }
-function renderAllNews(){renderCryptoNews();renderNewsTab();if(activeTab==='park')renderMovers(parkItems());if(chItem)renderSymbolNews(chItem);}
+function renderAllNews(){renderCryptoNews();renderNewsTab();marketBrief();if(activeTab==='park')renderMovers(parkItems());if(chItem)renderSymbolNews(chItem);}
 function renderCryptoNews(){
  const box=$('cryptoNews');const items=NEWS.items.filter(p=>CRYPTO_RX.test(p.text)).slice(0,5);
  box.innerHTML=items.length?items.map(p=>postCard(p,false)).join(''):`<div class="empty">${NEWS.err?'Headlines can’t load in this viewer.':NEWS.at?'No crypto headlines in the latest posts.':'Loading headlines…'}</div>`;

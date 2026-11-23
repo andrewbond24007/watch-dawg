@@ -14,4 +14,5 @@ setInterval(()=>{if(activeTab!=='health')loadHealth();},30*60e3);setTimeout(()=>
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')loadHealth();});
 $('parkRefresh').addEventListener('click',async e=>{const b=e.currentTarget;b.classList.remove('spin');void b.offsetWidth;b.classList.add('spin');buzz();await Promise.all([loadCrypto(),loadMetalsLive(),loadQuotes(true),loadYahoo(),loadExtended(true)]);syncPark();toast('Prices refreshed');});
 setInterval(()=>{clock();fresh();},1000);
+setInterval(()=>{if(activeTab==='markets')marketBrief();},60000);setTimeout(marketBrief,3000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden){loadCrypto();loadQuotes();loadFng();loadMetalsLive();loadYahoo();loadExtended();}});

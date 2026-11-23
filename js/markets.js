@@ -69,7 +69,7 @@ async function loadFng(){
  try{
   const j=await fetch('https://api.alternative.me/fng/?limit=8').then(r=>r.json());
   const d=j.data;if(!d||!d.length)return;fngAt=Date.now();
-  const v=+d[0].value, cls=d[0].value_classification, y=d[1]?+d[1].value:null, w=d[7]?+d[7].value:null;
+  const v=+d[0].value, cls=d[0].value_classification, y=d[1]?+d[1].value:null, w=d[7]?+d[7].value:null;fngNow={v,cls};
   const cols=['#d03b3b','#ef7d32','#e8c22c','#8bc34a','#0ca30c'];
   const cx=74,cy=76,R=62;
   const pt=a=>[cx+R*Math.cos(a),cy-R*Math.sin(a)];
@@ -211,3 +211,27 @@ function buildTape(){
 }
 $('range').addEventListener('click',e=>{const b=e.target.closest('button');if(!b||b.dataset.r===range)return;
  range=b.dataset.r;[...$('range').children].forEach(x=>x.classList.toggle('on',x===b));buildStocks();buildMetals();});
+
+/* ---------- Markets: today in brief ---------- */
+let fngNow=null;
+function marketBrief(){
+ const el=$('mBrief');if(!el||typeof parkItems!=='function')return;
+ const items=parkItems().filter(i=>i.pct!=null);if(!items.length){el.hidden=true;return;}
+ const find=n=>items.find(i=>i.name===n||i.label===n);
+ const spx=find('S&P 500'),ndx=find('Nasdaq 100'),btc=find('Bitcoin'),gold=find('Gold');
+ const p1=v=>(v>0?'+':'−')+Math.abs(v).toFixed(1)+'%',dir=(v,u,d)=>v>=0.3?u:v<=-0.3?d:'flat';
+ const parts=[];
+ if(spx)parts.push(`stocks ${dir(spx.pct,'rose','fell')} (S&P 500 ${p1(spx.pct)}${ndx?`, Nasdaq ${p1(ndx.pct)}`:''})`);
+ if(btc)parts.push(`crypto ${dir(btc.pct,'is up','is down')} (Bitcoin ${p1(btc.pct)})`);
+ if(gold)parts.push(`gold ${p1(gold.pct)}`);
+ const head=parts.length?parts.join(', ').replace(/^./,c=>c.toUpperCase())+'.':'';
+ const sorted=items.slice().sort((a,b)=>b.pct-a.pct),best=sorted[0],worst=sorted.at(-1),bul=[];
+ const reason=i=>{const r=pickReason(whyFor(i.item).direct);if(!r)return '';const b=splitTag(r.text).body.split('\n')[0];return ': '+(b.length>90?b.slice(0,87)+'…':b);};
+ if(worst&&worst.pct<=-1)bul.push(`<li><b>Biggest faller</b> ${esc(worst.label)} ${p1(worst.pct)}${esc(reason(worst))}</li>`);
+ if(best&&best.pct>=1&&best!==worst)bul.push(`<li><b>Biggest riser</b> ${esc(best.label)} ${p1(best.pct)}${esc(reason(best))}</li>`);
+ const ah=W.stocks.map(s=>[s,extFor(s)]).filter(([,e])=>e&&Math.abs(e.chg)>=0.5);
+ if(ah.length)bul.push(`<li><b>${extLabel(ah[0][1])}</b> ${ah.map(([s,e])=>`${esc(s.tk)} ${p1(e.chg)}`).join(', ')}</li>`);
+ if(fngNow)bul.push(`<li><b>Crypto mood</b> ${esc(fngNow.cls)} (${fngNow.v}/100)</li>`);
+ const mood=spx?spx.pct:btc?btc.pct:0,sig=mood>=0.3?'green':mood<=-0.3?'red':'amber';
+ el.hidden=false;el.innerHTML=`<div class="bh"><span>📈 Today in brief</span><span class="sig ${sig}">${sig==='green'?'Risk on':sig==='red'?'Risk off':'Mixed'}</span></div>${head?`<p>${head}</p>`:''}${bul.length?`<ul>${bul.join('')}</ul>`:''}`;
+}

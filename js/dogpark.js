@@ -70,7 +70,7 @@ function syncPark(){
   if(!n){n={key:i.key,x:FENCE+40+Math.random()*(park.w-2*FENCE-80),y:FENCE+40+Math.random()*(park.h-2*FENCE-80),ang:Math.random()*6.283,L:10,pause:0,tt:0,el:document.createElement('button')};
    n.el.className='dog';n.el.innerHTML='<span class="spr"></span><span class="say"></span><span class="tag num"></span>';box.appendChild(n.el);
    n.el.addEventListener('pointerdown',()=>{n.pause=performance.now()/1000+1.4;});
-   n.el.addEventListener('click',()=>openChart(n.item));}
+   n.el.addEventListener('click',()=>openDog(n.item));}
   keep.delete(i.key);
   n.tL=Math.max(58,Math.min(i.wt*k,Math.min(park.w,park.h)*0.4));
   const flat=i.pct!=null&&Math.abs(i.pct)<0.05;
@@ -191,7 +191,7 @@ function tick(now){
 }
 
 function renderRecap(){
- const el=$('recap');if(!el)return;
+ marketBrief();const el=$('recap');if(!el)return;
  const big=parkItems().filter(i=>i.pct!=null&&Math.abs(i.pct)>=2).sort((a,b)=>Math.abs(b.pct)-Math.abs(a.pct)).slice(0,3);
  if(!big.length){el.hidden=true;return;}
  el.hidden=false;
@@ -209,3 +209,57 @@ function renderMovers(items){
  if(need.length&&Date.now()-moverFetch>20e3){moverFetch=Date.now();Promise.all(need.map(it=>loadAssetNews(it))).then(()=>{if(activeTab==='park')renderMovers(parkItems());});}
 }
 addEventListener('resize',()=>{if(activeTab==='park')syncPark();});
+
+/* ---------- dog profile: the dog faces you and explains its move ---------- */
+// original front-facing Doberman, drawn in SVG; the mood follows the price move
+function dogFace(mood,col){
+ const B='#1d1a22',T='#b5652f',ear=mood==='sad'
+  ?'<path d="M60 66 L10 58 L58 40 Z" fill="'+B+'"/><path d="M140 66 L190 58 L142 40 Z" fill="'+B+'"/><path d="M54 58 L22 55 L52 46 Z" fill="#6b3f33"/><path d="M146 58 L178 55 L148 46 Z" fill="#6b3f33"/>'
+  :'<path d="M54 72 L40 6 L88 50 Z" fill="'+B+'"/><path d="M146 72 L160 6 L112 50 Z" fill="'+B+'"/><path d="M58 60 L48 22 L76 50 Z" fill="#6b3f33"/><path d="M142 60 L152 22 L124 50 Z" fill="#6b3f33"/>';
+ const eyes=mood==='happy'
+  ?'<path d="M70 92 Q80 82 90 92" stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="round"/><path d="M110 92 Q120 82 130 92" stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="round"/>'
+  :mood==='sad'
+  ?'<circle cx="80" cy="94" r="8" fill="#fff"/><circle cx="120" cy="94" r="8" fill="#fff"/><circle cx="80" cy="97" r="4.5" fill="#2a1c14"/><circle cx="120" cy="97" r="4.5" fill="#2a1c14"/><path d="M70 88 L90 84" stroke="'+B+'" stroke-width="7" stroke-linecap="round"/><path d="M130 88 L110 84" stroke="'+B+'" stroke-width="7" stroke-linecap="round"/><path d="M68 80 L86 74" stroke="'+T+'" stroke-width="5" stroke-linecap="round"/><path d="M132 80 L114 74" stroke="'+T+'" stroke-width="5" stroke-linecap="round"/>'
+  :'<circle cx="80" cy="92" r="8" fill="#fff"/><circle cx="120" cy="92" r="8" fill="#fff"/><circle cx="81" cy="93" r="4.5" fill="#2a1c14"/><circle cx="119" cy="93" r="4.5" fill="#2a1c14"/><circle cx="82.5" cy="91" r="1.4" fill="#fff"/><circle cx="120.5" cy="91" r="1.4" fill="#fff"/>';
+ const brows=mood==='sad'?'':'<ellipse cx="78" cy="76" rx="7" ry="5" fill="'+T+'"/><ellipse cx="122" cy="76" rx="7" ry="5" fill="'+T+'"/>';
+ const mouth=mood==='happy'
+  ?'<path d="M84 132 Q100 148 116 132" stroke="#0d0b10" stroke-width="4" fill="none" stroke-linecap="round"/><path d="M93 137 Q100 160 107 137 Z" fill="#e86b7a"/>'
+  :mood==='sad'?'<path d="M88 144 Q100 134 112 144" stroke="#0d0b10" stroke-width="4" fill="none" stroke-linecap="round"/>'
+  :'<path d="M90 138 Q100 142 110 138" stroke="#0d0b10" stroke-width="4" fill="none" stroke-linecap="round"/>';
+ return `<svg viewBox="0 0 200 230" class="dogface ${mood}" aria-hidden="true"><path d="M58 150 Q100 176 142 150 L166 230 L34 230 Z" fill="${B}"/>
+  <ellipse cx="82" cy="206" rx="13" ry="10" fill="${T}"/><ellipse cx="118" cy="206" rx="13" ry="10" fill="${T}"/>
+  <g class="head">${ear}<path d="M50 72 Q50 38 100 36 Q150 38 150 72 L144 120 Q138 152 100 162 Q62 152 56 120 Z" fill="${B}"/>
+  <path d="M72 112 Q100 98 128 112 L124 142 Q100 164 76 142 Z" fill="${T}"/>${brows}${eyes}<ellipse cx="100" cy="117" rx="12" ry="8.5" fill="#0d0b10"/><ellipse cx="96" cy="114.5" rx="3" ry="1.8" fill="#55505c"/>${mouth}</g>
+  <path d="M56 152 Q100 178 144 152 L146 165 Q100 190 54 165 Z" fill="${col}"/><circle cx="100" cy="186" r="9" fill="#d9b13b"/><circle cx="100" cy="186" r="4" fill="#b8902a"/></svg>`;
+}
+let dogItem=null;
+function dogPct(it){return it.kind==='crypto'?cryptoData[it.id]?.pct:pctFor(it);}
+function dogLines(it,fetched){
+ const pc=dogPct(it),ex=it.kind==='stock'?extFor(it):null,name=it.kind==='crypto'?it.n:it.name||it.n;
+ const when=it.kind==='crypto'?'over the last 24 hours':it.kind==='stock'&&!usOpen()?'at the last close':'today';
+ let first=pc==null?`I’m asleep: no price for ${name} yet.`:Math.abs(pc)<0.05?`I’m flat ${when}.`:`I’m ${pc>0?'up':'down'} ${Math.abs(pc).toFixed(1)}% ${when}`;
+ if(pc!=null&&Math.abs(pc)>=0.05)first+=ex?`, and ${ex.chg>=0?'up':'down'} another ${Math.abs(ex.chg).toFixed(1)}% ${extLabel(ex).toLowerCase()}.`:'.';
+ const w=whyFor(it,24),r=pickReason(w.direct),cut=t=>{const b=splitTag(t).body.split('\n')[0];return b.length>170?b.slice(0,167)+'…':b;};
+ let why;
+ if(r)why=`Here’s why: “${cut(r.text)}”`;
+ else if(!fetched)why='Sniffing out why…';
+ else if(w.broad[0])why=`Nothing about me specifically, but the wider market is moving: “${cut(w.broad[0].text)}”`;
+ else why='I can’t find a news reason. It may just be the wider market drifting.';
+ return {first,why,src:r?`${r.src==='news'?(r.source||'News'):SRC[r.src]?.n||r.src} · ${timeAgo(r.time)}`:''};
+}
+function renderDog(it,fetched){
+ if(!dogItem||assetKey(dogItem)!==assetKey(it))return;
+ const pc=dogPct(it),mood=pc==null?'neutral':pc>=1?'happy':pc<=-1?'sad':'neutral',L=dogLines(it,fetched);
+ $('dogTitle').textContent=it.kind==='crypto'?`${it.n} (${it.s})`:(it.name||it.n);
+ $('dogStage').innerHTML=`${dogFace(mood,colorVar(it.c))}<div class="bubble"><p>${esc(L.first)}</p><p>${esc(L.why)}</p>${L.src?`<small>${esc(L.src)}</small>`:''}</div>`;
+ const w=whyFor(it,48),posts=w.direct.filter(isPost).slice(0,8),heads=w.direct.filter(p=>!isPost(p)).slice(0,6);
+ $('dogPosts').innerHTML=(posts.length?`<h3>Recent posts</h3><div class="posts">${posts.map(p=>postCard(p,false)).join('')}</div>`:'')
+  +(heads.length?`<h3>Headlines</h3><div class="posts">${heads.map(p=>postCard(p,false)).join('')}</div>`:'')
+  +(!posts.length&&!heads.length?`<div class="empty">${fetched?'Nothing about '+esc(it.n||it.name)+' in the last 48 hours.':'Finding posts…'}</div>`:'')
+  +'<p class="hint" style="margin-top:8px">Posts from Walter Bloomberg and Watcher Guru, the breaking-news accounts also on X (read from their public channels), plus news headlines from the last 48 hours.</p>';
+}
+function openDog(it){
+ dogItem=it;buzz();openSheet('dogSheet');renderDog(it,false);
+ loadAssetNews(it).then(()=>renderDog(it,true));
+}
+$('dogChart').addEventListener('click',()=>{const it=dogItem;closeSheet('dogSheet');setTimeout(()=>openChart(it),180);});
