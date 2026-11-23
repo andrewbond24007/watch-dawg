@@ -263,3 +263,37 @@ function openDog(it){
  loadAssetNews(it).then(()=>renderDog(it,true));
 }
 $('dogChart').addEventListener('click',()=>{const it=dogItem;closeSheet('dogSheet');setTimeout(()=>openChart(it),180);});
+
+/* ---------- park gate: the first visit each day walks you in ---------- */
+const gateDay=()=>new Date().toLocaleDateString('en-CA');
+function gateMood(){
+ const ps=parkItems().map(o=>o.pct).filter(v=>v!=null&&isFinite(v));
+ const avg=ps.length?ps.reduce((a,b)=>a+b,0)/ps.length:0;
+ const night=!usOpen();
+ return {night,wx:avg<=-2?'storm':avg<=-0.3?'rain':avg<0.3?'cloudy':'sun',avg};
+}
+function placeGate(){
+ const g=$('pgate');if(!g||g.hidden)return;const W=innerWidth,H=innerHeight,s=Math.max(W/360,H/640),ox=(W-360*s)/2,oy=H-640*s;
+ const L=ox+124*s,T=oy+304*s,el=g.querySelector('.pg-gates');
+ Object.assign(el.style,{left:L+'px',top:T+'px',width:112*s+'px',height:152*s+'px',transformOrigin:`${W/2-L}px ${H*.7-T}px`});
+}
+function paintGate(){
+ const g=$('pgate'),m=gateMood();
+ g.className='pgate'+(m.night?' night':'')+(m.wx==='sun'?'':m.wx==='cloudy'?' cloudy':' rain')+(m.wx==='storm'?' storm':'');
+ const r=g.querySelector('.pg-rain');
+ r.innerHTML=m.wx==='rain'||m.wx==='storm'?Array.from({length:m.wx==='storm'?70:42},()=>{const x=Math.random()*380,y=Math.random()*560;return `<line x1="${x.toFixed(0)}" y1="${y.toFixed(0)}" x2="${(x-4).toFixed(0)}" y2="${(y+16).toFixed(0)}" style="animation-delay:-${(Math.random()*.7).toFixed(2)}s"/>`;}).join(''):'';
+}
+function maybeGate(){
+ const g=$('pgate');if(!g)return false;
+ if(store.get('wd.gate','')===gateDay())return false;
+ paintGate();g.hidden=false;placeGate();document.body.style.overflow='hidden';
+ return true;
+}
+function enterPark(){
+ const g=$('pgate');if(g.classList.contains('open'))return;
+ store.set('wd.gate',gateDay());buzz();g.classList.add('open');
+ setTimeout(()=>g.classList.add('gone'),1250);
+ setTimeout(()=>{g.hidden=true;g.classList.remove('open','gone');document.body.style.overflow='';syncPark();},1750);
+}
+$('pgEnter').addEventListener('click',enterPark);
+addEventListener('resize',placeGate);

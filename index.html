@@ -102,6 +102,36 @@
     </section>
   </div>
 
+  <!-- DOG PARK GATE: plays on the first visit each day -->
+  <div class="pgate" id="pgate" hidden>
+    <svg class="pg-scene" viewBox="0 0 360 640" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
+      <defs>
+        <linearGradient id="pgSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" class="pg-s1"/><stop offset="1" class="pg-s2"/></linearGradient>
+        <pattern id="pgGrass" width="46" height="10" patternUnits="userSpaceOnUse"><rect width="23" height="10" class="pg-g1"/><rect x="23" width="23" height="10" class="pg-g2"/></pattern>
+      </defs>
+      <rect width="360" height="640" fill="url(#pgSky)"/>
+      <g class="pg-stars"><circle cx="40" cy="60" r="1.4"/><circle cx="96" cy="120" r="1"/><circle cx="150" cy="44" r="1.6"/><circle cx="214" cy="96" r="1"/><circle cx="300" cy="58" r="1.3"/><circle cx="330" cy="150" r="1"/><circle cx="70" cy="190" r="1.1"/><circle cx="250" cy="180" r="1.2"/><circle cx="180" cy="150" r="0.9"/><circle cx="120" cy="230" r="1"/></g>
+      <g class="pg-sun"><circle cx="282" cy="118" r="46" class="pg-glow"/><circle cx="282" cy="118" r="30"/></g>
+      <g class="pg-moon"><circle cx="284" cy="112" r="24"/><circle cx="296" cy="104" r="22" class="pg-bite"/></g>
+      <g class="pg-clouds"><g class="pg-c1"><ellipse cx="80" cy="130" rx="44" ry="18"/><ellipse cx="108" cy="116" rx="30" ry="20"/><ellipse cx="56" cy="122" rx="24" ry="14"/></g><g class="pg-c2"><ellipse cx="250" cy="200" rx="52" ry="18"/><ellipse cx="226" cy="188" rx="28" ry="18"/><ellipse cx="276" cy="186" rx="30" ry="20"/></g></g>
+      <path d="M0 392 Q60 360 120 380 T240 372 T360 380 V640 H0Z" class="pg-hill"/>
+      <g class="pg-trees"><circle cx="30" cy="378" r="26"/><circle cx="66" cy="370" r="22"/><circle cx="300" cy="372" r="24"/><circle cx="336" cy="380" r="26"/><circle cx="270" cy="384" r="18"/></g>
+      <rect y="396" width="360" height="244" fill="url(#pgGrass)" transform="translate(0 0)"/>
+      <path d="M180 640 L150 452 H210 Z" class="pg-path"/>
+      <g class="pg-fence"><rect x="0" y="414" width="118" height="5" rx="2"/><rect x="0" y="432" width="118" height="5" rx="2"/><rect x="242" y="414" width="118" height="5" rx="2"/><rect x="242" y="432" width="118" height="5" rx="2"/>
+        <rect x="8" y="404" width="7" height="46" rx="2"/><rect x="36" y="404" width="7" height="46" rx="2"/><rect x="64" y="404" width="7" height="46" rx="2"/><rect x="92" y="404" width="7" height="46" rx="2"/><rect x="262" y="404" width="7" height="46" rx="2"/><rect x="290" y="404" width="7" height="46" rx="2"/><rect x="318" y="404" width="7" height="46" rx="2"/><rect x="346" y="404" width="7" height="46" rx="2"/></g>
+      <g class="pg-arch"><rect x="104" y="300" width="20" height="156" rx="3"/><rect x="236" y="300" width="20" height="156" rx="3"/><rect x="100" y="292" width="28" height="12" rx="3"/><rect x="232" y="292" width="28" height="12" rx="3"/>
+        <path d="M112 300 Q180 250 248 300" class="pg-archline"/><rect x="128" y="262" width="104" height="30" rx="7" class="pg-sign"/><text x="180" y="283" text-anchor="middle" class="pg-signt">DOG PARK</text>
+        <circle cx="114" cy="288" r="5" class="pg-lamp"/><circle cx="246" cy="288" r="5" class="pg-lamp"/></g>
+      <g class="pg-rain"></g>
+    </svg>
+    <div class="pg-gates" aria-hidden="true"><div class="pg-leaf l"></div><div class="pg-leaf r"></div></div>
+    <div class="pg-flash" aria-hidden="true"></div>
+    <div class="pg-ui">
+      <button class="pg-enter" id="pgEnter"><span>ENTER THE</span>DOG PARK</button>
+    </div>
+  </div>
+
   <!-- MARKET HEALTH -->
   <div class="view" id="v-health">
     <section style="margin-top:16px">

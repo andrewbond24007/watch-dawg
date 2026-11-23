@@ -1,5 +1,5 @@
 /* ---------- tabs ---------- */
-$('recap').addEventListener('click',()=>{switchTab('park');setTimeout(()=>$('movers').scrollIntoView({behavior:'smooth',block:'start'}),350);});
+$('recap').addEventListener('click',()=>{store.set('wd.gate',gateDay());switchTab('park');setTimeout(()=>$('movers').scrollIntoView({behavior:'smooth',block:'start'}),350);});
 document.querySelector('.tabbar').addEventListener('click',e=>{const b=e.target.closest('.tab');if(b)switchTab(b.dataset.tab);});
 function switchTab(name){
  if(name===activeTab)return window.scrollTo({top:0,behavior:'smooth'});
@@ -9,7 +9,8 @@ function switchTab(name){
  document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id==='v-'+name));
  window.scrollTo(0,0);
  if(name==='news'){renderNewsTab();loadCal();loadNews();}
- if(name==='park'){requestAnimationFrame(syncPark);loadQuotes();}
+ if(name==='park'){maybeGate();requestAnimationFrame(syncPark);loadQuotes();}
+ else{const g=$('pgate');if(g&&!g.hidden&&!g.classList.contains('open')){g.hidden=true;document.body.style.overflow='';}}
  if(name==='health'){renderHealth();loadHealth();loadCal();loadHealthNews();}
 }
 
