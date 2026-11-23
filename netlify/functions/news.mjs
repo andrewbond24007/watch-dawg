@@ -47,7 +47,7 @@ export function parseTg(html, ch, cat) {
     const time = (p.match(/<time[^>]*datetime="([^"]+)"/) || [])[1];
     const raw = (p.match(/<div class="tgme_widget_message_text[^"]*"[^>]*>([\s\S]*?)<\/div>/) || [])[1] || '';
     const img = (p.match(/tgme_widget_message_photo_wrap[^>]*background-image:url\('([^']+)'\)/) || [])[1] || null;
-    const text = decode(raw.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '')).replace(/\n{3,}/g, '\n\n').trim();
+    const text = decode(raw.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '')).replace(/\n{3,}/g, '\n\n').replace(/\s*(\$[A-Z]+)?\|FJ\s*$/, '').trim();
     if (!post || !time || !text) return null;
     return { id: post, src: ch, kind: 'post', time: new Date(time).toISOString(), text, img, link: 'https://t.me/' + post, ...(cat ? { cats: [cat] } : {}) };
   }).filter(Boolean);
@@ -92,13 +92,15 @@ export default async () => {
   const all = (await Promise.all(jobs)).flat().filter((p) => Date.parse(p.time) >= since && Date.parse(p.time) <= Date.now() + 300e3);
   // newest first; squawk posts win ties so the fastest version of a story is kept
   all.sort((a, b) => Date.parse(b.time) - Date.parse(a.time));
-  const seen = new Map(), items = [];
+  // no single publisher may crowd out the rest: at most 30 headlines each (squawk channels are uncapped)
+  const seen = new Map(), items = [], per = {};
   for (const p of all) {
+    if (p.kind === 'headline') { per[p.source] = (per[p.source] || 0) + 1; if (per[p.source] > 30) continue; }
     const k = norm(p.text);
     if (seen.has(k)) { const q = seen.get(k); if (p.cats) q.cats = [...new Set([...(q.cats || []), ...p.cats])]; continue; }
     seen.set(k, p); items.push(p);
   }
-  const out = items.slice(0, 400);
+  const out = items.slice(0, 500);
   return new Response(JSON.stringify({ items: out, sources: status, fetched: new Date().toISOString() }), {
     headers: { 'content-type': 'application/json', 'cache-control': 'public, max-age=60', 'netlify-cdn-cache-control': 'public, s-maxage=90, stale-while-revalidate=300', 'cdn-cache-control': 'public, s-maxage=90, stale-while-revalidate=300', 'access-control-allow-origin': '*' },
   });

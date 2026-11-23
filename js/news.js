@@ -7,14 +7,14 @@ function richText(t){return esc(t).replace(/(\$[A-Z]{2,6})\b/g,'<b class="cash">
 // shouty ALL-CAPS headlines -> Title Case for quoting (acronyms and tickers stay upper case)
 const KEEPUP=new Set(['US','UK','EU','AI','VIX','S&P','ETF','ETFS','CPI','GDP','PCE','PPI','ECB','BOE','IPO','CEO','CFO','SEC','IMF','OPEC','NFP','FOMC','NYSE','USD','GBP','EUR','BTC','ETH','SOL','NVDA','ANT','TSMC','AMD','QQQ','SPY','DXY','LKY','XRP','UAE','NATO','IRS']);
 function calm(t){const L=t.replace(/[^A-Za-z]/g,''),U=t.replace(/[^A-Z]/g,'');if(L.length<8||U.length/L.length<0.7)return t;
- return t.toLowerCase().replace(/[a-z&$][a-z&'.$]*/g,w=>{const u=w.toUpperCase().replace(/[.'$]+$/,'');return KEEPUP.has(u)||KEEPUP.has(u.replace(/^\$/,''))?w.toUpperCase():w.charAt(0).toUpperCase()+w.slice(1);});}
+ return t.toLowerCase().replace(/[a-z&$][a-z&'.$]*/g,w=>{const u=w.toUpperCase().replace(/[.'$]+$/,'');return w[0]==='$'||KEEPUP.has(u)?w.toUpperCase():w.charAt(0).toUpperCase()+w.slice(1);});}
 function splitTag(t){const m=/^\s*(BREAKING|JUST IN)\s*:?\s*/i.exec(t);return m?{tag:m[1].toUpperCase(),body:t.slice(m[0].length)}:{tag:'',body:t};}
 function postCard(p,big){
  const s=SRC[p.src]||{n:p.source||p.src,c:'#7a7396',i:(p.source||'N').replace(/^the /i,'').split(/\s+/).map(w=>w[0]).join('').slice(0,2).toUpperCase()};const h=splitTag(p.text);
  return `<a class="post${big?' big':''}" href="${esc(p.link)}" target="_blank" rel="noopener">
   <div class="ph"><span class="av" style="background:${s.c}">${s.i}</span><b>${esc(s.n)}</b><span class="ago">${timeAgo(p.time)}</span>${h.tag?`<span class="flag${h.tag==='BREAKING'?' brk':''}">${h.tag==='BREAKING'?'Breaking':'Just in'}</span>`:''}</div>
   ${p.img&&big?`<img src="${esc(p.img)}" alt="" loading="lazy" onerror="this.remove()">`:''}
-  <div class="pt">${richText(h.body)}</div></a>`;
+  <div class="pt">${richText(calm(h.body))}</div></a>`;
 }
 async function loadNews(force){
  if(NEWS.busy)return;if(!force&&NEWS.at&&Date.now()-NEWS.at<90e3){renderAllNews();return;}
