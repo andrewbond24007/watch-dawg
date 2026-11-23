@@ -60,7 +60,7 @@ function clock(){
  $('state').innerHTML=`<b>${state}</b>`;$('lamp').className='lamp'+(open?' open':'');
  $('countdown').textContent=cd;
  // times printed on the bar where each session starts and ends (your local time); the live time sits on the 'now' line
- const pts=[];const addPts=(dd,segs)=>segs.forEach(([a,b])=>[a,b].forEach(x=>{const p=x+off+dd*1440;if(p>20&&p<1420)pts.push(p);}));
+ const pts=[];const addPts=(dd,segs)=>segs.forEach(([a,b])=>[a,b].forEach(x=>{if(x%1440===0)return;const p=x+off+dd*1440;if(p>20&&p<1420)pts.push(p);}));
  [-1,0,1].forEach(dd=>addPts(dd,sessionsFor(ymdAdd(ymd,dd)).map(([a,b])=>[a,b])));
  [-2,-1,0,1].forEach(dd=>{const k=ymdAdd(ymd,dd);addPts(dd,overnightFor(k));addPts(dd,futuresFor(k));});
  const hm=m=>{m=((Math.round(m)%1440)+1440)%1440;return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');};
