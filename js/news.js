@@ -163,7 +163,8 @@ $('newsSeg').addEventListener('click',e=>{const b=e.target.closest('button');if(
 $('newsRefresh').addEventListener('click',async e=>{const b=e.currentTarget;b.classList.remove('spin');void b.offsetWidth;b.classList.add('spin');buzz();await Promise.all([loadNews(true),loadCal(true)]);toast('News refreshed');});
 /* match breaking posts to an asset: direct words first, then broader market words */
 const ALIAS={'S&P 500':['S&P','SPX','SPY','S&P 500','Wall Street','stocks','equities','Dow'],'Nasdaq 100':['Nasdaq','NDX','QQQ','tech stocks'],
- Gold:['gold','XAU','bullion','precious metals'],Silver:['silver','XAG','precious metals'],Palladium:['palladium','PGM'],Platinum:['platinum','PGM'],Copper:['copper'],Bitcoin:['bitcoin','BTC'],Ethereum:['ethereum','ether','ETH']};
+ Gold:['gold','XAU','bullion','precious metals'],Silver:['silver','XAG','precious metals'],Palladium:['palladium','PGM'],Platinum:['platinum','PGM'],Copper:['copper'],Bitcoin:['bitcoin','BTC'],Ethereum:['ethereum','ether','ETH'],
+ Tesla:['Tesla','TSLA','Cybertruck','robotaxi'],Apple:['Apple','AAPL','iPhone'],Google:['Google','Alphabet','GOOGL','GOOG','Gemini','Waymo']};
 const BROAD={crypto:['crypto','digital assets'],metal:['metals','commodities','dollar','DXY'],stock:['Fed','yields','tariff','Treasury','markets']};
 const wordRx=ws=>new RegExp('(^|[^a-z0-9])\\$?('+ws.filter(w=>w&&w.length>1).map(w=>w.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|')+')(?![a-z0-9])','i');
 let ASSETNEWS={};

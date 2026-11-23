@@ -12,7 +12,10 @@ const DEFAULTS={
   {sym:'FOREXCOM:SPXUSD',tk:'S&P 500',name:'S&P 500',icon:'bars',c:'--spx',q:'SPY'},
   {sym:'FOREXCOM:NSXUSD',tk:'NDX',name:'Nasdaq 100',icon:'trend',c:'--ndx',q:'QQQ'},
   {sym:'NASDAQ:NVDA',tk:'NVDA',name:'Nvidia',icon:'chip',c:'--nvda',q:'NVDA'},
-  {sym:'NASDAQ:ANT',tk:'ANT',name:'Anthropic',icon:'ai',c:'--ant',q:'',y:'ANT'}],
+  {sym:'NASDAQ:ANT',tk:'ANT',name:'Anthropic',icon:'ai',c:'--ant',q:'',y:'ANT'},
+  {sym:'NASDAQ:TSLA',tk:'TSLA',name:'Tesla',icon:'car',c:'#e4572e',q:'TSLA',y:'TSLA'},
+  {sym:'NASDAQ:AAPL',tk:'AAPL',name:'Apple',icon:'phone',c:'#8e8e93',q:'AAPL',y:'AAPL'},
+  {sym:'NASDAQ:GOOGL',tk:'GOOGL',name:'Google',icon:'search',c:'#2e86ab',q:'GOOGL',y:'GOOGL'}],
  metals:[
   {sym:'OANDA:XAUUSD',n:'Gold',c:'--au',q:'XAU/USD',y:'GC=F'},
   {sym:'OANDA:XAGUSD',n:'Silver',c:'--ag',q:'',y:'SI=F'},
@@ -33,6 +36,8 @@ const ICONS={
  oil:'<path d="M12 3c3 4 6 7.5 6 11a6 6 0 0 1-12 0c0-3.5 3-7 6-11z"/>',
  car:'<path d="M3 15l2-6h14l2 6v3H3z"/><circle cx="7.5" cy="18" r="1.5"/><circle cx="16.5" cy="18" r="1.5"/>',
  cart:'<path d="M3 4h3l2.5 11h10L21 7H7"/><circle cx="10" cy="19.5" r="1.4"/><circle cx="17" cy="19.5" r="1.4"/>',
+ phone:'<rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M10.5 18.5h3"/>',
+ search:'<circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l6 6"/>',
  globe:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/>'
 };
 
@@ -60,8 +65,9 @@ if(!W||!Array.isArray(W.crypto)||!Array.isArray(W.stocks)||!Array.isArray(W.meta
  W.stocks.forEach(s=>{if(s.y==null){const ex=s.sym.includes(':')?s.sym.split(':')[0]:'';s.y=!ex||['NASDAQ','NYSE','AMEX','ARCA','BATS'].includes(ex)?s.tk:'';if(s.sym.startsWith('FOREXCOM:'))s.y='';}if(s.sym==='NASDAQ:ANT')s.q='';});
  W.crypto.forEach(c=>{if(c.id==='luckycoin'&&!c.chart){delete c.tv;c.chart='nonkyc:LKY/USDT';}});
  /* one-off additions: added once, never re-added if you remove them */
- [{flag:'wd.added.lky',coin:{id:'luckycoin',n:'Luckycoin',s:'LKY',g:'',c:'#d4a017',chart:'nonkyc:LKY/USDT'}}].forEach(a=>{let done=null;try{done=localStorage.getItem(a.flag);}catch(e){}
-  if(!done){if(!W.crypto.some(x=>x.id===a.coin.id))W.crypto.push({...a.coin});try{localStorage.setItem(a.flag,'1');}catch(e){}}});
+ [{flag:'wd.added.lky',coin:{id:'luckycoin',n:'Luckycoin',s:'LKY',g:'',c:'#d4a017',chart:'nonkyc:LKY/USDT'}},
+  ...['TSLA','AAPL','GOOGL'].map(t=>({flag:'wd.added.'+t.toLowerCase(),stock:DEFAULTS.stocks.find(x=>x.tk===t)}))].forEach(a=>{let done=null;try{done=localStorage.getItem(a.flag);}catch(e){}
+  if(!done){if(a.coin&&!W.crypto.some(x=>x.id===a.coin.id))W.crypto.push({...a.coin});if(a.stock&&!W.stocks.some(x=>x.tk===a.stock.tk||x.sym===a.stock.sym))W.stocks.push({...a.stock});try{localStorage.setItem(a.flag,'1');}catch(e){}}});
  try{localStorage.setItem('wd.watchlist',JSON.stringify(W));}catch(e){}})();
 const saveW=()=>store.set('wd.watchlist',W);
 let tdKey=store.get('wd.tdkey',DEFAULT_TD_KEY)||'';
