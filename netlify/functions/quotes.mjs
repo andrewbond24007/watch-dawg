@@ -12,8 +12,15 @@ export default async (req) => {
       const res = j?.chart?.result?.[0];
       const m = res?.meta;
       if (!m || m.regularMarketPrice == null) { out[s] = { error: j?.chart?.error?.description || 'no data' }; return; }
-      const price = m.regularMarketPrice;
-      const prev = m.chartPreviousClose ?? m.previousClose ?? null;
+      // Yahoo's meta.regularMarketPrice can pick up overnight (Blue Ocean ATS) trades, so the
+      // regular-session price comes from daily bars, which only hold regular-session trading
+      let price = m.regularMarketPrice, prev = m.chartPreviousClose ?? m.previousClose ?? null;
+      try {
+        const d = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(s)}?range=5d&interval=1d`,
+          { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; WatchDawg/1.0)' }, signal: AbortSignal.timeout(8000) }).then((r) => r.json());
+        const dc = (d?.chart?.result?.[0]?.indicators?.quote?.[0]?.close || []).filter((x) => x != null);
+        if (dc.length >= 2) { price = dc[dc.length - 1]; prev = dc[dc.length - 2]; }
+      } catch (e) { /* keep the meta values */ }
       const closes = (res.indicators?.quote?.[0]?.close || []).filter(x => x != null);
       const last = closes.length ? closes[closes.length - 1] : price;
       // extended hours: if the latest trade is outside the regular session, report it against the regular close
