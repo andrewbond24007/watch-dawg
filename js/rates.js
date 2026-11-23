@@ -116,7 +116,7 @@ function renderRates(){
  // inflation
  const irows=(d.inflation||[]).map(i=>{const ch=i.prev!=null?i.value-i.prev:0;RSER[i.id]=i.series;
   const stale=i.id.startsWith('us')&&i.date==='2026-09-01'?'<br><i>October’s yearly rate wasn’t published: there is no October 2025 figure to compare with after last year’s shutdown.</i>':'';
-  return rRow({id:i.id,key:'infl:'+i.id,flag:i.flag,name:i.name.replace(/^(US|UK) /,'').replace(/^inflation \(CPI\)$/,'Inflation (CPI)'),val:rp(i.value,1),chg:i.prev!=null?`<b class="${rcls(ch)}">${ch>0?'+':ch<0?'−':''}${Math.abs(ch).toFixed(1)} pts</b> · target 2%`:'',trend:ch,next:i.next,sub:i.freq||'',
+  return rRow({id:i.id,key:'infl:'+i.id,flag:i.flag,name:(n=>n.charAt(0).toUpperCase()+n.slice(1))(i.name.replace(/^(US|UK) /,'')),val:rp(i.value,1),chg:i.prev!=null?`<b class="${rcls(ch)}">${ch>0?'+':ch<0?'−':''}${Math.abs(ch).toFixed(1)} pts</b> · target 2%`:'',trend:ch,next:i.next,sub:i.freq||'',
    detail:`<b>${esc(i.name)}</b>, 12-month rate<br>${rmonth(i.date)} · ${esc(i.src)}${i.next?'<br>Next figure '+rwhen(i.next):''}${stale}`});}).join('');
  // currencies
  const FX=[['gbpusd','🇬🇧🇺🇸 Pound in dollars',4],['eurusd','🇪🇺🇺🇸 Euro in dollars',4],['eurgbp','🇪🇺🇬🇧 Euro in pounds',4],['dxy','🇺🇸 Dollar index',2]];
