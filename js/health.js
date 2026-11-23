@@ -107,12 +107,13 @@ function regionCard(r){
  const groups=[['Momentum',rest.filter(m=>m.grp==='mom')],['Rents and yields',rest.filter(m=>m.grp!=='mom'&&m.noscore)],['More figures',rest.filter(m=>m.grp!=='mom'&&!m.noscore)]].filter(g=>g[1].length);
  const hasDd=r.dd&&r.stocks&&r.stocks.length,moreN=rest.length+(hasDd?r.stocks.length:0);
  const open=HEXP.has(key)||rest.some(m=>HFRESH.has(key+'/'+m.id));
+ const kt=keyM.length?`<div class="ktiles mtiles" style="--n:${keyM.length}"${open?' hidden':''}>${keyM.map(m=>{const k=key+'/'+m.id,nw=HFRESH.has(k),t=m.trend||0;return `<button class="mtile${nw?' isnew':''}" data-jump="${esc(k)}"><small>${esc(SL[m.id]||m.short||m.label)}${nw?' <span class="newtag">New</span>':''}</small><b class="num">${mVal(m)}</b><span>${mChange(m)||esc(hDate(m))}</span></button>`;}).join('')}</div>`:'';
  const mapA=hSec==='housing'?{us:'us',uk:'uk',ie:'ie',med:'med'}[r.id]:null;
- const more=moreN?`<div class="more"${open?'':' hidden'}>${groups.map(([h,list])=>`<div class="subh">${h}</div>${list.map(m=>metricRow(m,key+'/'+m.id)).join('')}`).join('')}${hasDd?`<div class="subh">Each landlord</div>${ddList(r.stocks)}`:''}${r.note?`<div class="hnote">${esc(r.note)}</div>`:''}</div>
-  <button class="morebtn" data-exp="${esc(key)}" aria-expanded="${open}">${open?'Show fewer':`Show all ${moreN+keyM.length} figures`}<span class="ch">▾</span></button>`:r.note?`<div class="hnote">${esc(r.note)}</div>`:'';
+ const more=moreN||keyM.length?`<div class="more"${open?'':' hidden'}>${keyM.length?`<div class="subh">Key figures</div>${keyM.map(m=>metricRow(m,key+'/'+m.id)).join('')}`:''}${groups.map(([h,list])=>`<div class="subh">${h}</div>${list.map(m=>metricRow(m,key+'/'+m.id)).join('')}`).join('')}${hasDd?`<div class="subh">Each landlord</div>${ddList(r.stocks)}`:''}${r.note?`<div class="hnote">${esc(r.note)}</div>`:''}</div>
+  <button class="morebtn" data-exp="${esc(key)}" aria-expanded="${open}">${open?'Show less':`Details · all ${moreN+keyM.length} figures`}<span class="ch">▾</span></button>`:r.note?`<div class="hnote">${esc(r.note)}</div>`:'';
  return `<div class="card hreg" data-card="${esc(key)}"><div class="hh"><span class="fl">${r.flag}</span><h3>${esc(r.name)}</h3><span class="sig ${r.signal}">${SIG_WORD[r.signal]||''}</span>${mapA?`<button class="mapbtn" data-map="${mapA}" aria-label="Map of ${esc(r.name)} house prices">Map</button>`:''}</div>
   ${r.why?`<div class="why">${esc((w=>w.charAt(0).toUpperCase()+w.slice(1))(lowWhy(r.why)))}.</div>`:''}
-  ${momStrip(r,ms,key)}${keyM.map(m=>metricRow(m,key+'/'+m.id)).join('')}${r.table?medTable(r.table,key+'/'):''}${hasDd?`<div class="subh">Office landlord shares</div>${avgBoxes(r.avg)}`:chipRow(r.stocks)}${more}</div>`;
+  ${kt}${momStrip(r,ms,key)}${r.table?medTable(r.table,key+'/'):''}${hasDd?`<div class="subh">Office landlord shares</div>${avgBoxes(r.avg)}`:chipRow(r.stocks)}${more}</div>`;
 }
 /* section briefing: one plain-English line plus a reason per area */
 const RNAME={us:'US',uk:'UK and NI',ie:'Ireland',med:'Mediterranean',off_us:'US offices',off_eu:'UK and Europe offices'};

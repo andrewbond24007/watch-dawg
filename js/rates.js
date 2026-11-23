@@ -64,18 +64,20 @@ function fedOdds(b){
  const path=p.map(x=>{const mv=x.post-b.effective;return `<span><small>${new Date(x.date).toLocaleDateString('en-GB',{day:'numeric',month:'short'})}</small><b class="num">${x.post.toFixed(2)}%</b><em class="${rcls(mv)}">${Math.abs(mv)<0.005?'no change':bps(mv)}</em></span>`;}).join('');
  return `<div class="mom rodds"><div class="momh"><span>What markets expect</span></div><p class="oddsh">${head}</p>${bar}<div class="rpath">${path}</div><div class="hnote" style="margin-top:6px">From fed funds futures. The rate after each meeting is the market’s best guess, compared with today’s effective rate of ${rp(b.effective)}.</div></div>`;
 }
+function fedHead(b){const n=(b.path||[])[0];if(!n)return '';const when=new Date(n.date).toLocaleDateString('en-GB',{day:'numeric',month:'short'}),h=Math.round(n.hike*100),c=Math.round(n.cut*100);
+ return `<p class="oddsh" style="margin:10px 2px 0">Markets: ${h>=5?`<b class="down">${h}%</b> chance of a rise on ${when}`:c>=5?`<b class="up">${c}%</b> chance of a cut on ${when}`:`no change expected on ${when}`}</p>`;}
 function bankCard(b){
  const [sc,sw]=stance(b),l=b.decisions?.at(-1),key='bank:'+b.id,nw=RFRESH.has(key),open=REXP.has(b.id);
  const last=l?`Last move: <b class="${rcls(l.change/100)}">${l.change>0?'+':'−'}${Math.abs(l.change/100).toFixed(2)} pts</b> on ${rdate(l.date)}`:'No change since 2022';
  const hist=(b.decisions||[]).slice().reverse().map(x=>`<div class="rdec"><span>${rdate(x.date)}</span><b class="${rcls(x.change/100)}">${x.change>0?'Raised':'Cut'} ${Math.abs(x.change/100).toFixed(2)} pts</b><span class="num">to ${b.id==='fed'&&x.lo!=null?x.lo.toFixed(2)+'–'+x.value.toFixed(2)+'%':rp(x.value)}</span></div>`).join('');
  return `<div class="card hreg rbank${nw?' isnew':''}" id="rb-${b.id}"><div class="hh"><span class="fl">${b.flag}</span><h3>${esc(b.name)}</h3><span class="sig ${sc}">${sw}</span></div>
   <div class="rbig"><div><small>${esc(b.what)}${nw?'<span class="newtag">New</span>':''}</small><b class="num">${bankRate(b)}</b></div>${b.real!=null?`<div class="rreal"><small>Real rate</small><b class="num ${b.real>0?'':'up'}">${b.real>0?'+':''}${b.real.toFixed(2)}%</b><span>after inflation</span></div>`:''}</div>
-  <div class="why">${last}${b.effective!=null?` · effective rate ${rp(b.effective)}`:''}.</div>
   ${b.next?`<div class="rnext"><div><small>Next decision</small><b>${rwhen(b.next)}</b></div>${cdEl(b.next,'big')}</div>`:''}
-  ${b.id==='fed'?fedOdds(b):''}
-  ${stepChart(b)}
-  <div class="more"${open?'':' hidden'}><div class="subh">Decisions since 2022</div>${hist||'<div class="hnote">No changes.</div>'}<div class="subh">Coming meetings</div><div class="rmeet">${(b.meetings||[]).map(m=>`<span>${new Date(m).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'2-digit'})}</span>`).join('')}</div><div class="hnote">${esc(b.note||'')}</div></div>
-  <button class="morebtn" data-rexp="${b.id}" aria-expanded="${open}">${open?'Show less':'Decision history and dates'}<span class="ch">▾</span></button></div>`;
+  ${b.id==='fed'&&!open?fedHead(b):''}
+  <div class="more"${open?'':' hidden'}><div class="why">${last}${b.effective!=null?` · effective rate ${rp(b.effective)}`:''}.</div>
+  ${b.id==='fed'?fedOdds(b):''}${stepChart(b)}
+  <div class="subh">Decisions since 2022</div>${hist||'<div class="hnote">No changes.</div>'}<div class="subh">Coming meetings</div><div class="rmeet">${(b.meetings||[]).map(m=>`<span>${new Date(m).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'2-digit'})}</span>`).join('')}</div><div class="hnote">${esc(b.note||'')}</div></div>
+  <button class="morebtn" data-rexp="${b.id}" aria-expanded="${open}">${open?'Show less':b.id==='fed'?'Details · market odds, history and dates':'Details · history and dates'}<span class="ch">▾</span></button></div>`;
 }
 /* rows in the Health style: label, value, change, sparkline; tap for source and next update */
 function rRow(o){
@@ -86,6 +88,12 @@ function rRow(o){
   <div class="md" hidden>${o.detail}</div></div>`;
 }
 const RSER={};
+function secCard(id,icon,title,why,items,rowsHtml,extra=''){
+ const open=REXP.has(id),nw=items.some(o=>o.key&&RFRESH.has(o.key));
+ const tiles=`<div class="rtiles">${items.map(o=>`<button class="rtile${o.key&&RFRESH.has(o.key)?' isnew':''}" data-rexp="${id}"><small>${o.flag?o.flag+' ':''}${esc(o.short||o.name)}</small><b class="num">${o.val}</b><span>${o.chgShort||''}</span>${o.next?`<em>${cdEl(o.next)}</em>`:''}</button>`).join('')}</div>`;
+ return `<div class="card hreg" id="${id}"><div class="hh"><span class="fl">${icon}</span><h3>${esc(title)}</h3>${nw?'<span class="newtag">New</span>':''}${id==='rfx'?'<span class="rlive">Live</span>':''}</div>${why?`<div class="why">${why}</div>`:''}
+  ${open?rowsHtml:tiles}${extra}${rowsHtml?`<button class="morebtn" data-rexp="${id}" aria-expanded="${open}">${open?'Show less':'Details · charts and sources'}<span class="ch">▾</span></button>`:''}</div>`;
+}
 function renderRates(){
  if(activeTab!=='rates')return;const d=RATES.data;
  $('ratesStatus').innerHTML=d?`<span>Updated <b>${timeAgo(d.fetched)}</b></span>${RATES.err?'<span class="bad">Couldn’t refresh; showing the last copy</span>':''}${RATES.busy?'<span>Refreshing…</span>':''}${(d.errors||[]).length?`<span class="bad">${d.errors.length} source${d.errors.length>1?'s':''} not answering</span>`:''}`:'';
@@ -106,27 +114,28 @@ function renderRates(){
  const brief=`<div class="brief"><div class="bh"><span>🏦 In brief</span><span class="sig ${ups>downs?'red':downs>ups?'green':'amber'}">${ups>downs?'Rising':downs>ups?'Falling':'Holding'}</span></div><p>${esc(head)}</p><ul>${bul}</ul></div>`;
  const next=`<div class="subh" style="margin-top:4px">Next to change</div><div class="rev">${ev.slice(0,6).map(([t,l,j])=>`<button data-jump="${j}"><small>${esc(l)}</small><b>${new Date(t).toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'})}</b>${cdEl(t)}</button>`).join('')}</div>`;
  // yields
- const yrows=d.yields.map(y=>{const lv=RLIVE[y.id],v=lv&&Date.now()-lv.at<15*60e3?lv.price:y.value,ch=v-(y.w1??v);RSER[y.id]=y.series;
-  return rRow({id:y.id,name:y.name,val:rp(v),chg:`<b class="${rcls(ch)}">${bps(ch)}</b> in a week`,trend:v-(y.m1??v),live:!!lv,sub:y.y1!=null?`${bps(v-y.y1)} on a year`:'',detail:`<b>${esc(y.name)} government bond yield</b><br>${lv?'Live price, with the official close of '+rp(y.value)+' on '+rdate(y.date):'Official close on '+rdate(y.date)} · ${esc(y.src)}<br>A year ago ${rp(y.y1)}, a month ago ${rp(y.m1)}.`});}).join('');
+ const yI=d.yields.map(y=>{const lv=RLIVE[y.id],v=lv&&Date.now()-lv.at<15*60e3?lv.price:y.value,ch=v-(y.w1??v);RSER[y.id]=y.series;
+  return {id:y.id,name:y.name,short:y.name.replace(' gilt','').replace('Euro area','Euro'),val:rp(v),chg:`<b class="${rcls(ch)}">${bps(ch)}</b> in a week`,chgShort:`<b class="${rcls(ch)}">${bps(ch)}</b> 1w`,trend:v-(y.m1??v),live:!!lv,sub:y.y1!=null?`${bps(v-y.y1)} on a year`:'',detail:`<b>${esc(y.name)} government bond yield</b><br>${lv?'Live price, with the official close of '+rp(y.value)+' on '+rdate(y.date):'Official close on '+rdate(y.date)} · ${esc(y.src)}<br>A year ago ${rp(y.y1)}, a month ago ${rp(y.m1)}.`};});
  const cv=d.curve?`<div class="rcurve"><span>US 2s10s curve</span><b class="num">${d.curve.us>0?'+':''}${d.curve.us.toFixed(2)} pts</b><em>${d.curve.us<0?'Inverted: often a recession warning':'Normal: long rates above short'}</em></div>`:'';
  // mortgages
- const mrows=d.mortgages.map(m=>{const ch=m.prev!=null?m.value-m.prev:0;RSER[m.id]=m.series;
-  return rRow({id:m.id,key:'mort:'+m.id,flag:m.flag,name:m.name.replace(/^(US|UK) /,''),val:rp(m.value),chg:m.prev!=null?`<b class="${rcls(ch)}">${bps(ch)}</b> ${m.freq.startsWith('Weekly')?'w/w':'m/m'}`:'',trend:m.value-(m.y1??m.value),next:m.next,sub:m.freq,
-   detail:`<b>${esc(m.name)}</b><br>${m.id.startsWith('IUMBV')?rmonth(m.date):'Week to '+rdate(m.date)} · ${esc(m.src)} · ${esc(m.freq)}${m.next?'<br>Next figure '+rwhen(m.next):''}<br>A year ago ${rp(m.y1)}.`});}).join('');
+ const mI=d.mortgages.map(m=>{const ch=m.prev!=null?m.value-m.prev:0,per=m.freq.startsWith('Weekly')?'w/w':'m/m';RSER[m.id]=m.series;
+  return {id:m.id,key:'mort:'+m.id,flag:m.flag,name:m.name.replace(/^(US|UK) /,''),short:m.name.replace(/^(US|UK) /,'').replace(' (75% LTV)',''),val:rp(m.value),chg:m.prev!=null?`<b class="${rcls(ch)}">${bps(ch)}</b> ${per}`:'',chgShort:m.prev!=null?`<b class="${rcls(ch)}">${bps(ch)}</b> ${per}`:'',trend:m.value-(m.y1??m.value),next:m.next,sub:m.freq,
+   detail:`<b>${esc(m.name)}</b><br>${m.id.startsWith('IUMBV')?rmonth(m.date):'Week to '+rdate(m.date)} · ${esc(m.src)} · ${esc(m.freq)}${m.next?'<br>Next figure '+rwhen(m.next):''}<br>A year ago ${rp(m.y1)}.`};});
  // inflation
- const irows=(d.inflation||[]).map(i=>{const ch=i.prev!=null?i.value-i.prev:0;RSER[i.id]=i.series;
+ const iI=(d.inflation||[]).map(i=>{const ch=i.prev!=null?i.value-i.prev:0;RSER[i.id]=i.series;
   const stale=i.id.startsWith('us')&&i.date==='2026-09-01'?'<br><i>October’s yearly rate wasn’t published: there is no October 2025 figure to compare with after last year’s shutdown.</i>':'';
-  return rRow({id:i.id,key:'infl:'+i.id,flag:i.flag,name:(n=>n.charAt(0).toUpperCase()+n.slice(1))(i.name.replace(/^(US|UK) /,'')),val:rp(i.value,1),chg:i.prev!=null?`<b class="${rcls(ch)}">${ch>0?'+':ch<0?'−':''}${Math.abs(ch).toFixed(1)} pts</b> · target 2%`:'',trend:ch,next:i.next,sub:i.freq||'',
-   detail:`<b>${esc(i.name)}</b>, 12-month rate<br>${rmonth(i.date)} · ${esc(i.src)}${i.next?'<br>Next figure '+rwhen(i.next):''}${stale}`});}).join('');
+  const nm=(n=>n.charAt(0).toUpperCase()+n.slice(1))(i.name.replace(/^(US|UK) /,''));
+  return {id:i.id,key:'infl:'+i.id,flag:i.flag,name:nm,short:nm.replace(' (CPI)',''),val:rp(i.value,1),chg:i.prev!=null?`<b class="${rcls(ch)}">${ch>0?'+':ch<0?'−':''}${Math.abs(ch).toFixed(1)} pts</b> · target 2%`:'',chgShort:`${rmonth(i.date).split(' ')[0]}`,trend:ch,next:i.next,sub:i.freq||'',
+   detail:`<b>${esc(i.name)}</b>, 12-month rate<br>${rmonth(i.date)} · ${esc(i.src)}${i.next?'<br>Next figure '+rwhen(i.next):''}${stale}`};});
  // currencies
- const FX=[['gbpusd','🇬🇧🇺🇸 Pound in dollars',4],['eurusd','🇪🇺🇺🇸 Euro in dollars',4],['eurgbp','🇪🇺🇬🇧 Euro in pounds',4],['dxy','🇺🇸 Dollar index',2]];
- const fx=FX.map(([k,n,dp])=>{const v=RLIVE[k];if(!v)return '';const ch=v.prev?(v.price/v.prev-1)*100:null;
-  return `<div class="rfx"><span>${n}</span><b class="num">${v.price.toFixed(dp)}</b><em class="${ch>0?'upt':ch<0?'dnt':''}">${ch==null?'':fmtPct(ch)}</em></div>`;}).join('');
+ const FX=[['gbpusd','🇬🇧🇺🇸 Pound in dollars','£ in $',4],['eurusd','🇪🇺🇺🇸 Euro in dollars','€ in $',4],['eurgbp','🇪🇺🇬🇧 Euro in pounds','€ in £',4],['dxy','🇺🇸 Dollar index','Dollar index',2]];
+ const fI=FX.map(([k,n,sh,dp])=>{const v=RLIVE[k];if(!v)return null;const ch=v.prev?(v.price/v.prev-1)*100:null;return {n,short:sh,val:v.price.toFixed(dp),ch,chgShort:ch==null?'':`<b class="${ch>0?'upt':ch<0?'dnt':''}">${fmtPct(ch)}</b> today`};}).filter(Boolean);
+ const fxRows=fI.map(o=>`<div class="rfx"><span>${o.n}</span><b class="num">${o.val}</b><em class="${o.ch>0?'upt':o.ch<0?'dnt':''}">${o.ch==null?'':fmtPct(o.ch)}</em></div>`).join('');
  $('ratesBox').innerHTML=brief+next+B.map(bankCard).join('')
-  +`<div class="card hreg" id="ryld"><div class="hh"><span class="fl">📈</span><h3>Bond yields</h3></div><div class="why">What governments pay to borrow for 2 to 30 years. Mortgage rates follow these.</div>${yrows}${cv}</div>`
-  +`<div class="card hreg" id="rmort"><div class="hh"><span class="fl">🏠</span><h3>Mortgage rates</h3></div>${mrows}</div>`
-  +`<div class="card hreg" id="rinfl"><div class="hh"><span class="fl">🛒</span><h3>Inflation</h3></div><div class="why">Central banks aim for 2%. Above that, rates tend to stay high.</div>${irows}</div>`
-  +(fx?`<div class="card hreg" id="rfx"><div class="hh"><span class="fl">💱</span><h3>Currencies</h3><span class="rlive">Live</span></div><div class="why">Today’s change. Rate decisions and surprises in inflation move these first.</div>${fx}</div>`:'');
+  +secCard('ryld','📈','Bond yields','What governments pay to borrow. Mortgage rates follow these.',yI,yI.map(rRow).join('')+cv,REXP.has('ryld')?'':cv)
+  +secCard('rmort','🏠','Mortgage rates','',mI,mI.map(rRow).join(''))
+  +secCard('rinfl','🛒','Inflation','Central banks aim for 2%. Above that, rates tend to stay high.',iI,iI.map(rRow).join(''))
+  +(fI.length?`<div class="card hreg" id="rfx"><div class="hh"><span class="fl">💱</span><h3>Currencies</h3><span class="rlive">Live</span></div><div class="rtiles">${fI.map(o=>`<div class="rtile"><small>${esc(o.short)}</small><b class="num">${o.val}</b><span>${o.chgShort}</span></div>`).join('')}</div></div>`:'');
  $('ratesBox').querySelectorAll('svg[data-rsp]').forEach(s=>spark(s,(RSER[s.dataset.rsp]||[]).map(p=>p[1]),s.dataset.v));
  updateRatesDot();
 }
