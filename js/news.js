@@ -70,12 +70,16 @@ function buildThreads(items){
  // terms (CPI, PMI) never link stories on their own.
  const NOLINK=/^(january|february|march|april|may|june|july|august|september|october|november|december|monday|tuesday|wednesday|thursday|friday|saturday|sunday|today|breaking|just|live|update|report|exclusive|watch|news)$/;
  const idf=new Map();items.forEach(p=>new Set((calm(p.text).match(/\$?[A-Za-z][A-Za-z]{2,}/g)||[]).map(w=>w.replace(/^\$/,'').toLowerCase())).forEach(k=>idf.set(k,(idf.get(k)||0)+1)));
- const rare=c=>new Set([...c.ents.keys()].filter(k=>!NOLINK.test(k)&&!KEEPUP.has(k.toUpperCase())&&(idf.get(k)||0)<items.length*0.12));
+ const rare=c=>new Set([...c.ents.keys()].filter(k=>!NOLINK.test(k)&&!KEEPUP.has(k.toUpperCase())&&(idf.get(k)||0)<items.length*0.25));
+ const PLACE=/^(us|uk|eu|china|chinese|japan|japanese|india|iran|israel|russia|ukraine|europe|european|germany|german|france|french|italy|spain|britain|british|canada|mexico|brazil|taiwan|korea|saudi|washington|london|beijing|tokyo|moscow|brussels|asia|america|american)$/;
+ const wt=k=>PLACE.test(k)?0.5:1;
  const threads=[];
  cls.sort((a,b)=>b.ps.length-a.ps.length).forEach(c=>{const rc=rare(c);
-  const th=threads.find(t=>Math.abs(t.t1-c.t1)<24*3600e3&&[...rc].filter(k=>t.rare.has(k)).length>=2);
-  if(th){th.cls.push(c);rc.forEach(k=>th.rare.add(k));th.t1=Math.max(th.t1,c.t1);th.t0=Math.min(th.t0,c.t0);c.srcs.forEach(x=>th.srcs.add(x));}
-  else threads.push({cls:[c],rare:rc,t0:c.t0,t1:c.t1,srcs:new Set(c.srcs)});});
+  const th=threads.find(t=>{if(Math.abs(t.t1-c.t1)>24*3600e3)return false;const sh=[...rc].filter(k=>t.rare.has(k)),sc=sh.reduce((a,k)=>a+wt(k),0);
+   // two distinctive names in common, or one of the story's core names within six hours
+   return sc>=2||(sc>=1&&Math.abs(t.t1-c.t1)<6*3600e3&&sh.some(k=>wt(k)===1&&(t.core.get(k)||0)>=Math.max(3,t.n0*0.3)));});
+  if(th){th.cls.push(c);rc.forEach(k=>th.rare.add(k));th.n0+=c.ps.length;c.ents.forEach((v,k)=>th.core.set(k,(th.core.get(k)||0)+v));th.t1=Math.max(th.t1,c.t1);th.t0=Math.min(th.t0,c.t0);c.srcs.forEach(x=>th.srcs.add(x));}
+  else threads.push({cls:[c],rare:rc,t0:c.t0,t1:c.t1,srcs:new Set(c.srcs),n0:c.ps.length,core:new Map(c.ents)});});
  threads.forEach(t=>{t.cls.sort((a,b)=>b.t1-a.t1);t.main=t.cls.slice().sort((a,b)=>b.ps.length-a.ps.length||b.t1-a.t1)[0];t.head=t.main.head;t.all=t.cls.flatMap(c=>c.ps);t.n=t.all.length;
   t.img=(t.all.find(p=>p.img&&p.kind==='headline')||t.all.find(p=>p.img)||{}).img||null;t.cat=catOf(t.head);
   t.brk=t.all.some(p=>/^\s*\W*\s*breaking/i.test(p.text));});
