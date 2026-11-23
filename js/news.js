@@ -1,5 +1,5 @@
 /* ---------- news + big events (own cards) ---------- */
-let NEWS={items:[],at:0,busy:false,err:false},CAL={events:[],at:0,busy:false,err:false},newsMode='calendar';
+let NEWS={items:[],at:0,busy:false,err:false},CAL={events:[],at:0,busy:false,err:false},newsMode='headlines';
 const SRC={WatcherGuru:{n:'Watcher Guru',c:'#d99a00',i:'WG'},WalterBloomberg:{n:'Walter Bloomberg',c:'#2f6fde',i:'WB'},financialjuice:{n:'FinancialJuice',c:'#e2462f',i:'FJ'},marketfeed:{n:'Market Feed',c:'#15806b',i:'MF'},unfolded:{n:'Unfolded',c:'#8a4fd8',i:'UF'},bwenews:{n:'BWEnews',c:'#c2410c',i:'BW'},cointelegraph:{n:'Cointelegraph',c:'#3d8f3d',i:'CT'}};
 const CRYPTO_RX=/\$(BTC|ETH|SOL|XRP|DOGE|BNB|ADA|USDT|USDC|LKY)\b|bitcoin|ethereum|solana|luckycoin|crypto|stablecoin|binance|coinbase|blockchain|memecoin|tokeni[sz]/i;
 function timeAgo(t){const s=(Date.now()-new Date(t))/1000;if(s<60)return 'just now';if(s<3600)return Math.floor(s/60)+'m ago';if(s<86400)return Math.floor(s/3600)+'h ago';return Math.floor(s/86400)+'d ago';}
