@@ -29,14 +29,81 @@ function postCard(p,big,story){
 }
 /* same-story grouping: headlines sharing most of their key words within 12 hours become one card */
 const STOP=new Set('the a an and or of to in on for at by with from as is are was were be been it its this that after over into amid says said say will would could may new more than about up down out off his her their they we you not but has have had just breaking report reports reportedly per via sources source us'.split(' '));
-const toks=t=>new Set(calm(splitTag(t).body).toLowerCase().replace(/https?:\S+/g,'').match(/[a-z0-9$%.]+/g)?.map(w=>w.replace(/\.$/,'')).filter(w=>(w.length>2||/\d/.test(w))&&!STOP.has(w))||[]);
-function groupStories(items){
- const groups=[];
- for(const p of items){const tk=toks(p.text),t=Date.parse(p.time);let hit=null;
-  if(tk.size>=3)for(const g of groups){if(Math.abs(g.t-t)>12*3600e3)continue;let n=0;for(const w of tk)if(g.tk.has(w))n++;
-   if(n>=3&&n/Math.min(tk.size,g.tk.size)>=0.55){hit=g;break;}}
-  if(hit)hit.items.push(p);else groups.push({lead:p,items:[p],tk,t});}
- return groups;
+/* ---------- story detection ----------
+   1) clusters: posts about the same event, matched on weighted key words (rare words count more) and at
+      least one shared name, ticker or number, within 18 hours
+   2) threads: clusters about the same running story (sharing two distinctive names, e.g. Nvidia + Huang)
+      are shown together as one story with its developments */
+const JUNK=/^(upcoming dividend run|dividend (champion|aristocrat)s?\b|[A-Z]{1,5} (declares|announces) .*dividend|stock market today:? live)/i;
+function storyCluster(items){
+ const docs=items.map(p=>{const raw=splitTag(p.text).body,c=calm(raw).replace(/https?:\S+/g,'').split('\n')[0].slice(0,220);
+  const words=c.match(/\$?[A-Za-z][A-Za-z0-9&'’.-]*|\d[\d,.]*%?/g)||[];
+  const toks=[],ents=new Set();
+  words.forEach((w,i)=>{let k=w.toLowerCase().replace(/['’]s$/,'').replace(/[.,]+$/,'');if(!k||STOP.has(k)||(k.length<3&&!/\d/.test(k)))return;
+   if(/^\$/.test(k))k=k.slice(1);toks.push(k);
+   const prev=c.slice(0,c.indexOf(w)).trim();const sentStart=!prev||/[.!?:\-–—*‼]$/.test(prev);
+   if(/^\$/.test(w)||/\d/.test(w)&&w.length>=3||(/^[A-Z]/.test(w)&&!sentStart)||/^[A-Z]{2,}$/.test(w))ents.add(k);});
+  return {p,toks,ents,t:Date.parse(p.time)};});
+ const df=new Map();docs.forEach(d=>new Set(d.toks).forEach(k=>df.set(k,(df.get(k)||0)+1)));
+ const N=docs.length,idf=k=>Math.log((N+1)/((df.get(k)||0)+0.5));
+ docs.forEach(d=>{const v=new Map();d.toks.forEach(k=>v.set(k,(v.get(k)||0)+idf(k)));let n=0;v.forEach(x=>n+=x*x);d.v=v;d.n=Math.sqrt(n)||1;});
+ const cl=[];
+ for(const d of docs){let best=null,bs=0;
+  for(const c of cl){if(Math.min(...c.ts.map(t=>Math.abs(t-d.t)))>18*3600e3)continue;
+   let dot=0;d.v.forEach((x,k)=>{const y=c.v.get(k);if(y)dot+=x*y;});const s=dot/(d.n*c.n);
+   let shared=0;d.ents.forEach(e=>{if(c.ents.has(e)&&idf(e)>1.2)shared++;});
+   if(s>bs&&shared>=1){bs=s;best=c;}}
+  if(best&&bs>=0.3){best.items.push(d);best.ts.push(d.t);d.v.forEach((x,k)=>best.v.set(k,(best.v.get(k)||0)+x));let n=0;best.v.forEach(x=>n+=x*x);best.n=Math.sqrt(n);d.ents.forEach(e=>best.ents.add(e));}
+  else cl.push({items:[d],ts:[d.t],v:new Map(d.v),n:d.n,ents:new Set(d.ents)});}
+ return cl.map(c=>c.items.map(d=>d.p));
+}
+
+function bestHead(ps){const sc=p=>{const t=splitTag(p.text).body.split('\n')[0],U=t.replace(/[^A-Z]/g,'').length,L=t.replace(/[^A-Za-z]/g,'').length||1;
+ return (p.kind==='headline'?2:0)+(U/L<0.5?1:0)+(t.length>=35&&t.length<=120?1:0)-(/^[^A-Za-z0-9$]/.test(t)?.5:0)-(t.length>160?1:0);};
+ return ps.slice().sort((a,b)=>sc(b)-sc(a)||Date.parse(a.time)-Date.parse(b.time))[0];}
+const catOf=p=>(NCATS.slice(1).find(([c])=>inCat(p,c))||[])[1]||'';
+function buildThreads(items){
+ const cls=storyCluster(items.filter(p=>!JUNK.test(splitTag(p.text).body))).map(ps=>{const ents=new Map();
+  ps.forEach(p=>(calm(splitTag(p.text).body).match(/\$[A-Z]{2,6}|\b[A-Z][a-zA-Z]{2,}\b/g)||[]).forEach((w,i)=>{if(i===0&&!/^\$/.test(w)&&!NAMES.has(w.toLowerCase()))return;const k=w.replace(/^\$/,'').toLowerCase();if(STOP.has(k))return;ents.set(k,(ents.get(k)||0)+1);}));
+  const ts=ps.map(p=>Date.parse(p.time));return {ps,head:bestHead(ps),ents,t0:Math.min(...ts),t1:Math.max(...ts),srcs:new Set(ps.map(p=>p.src==='news'?p.source:p.src))};});
+ // how common each name is across clusters: names in many unrelated clusters (US, Trump, Fed) don't link stories
+ const cf=new Map();cls.forEach(c=>c.ents.forEach((_,k)=>cf.set(k,(cf.get(k)||0)+1)));
+ const rare=c=>new Set([...c.ents.keys()].filter(k=>cf.get(k)<=Math.max(3,cls.length*0.03)));
+ const threads=[];
+ cls.sort((a,b)=>b.ps.length-a.ps.length).forEach(c=>{const rc=rare(c);
+  const th=threads.find(t=>Math.abs(t.t1-c.t1)<24*3600e3&&[...rc].filter(k=>t.rare.has(k)).length>=2);
+  if(th){th.cls.push(c);rc.forEach(k=>th.rare.add(k));th.t1=Math.max(th.t1,c.t1);th.t0=Math.min(th.t0,c.t0);c.srcs.forEach(x=>th.srcs.add(x));}
+  else threads.push({cls:[c],rare:rc,t0:c.t0,t1:c.t1,srcs:new Set(c.srcs)});});
+ threads.forEach(t=>{t.cls.sort((a,b)=>b.t1-a.t1);t.main=t.cls.slice().sort((a,b)=>b.ps.length-a.ps.length||b.t1-a.t1)[0];t.head=t.main.head;t.all=t.cls.flatMap(c=>c.ps);t.n=t.all.length;
+  t.img=(t.all.find(p=>p.img&&p.kind==='headline')||t.all.find(p=>p.img)||{}).img||null;t.cat=catOf(t.head);
+  t.brk=t.all.some(p=>/^\s*\W*\s*breaking/i.test(p.text));});
+ return threads;
+}
+/* ---------- news cards ---------- */
+const hText=p=>calm(splitTag(p.text).body).replace(/https?:\S+/g,'').trim();
+const firstLine=t=>{const l=t.split('\n').map(x=>x.trim()).filter(Boolean);return l[0]||'';};
+const srcName=p=>srcOf(p).n;
+function hm(t){return new Date(t).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});}
+function avStack(ps,n=4){const seen=new Set(),out=[];for(const p of ps){const o=srcOf(p);if(seen.has(o.n))continue;seen.add(o.n);out.push(`<i style="background:${o.c}" title="${esc(o.n)}">${o.i}</i>`);if(out.length>=n)break;}return `<span class="avs">${out.join('')}</span>`;}
+function coverage(t){
+ const ps=t.all.slice().sort((a,b)=>Date.parse(b.time)-Date.parse(a.time));
+ return `<div class="cov" hidden>${ps.map(p=>{const o=srcOf(p);return `<a href="${esc(p.link)}" target="_blank" rel="noopener"><span class="tt">${hm(p.time)}</span><span class="dt" style="background:${o.c}"></span><span><b>${esc(o.n)}</b> ${esc(firstLine(hText(p)).slice(0,150))}</span></a>`;}).join('')}</div>`;
+}
+function storyCard(t){
+ const h=t.head,o=srcOf(h),txt=firstLine(hText(h)),ago=timeAgo(t.t1),ns=t.srcs.size;
+ const devs=t.cls.length>1?t.cls.filter(c=>c!==t.main).slice(0,3).map(c=>`<li><span class="tt">${hm(c.t1)}</span>${esc(firstLine(hText(c.head)).slice(0,110))}</li>`).join(''):'';
+ return `<article class="sc${t.img?' hasimg':''}">
+  ${t.img?`<a class="sci" href="${esc(h.link)}" target="_blank" rel="noopener"><img src="${esc(t.img)}" alt="" loading="lazy" onerror="this.closest('.sci').remove()"></a>`:''}
+  <div class="scb"><div class="scm">${t.brk?'<span class="brk">Breaking</span>':''}${t.cat?`<span class="cat">${esc(t.cat)}</span>`:''}<span>${ago}</span></div>
+  <a class="sch" href="${esc(h.link)}" target="_blank" rel="noopener">${richText(txt)}</a>
+  ${devs?`<ul class="devs">${devs}</ul>`:''}
+  <button class="scf" aria-expanded="false">${avStack(t.all)}<span>${ns>1?`${ns} sources · ${t.n} reports`:esc(o.n)}</span><span class="ch">▾</span></button>
+  ${coverage(t)}</div></article>`;
+}
+function newsRow(t){
+ const h=t.head,o=srcOf(h),full=hText(h),txt=firstLine(full),more=full.split('\n').filter(x=>x.trim()).slice(1).join(' ').slice(0,180),ns=t.srcs.size;
+ return `<div class="nr"><a href="${esc(h.link)}" target="_blank" rel="noopener"><span class="nt">${hm(h.time)}</span><span class="nb"><span class="ns"><i style="background:${o.c}"></i>${esc(o.n)}${t.brk?' <em class="brk">Breaking</em>':''}</span><span class="nh">${richText(txt)}</span>${more?`<span class="nm">${esc(more)}</span>`:''}</span>${h.img?`<img src="${esc(h.img)}" alt="" loading="lazy" onerror="this.remove()">`:''}</a>
+  ${t.n>1?`<button class="scf mini" aria-expanded="false">${avStack(t.all,3)}<span>${ns>1?`Also ${ns-1} other source${ns>2?'s':''}`:`${t.n} updates`}</span><span class="ch">▾</span></button>${coverage(t)}`:''}</div>`;
 }
 async function loadNews(force){
  if(NEWS.busy)return;if(!force&&NEWS.at&&Date.now()-NEWS.at<90e3){renderAllNews();return;}
@@ -173,18 +240,19 @@ function renderNewsTab(){
   if(!NEWS.items.length){box.innerHTML=`<div class="empty">${NEWS.err?'News can’t load in this viewer.':'Loading news…'}</div>`;return;}
   if(!items.length){box.innerHTML=`<div class="empty">No ${esc(label.toLowerCase())} news in the latest posts.</div>`;return;}
   const day=Date.now()-24*3600e3;
-  const groups=groupStories(items),gOf=new Map();groups.forEach(g=>g.items.forEach(p=>gOf.set(p,g)));
-  // biggest: breaking posts first, then the stories the most outlets are covering, then posts with pictures
-  const fresh=groups.filter(g=>g.t>day);
-  let big=fresh.filter(g=>/^\s*breaking/i.test(g.lead.text));
-  big=big.concat(fresh.filter(g=>g.items.length>=3&&!big.includes(g)).sort((a,b)=>b.items.length-a.items.length));
-  if(big.length<3)big=big.concat(fresh.filter(g=>g.lead.img&&g.lead.kind!=='headline'&&!big.includes(g)).slice(0,3-big.length));
-  big=big.slice(0,4);const bs=new Set(big);
-  const rest=groups.filter(g=>!bs.has(g)),more=rest.length-newsShown;
-  box.innerHTML=(big.length?`<div class="day">Biggest today${newsCat==='all'?'':' in '+esc(label.toLowerCase())}</div><div class="posts">${big.map(g=>postCard(g.lead,true,g.items)).join('')}</div>`:'')+
-   `<div class="day">Latest</div><div class="posts">${rest.slice(0,newsShown).map(g=>postCard(g.lead,false,g.items)).join('')}</div>`+(more>0?`<button class="linkbtn earlier" id="newsMore">Show more (${more} left)</button>`:'');
+  const threads=buildThreads(items),now=Date.now();
+  // top stories: most outlets covering it, weighted towards the last few hours
+  const score=t=>(t.srcs.size*2+Math.min(t.n,12)+(t.brk?3:0))*Math.exp(-(now-t.t1)/(10*3600e3));
+  const top=threads.filter(t=>now-t.t1<24*3600e3&&(t.srcs.size>=3||t.brk&&t.srcs.size>=2)).sort((a,b)=>score(b)-score(a)).slice(0,5),ts=new Set(top);
+  const rest=threads.filter(t=>!ts.has(t)).sort((a,b)=>Date.parse(b.head.time)-Date.parse(a.head.time)),shown=rest.slice(0,newsShown),more=rest.length-shown.length;
+  const bucket=t=>{const a=now-Date.parse(t.head.time),d=new Date(t.head.time),td=new Date();return a<3600e3?'Last hour':d.toDateString()===td.toDateString()?'Earlier today':d.toDateString()===new Date(now-864e5).toDateString()?'Yesterday':d.toLocaleDateString('en-GB',{weekday:'long'});};
+  let html=top.length?`<div class="day">Top stories${newsCat==='all'?'':' · '+esc(label)}</div><div class="scs">${top.map(storyCard).join('')}</div>`:'';
+  let cur='';shown.forEach(t=>{const b=bucket(t);if(b!==cur){html+=(cur?'</div>':'')+`<div class="day">${b}</div><div class="nlist">`;cur=b;}html+=newsRow(t);});
+  if(cur)html+='</div>';
+  if(more>0)html+=`<button class="linkbtn earlier" id="newsMore">Show more (${more} left)</button>`;
+  box.innerHTML=html;
+  box.querySelectorAll('.scf').forEach(b=>b.onclick=()=>{const l=b.nextElementSibling,o=l.hidden;l.hidden=!o;b.setAttribute('aria-expanded',o);buzz();});
   const nm=$('newsMore');if(nm)nm.onclick=()=>{newsShown+=40;buzz();renderNewsTab();};
-  box.querySelectorAll('.stb').forEach(b=>b.onclick=()=>{const l=b.nextElementSibling,o=l.hidden;l.hidden=!o;b.setAttribute('aria-expanded',o);buzz();});
  }
 }
 $('newsSeg').addEventListener('click',e=>{const b=e.target.closest('button');if(!b||b.dataset.n===newsMode)return;newsMode=b.dataset.n;[...$('newsSeg').children].forEach(x=>x.classList.toggle('on',x===b));buzz();renderNewsTab();window.scrollTo({top:0,behavior:'smooth'});});
