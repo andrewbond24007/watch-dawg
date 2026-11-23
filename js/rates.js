@@ -90,7 +90,7 @@ function rRow(o){
 const RSER={};
 function secCard(id,icon,title,why,items,rowsHtml,extra=''){
  const open=REXP.has(id),nw=items.some(o=>o.key&&RFRESH.has(o.key));
- const tiles=`<div class="rtiles">${items.map(o=>`<button class="rtile${o.key&&RFRESH.has(o.key)?' isnew':''}" data-rexp="${id}"><small>${o.flag?o.flag+' ':''}${esc(o.short||o.name)}</small><b class="num">${o.val}</b><span>${o.chgShort||''}</span>${o.next?`<em>${cdEl(o.next)}</em>`:''}</button>`).join('')}</div>`;
+ const tiles=`<div class="rtiles">${items.map(o=>`<button class="rtile${o.key&&RFRESH.has(o.key)?' isnew':''}" data-rexp="${id}"><small>${o.flag?o.flag+' ':''}${esc(o.short||o.name)}</small><b class="num">${o.val}</b><span>${o.chgShort||''}</span>${o.next?`<em>Next in ${cdEl(o.next)}</em>`:''}</button>`).join('')}</div>`;
  return `<div class="card hreg" id="${id}"><div class="hh"><span class="fl">${icon}</span><h3>${esc(title)}</h3>${nw?'<span class="newtag">New</span>':''}${id==='rfx'?'<span class="rlive">Live</span>':''}</div>${why?`<div class="why">${why}</div>`:''}
   ${open?rowsHtml:tiles}${extra}${rowsHtml?`<button class="morebtn" data-rexp="${id}" aria-expanded="${open}">${open?'Show less':'Details · charts and sources'}<span class="ch">▾</span></button>`:''}</div>`;
 }
