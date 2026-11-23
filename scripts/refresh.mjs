@@ -65,6 +65,9 @@ try {
 } catch (e) { errors['rates:all'] = String(e.message || e); }
 
 write('history.json', hist);
+// the data branch is only read through raw GitHub links: tell Vercel never to deploy it (each deploy counts
+// towards the free plan's 100 a day)
+fs.writeFileSync(path.join(dir, 'vercel.json'), JSON.stringify({ git: { deploymentEnabled: false } }));
 const status = updateStatus(read('status.json', {}), errors, Object.keys(SOURCE_NAMES));
 status.seconds = Math.round((Date.now() - t0) / 1000);
 write('status.json', status);
