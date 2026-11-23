@@ -105,7 +105,7 @@ async function loadQuotes(force){
  try{
   const k=tdKey&&tdKey!==DEFAULT_TD_KEY?'&k='+encodeURIComponent(tdKey):'';
   const j=await fetch(`/.netlify/functions/td?s=${encodeURIComponent(syms.join(','))}&b=${b}${k}`).then(r=>r.json());
-  if(j.error){qRetryAt=Date.now()+65e3;qStatus=j.code===429?'Twelve Data’s limit was hit, using Yahoo prices for now':j.error;}
+  if(j.error){qRetryAt=j.retryAt||Date.now()+65e3;qStatus=j.daily?'Twelve Data’s daily allowance is used up until midnight UTC, so prices come from Yahoo until then':j.code===429?'Twelve Data’s per-minute limit was hit, using Yahoo prices for now':j.error;}
   else{let ok=0,miss=[],lim=false;
    syms.forEach(s=>{const v=j.quotes[s];if(v&&!v.error){quotes[s]={...v,at:j.at};ok++;}else{miss.push(s);if(v&&v.code===429)lim=true;}});
    quotesAt=Date.now();store.set('wd.quotes',quotes);store.set('wd.quotesAt',quotesAt);

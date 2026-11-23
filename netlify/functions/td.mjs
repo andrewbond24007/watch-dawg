@@ -16,7 +16,9 @@ export default async (req) => {
   try {
     const j = await fetch(`https://api.twelvedata.com/quote?symbol=${encodeURIComponent(syms.join(','))}&apikey=${encodeURIComponent(key)}`,
       { signal: AbortSignal.timeout(15000) }).then((r) => r.json());
-    if (j && j.status === 'error' && !j[syms[0]]) return json({ error: j.message || 'rejected', code: j.code || null }, 60);
+    // out of credits for the day: remember that until midnight UTC (when Twelve Data resets) so nobody keeps retrying
+    const untilReset = () => Math.max(60, Math.ceil((Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate() + 1) - Date.now()) / 1000) + 60);
+    if (j && j.status === 'error' && !j[syms[0]]) { const day = /for the day/i.test(j.message || ''); return json({ error: j.message || 'rejected', code: j.code || null, daily: day, retryAt: day ? Date.now() + untilReset() * 1000 : null }, day ? untilReset() : 60); }
     const map = syms.length === 1 ? { [syms[0]]: j } : j, out = {};
     let limited = false;
     for (const k of syms) {
