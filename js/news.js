@@ -66,9 +66,11 @@ function buildThreads(items){
  const cls=storyCluster(items.filter(p=>!JUNK.test(splitTag(p.text).body))).map(ps=>{const ents=new Map();
   ps.forEach(p=>(calm(splitTag(p.text).body).match(/\$[A-Z]{2,6}|\b[A-Z][a-zA-Z]{2,}\b/g)||[]).forEach((w,i)=>{if(i===0&&!/^\$/.test(w)&&!NAMES.has(w.toLowerCase()))return;const k=w.replace(/^\$/,'').toLowerCase();if(STOP.has(k))return;ents.set(k,(ents.get(k)||0)+1);}));
   const ts=ps.map(p=>Date.parse(p.time));return {ps,head:bestHead(ps),ents,t0:Math.min(...ts),t1:Math.max(...ts),srcs:new Set(ps.map(p=>p.src==='news'?p.source:p.src))};});
- // how common each name is across clusters: names in many unrelated clusters (US, Trump, Fed) don't link stories
- const cf=new Map();cls.forEach(c=>c.ents.forEach((_,k)=>cf.set(k,(cf.get(k)||0)+1)));
- const rare=c=>new Set([...c.ents.keys()].filter(k=>cf.get(k)<=Math.max(3,cls.length*0.03)));
+ // linking names: people, companies and places that appear in under 12% of posts. Months, days and data
+ // terms (CPI, PMI) never link stories on their own.
+ const NOLINK=/^(january|february|march|april|may|june|july|august|september|october|november|december|monday|tuesday|wednesday|thursday|friday|saturday|sunday|today|breaking|just|live|update|report|exclusive|watch|news)$/;
+ const idf=new Map();items.forEach(p=>new Set((calm(p.text).match(/\$?[A-Za-z][A-Za-z]{2,}/g)||[]).map(w=>w.replace(/^\$/,'').toLowerCase())).forEach(k=>idf.set(k,(idf.get(k)||0)+1)));
+ const rare=c=>new Set([...c.ents.keys()].filter(k=>!NOLINK.test(k)&&!KEEPUP.has(k.toUpperCase())&&(idf.get(k)||0)<items.length*0.12));
  const threads=[];
  cls.sort((a,b)=>b.ps.length-a.ps.length).forEach(c=>{const rc=rare(c);
   const th=threads.find(t=>Math.abs(t.t1-c.t1)<24*3600e3&&[...rc].filter(k=>t.rare.has(k)).length>=2);
@@ -93,7 +95,7 @@ function storyCard(t){
  const h=t.head,o=srcOf(h),txt=firstLine(hText(h)),ago=timeAgo(t.t1),ns=t.srcs.size;
  const devs=t.cls.length>1?t.cls.filter(c=>c!==t.main).slice(0,3).map(c=>`<li><span class="tt">${hm(c.t1)}</span>${esc(firstLine(hText(c.head)).slice(0,110))}</li>`).join(''):'';
  return `<article class="sc${t.img?' hasimg':''}">
-  ${t.img?`<a class="sci" href="${esc(h.link)}" target="_blank" rel="noopener"><img src="${esc(t.img)}" alt="" loading="lazy" onerror="this.closest('.sci').remove()"></a>`:''}
+  ${t.img?`<a class="sci" href="${esc(h.link)}" target="_blank" rel="noopener"><img src="${esc(t.img)}" alt="" onerror="this.closest('.sci').remove()"></a>`:''}
   <div class="scb"><div class="scm">${t.brk?'<span class="brk">Breaking</span>':''}${t.cat?`<span class="cat">${esc(t.cat)}</span>`:''}<span>${ago}</span></div>
   <a class="sch" href="${esc(h.link)}" target="_blank" rel="noopener">${richText(txt)}</a>
   ${devs?`<ul class="devs">${devs}</ul>`:''}
