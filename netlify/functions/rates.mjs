@@ -162,12 +162,10 @@ const safe = async (p, errs, name) => { try { return await p; } catch (e) { errs
 export default async (req) => {
   const pu = new URL(req.url);
   if (pu.searchParams.get('probe')) {
-    const urls = ['https://data-api.ecb.europa.eu/service/data/ICP/M.U2.N.000000.4.ANR?format=csvdata&detail=dataonly&lastNObservations=2',
-      'https://data-api.ecb.europa.eu/service/data/ICP/M..N.000000.4.ANR?format=csvdata&detail=serieskeysonly&startPeriod=2026-06',
-      'https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/prc_hicp_manr?geo=EA&coicop=CP00&lastTimePeriod=2',
-      'https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/prc_hicp_minr?geo=EA&lastTimePeriod=2',
-      'https://markets.newyorkfed.org/api/rates/unsecured/effr/last/1000.json'];
-    const out = {}; await Promise.all(urls.map(async (u) => { try { const r = await fetch(u, { headers: UA, signal: T(15000) }); const t = await r.text(); out[u] = r.status + ' ' + t.slice(0, 700); } catch (e) { out[u] = String(e); } }));
+    const out = {};
+    try { const t = await get('https://data-api.ecb.europa.eu/service/data/ICP/M..N.000000.4.ANR?format=csvdata&detail=dataonly&lastNObservations=1', 20000, { Accept: 'text/csv' }); out.areas = t.split(/\r?\n/).slice(1).map((l) => l.split(',')).map((c) => c[2] + ':' + c[7] + '=' + c[8]).join(' '); } catch (e) { out.areas = String(e); }
+    try { const j = JSON.parse(await get('https://markets.newyorkfed.org/api/rates/unsecured/effr/last/500.json')); const r = j.refRates; out.ny = r.length + ' first ' + r[0].effectiveDate + ' last ' + r.at(-1).effectiveDate; } catch (e) { out.ny = String(e); }
+    try { const j = JSON.parse(await get('https://markets.newyorkfed.org/api/rates/unsecured/effr/search.json?startDate=2022-01-01&endDate=2026-12-31')); const r = j.refRates; out.ny2 = r.length + ' first ' + r[0].effectiveDate + ' last ' + r.at(-1).effectiveDate + ' ' + JSON.stringify(r[0]); } catch (e) { out.ny2 = String(e); }
     return new Response(JSON.stringify(out, null, 1), { headers: { 'content-type': 'application/json' } });
   }
   const errs = [], now = Date.now();
