@@ -56,14 +56,12 @@
   <div class="view active" id="v-markets">
     <div class="brief mbrief" id="mBrief" hidden></div>
     <div class="clock" aria-live="polite">
-      <div class="state"><span class="lamp" id="lamp"></span><span id="state"><b>Wall Street</b></span></div>
-      <div class="countdown num" id="countdown">—</div>
+      <div class="state"><span class="lamp" id="lamp"></span><span class="st" id="state"><b>Wall Street</b></span><span class="ctime num" id="ctime"></span></div>
+      <div class="cdl"><span class="countdown num" id="countdown">—</span><span id="futs"></span></div>
       <div class="band-wrap"><div class="band" id="band"></div></div>
-      <div class="ticks num" id="ticks"></div>
       <div class="band fband" id="fband" aria-hidden="true"></div>
-      <div class="legend"><span style="--c:var(--pre)">Pre-market</span><span style="--c:var(--reg)">Open</span><span style="--c:var(--post)">After hours</span><span style="--c:var(--night)">Overnight</span><span style="--c:var(--fut)">Futures</span></div>
-      <div class="sess" id="sess"></div>
-      <div class="futnote" id="futnote"></div>
+      <div class="ticks num" id="ticks"></div>
+      <div class="legend" id="legend"><span data-k="pre" style="--c:var(--pre)">Pre</span><span data-k="reg" style="--c:var(--reg)">Open</span><span data-k="post" style="--c:var(--post)">After</span><span data-k="night" style="--c:var(--night)">Overnight</span><span data-k="fut" style="--c:var(--fut)">Futures</span></div>
     </div>
     <button class="recap" id="recap" hidden></button>
     <div class="tape" id="tape"></div>

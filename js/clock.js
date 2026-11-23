@@ -46,16 +46,10 @@ function clock(){
  const fb=$('fband');fb.innerHTML='';
  [-2,-1,0,1].forEach(dd=>{const k=ymdAdd(ymd,dd);paint(band,dd,overnightFor(k),'--night');paint(fb,dd,futuresFor(k),'--fut');});
  const n=document.createElement('div');n.className='now';n.style.left=(lm/14.4)+'%';band.appendChild(n);
- const row=(name,sub,c,st,openTxt)=>`<div><span class="lamp${st.open?' on':''}" style="--c:var(${c})"></span><span><b>${name}</b><small>${sub}</small></span><span>${st.open?openTxt(st):st.opensIn==null?'—':st.opensIn<=720?'Opens in '+fmtDur(st.opensIn):'Opens '+whenLocal(st.opensIn)}</span></div>`;
  const fut=sessionStatus(futuresFor,ymd,mins),ovn=sessionStatus(overnightFor,ymd,mins);
- $('sess').innerHTML=row('Futures','S&amp;P 500, Nasdaq 100, Dow','--fut',fut,s=>`Open · ${s.until<=720?'pauses in '+fmtDur(s.until):'until '+whenLocal(s.until)}`)
-  +row('Overnight stock trading','24-hour brokers, 8pm–4am New York','--night',ovn,s=>`Open · until ${whenLocal(s.until)}`)
-  +row('Crypto','Bitcoin, Ethereum and the rest','--reg',{open:true},()=>'Open 24/7');
  const nx=nextOpen(ymd,mins),dow=ymdDow(ymd),postEnd=close===960?1200:1020,over=trading&&mins>=postEnd;
  const weekendAhead=nx&&[...Array(Math.max(0,Math.round((Date.parse(nx.ymd)-Date.parse(ymd))/864e5)-1))].some((_,i)=>[0,6].includes(ymdDow(ymdAdd(ymd,i+1))));
  const why=US_HOLIDAYS[ymd]?`Closed for ${US_HOLIDAYS[ymd]}`:(dow===0||dow===6||(over&&weekendAhead))?'Closed for the weekend':over?'Closed for the day':'';
- $('ticks').innerHTML=trading&&!over?`<span>00:00</span><span>Opens ${localAt(570,mins)}</span><span>Closes ${localAt(close,mins)}${early?' (early)':''}</span><span>24:00</span>`
-  :`<span>00:00</span><span>${why}${nx?' · opens '+whenLocal(nx.add):''}</span><span>24:00</span>`;
  let state,cd,open=false;
  if(trading&&mins>=570&&mins<close){open=true;state=early?'Wall Street is open · closes early today':'Wall Street is open';cd=`Closes in ${fmtDur(close-mins)}`;}
  else{
@@ -64,6 +58,17 @@ function clock(){
   cd=!nx?'':nx.add<=720?`Opens in ${fmtDur(nx.add)}`:`Opens ${whenLocal(nx.add)}`;}
  if(open&&US_HOLIDAYS[ymdAdd(ymd,1)])state+=` · closed tomorrow for ${US_HOLIDAYS[ymdAdd(ymd,1)]}`;
  $('state').innerHTML=`<b>${state}</b>`;$('lamp').className='lamp'+(open?' open':'');
- const cdEl=$('countdown');if(cdEl.textContent!==cd){cdEl.textContent=cd;fitCountdown(cdEl);}
- $('futnote').textContent=open?'The S&P 500 and Nasdaq 100 rows are following the live index.':fut.open?'The S&P 500 and Nasdaq 100 rows are following futures, which are trading now. Single stocks hold their last price until trading resumes.':'Futures are paused too, so the S&P 500 and Nasdaq 100 rows show their last futures price. Single stocks hold their last price until trading resumes.';
+ $('countdown').textContent=cd;
+ // times printed on the bar where each session starts and ends (your local time); the live time sits on the 'now' line
+ const pts=[];const addPts=(dd,segs)=>segs.forEach(([a,b])=>[a,b].forEach(x=>{const p=x+off+dd*1440;if(p>20&&p<1420)pts.push(p);}));
+ [-1,0,1].forEach(dd=>addPts(dd,sessionsFor(ymdAdd(ymd,dd)).map(([a,b])=>[a,b])));
+ [-2,-1,0,1].forEach(dd=>{const k=ymdAdd(ymd,dd);addPts(dd,overnightFor(k));addPts(dd,futuresFor(k));});
+ const hm=m=>{m=((Math.round(m)%1440)+1440)%1440;return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');};
+ const shown=[lm];let tk=`<span class="nowt" style="left:${Math.min(96,Math.max(4,lm/14.4))}%">Now</span>`;
+ [...new Set(pts.map(Math.round))].sort((x,y)=>x-y).forEach(p=>{if(shown.some(q=>Math.abs(q-p)<130))return;shown.push(p);tk+=`<span style="left:${Math.min(95,Math.max(5,p/14.4))}%">${hm(p)}</span>`;});
+ $('ticks').innerHTML=tk;
+ $('ctime').textContent=now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+ const liveK={pre:trading&&mins>=240&&mins<570,reg:open,post:trading&&mins>=close&&mins<postEnd,night:ovn.open,fut:fut.open};
+ if(document.querySelectorAll)document.querySelectorAll('#legend span').forEach(e=>e.classList.toggle('live',!!liveK[e.dataset.k]));
+ $('futs').textContent=open?'':fut.open?(fut.until<=720?'Futures pause in '+fmtDur(fut.until):'Futures trading'):fut.opensIn==null?'Futures shut':fut.opensIn<=720?'Futures open in '+fmtDur(fut.opensIn):'Futures open '+whenLocal(fut.opensIn);
 }

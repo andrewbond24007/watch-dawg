@@ -58,19 +58,26 @@ main{max-width:560px;margin:0 auto;padding:calc(14px + env(safe-area-inset-top))
 .tab[aria-selected="true"] svg{transform:translateY(-1px) scale(1.08)}
 
 /* market clock */
-.clock{margin-top:14px;background:var(--surface);border-radius:20px;padding:16px 16px 14px;box-shadow:var(--shadow)}
+.clock{margin-top:12px;background:var(--surface);border-radius:16px;padding:11px 14px 10px;box-shadow:var(--shadow)}
 .clock .state{font-size:14px;color:var(--muted);display:flex;align-items:center;gap:8px}
 .clock .state b{color:var(--ink);font-weight:600}
 .lamp{width:10px;height:10px;border-radius:3px;background:var(--muted)}.lamp.open{background:var(--reg)}
-.countdown{font-size:clamp(28px,9vw,40px);white-space:nowrap;line-height:1.05;font-weight:700;font-variation-settings:"wdth" 118;margin:6px 0 12px;letter-spacing:-.02em}
+.cdl{font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3;color:var(--muted);margin:2px 0 8px 18px}
+.countdown{font-weight:600;color:var(--ink)}
+#futs:not(:empty)::before{content:" · "}
 .band-wrap{position:relative;padding:4px 0}
 .band{position:relative;height:14px;border-radius:7px;overflow:hidden;background:var(--shut)}
 .band i{position:absolute;top:0;bottom:0}
 .now{position:absolute;top:0;bottom:0;width:3px;margin-left:-1.5px;background:var(--ink);border-radius:2px;box-shadow:0 0 0 2px var(--surface)}
-.ticks{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:6px}
-.legend{display:flex;gap:14px;font-size:12px;color:var(--muted);margin-top:10px;flex-wrap:wrap}
+.ticks{position:relative;height:14px;font-size:10.5px;color:var(--muted);margin-top:3px}
+.ticks span{position:absolute;top:0;transform:translateX(-50%);white-space:nowrap}
+.ticks span.nowt{color:var(--ink);font-weight:700}
+.clock .st{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctime{font-size:13px;font-weight:700;color:var(--ink)}
+.legend{display:flex;gap:10px;font-size:11px;color:var(--muted);margin-top:6px;flex-wrap:wrap}
+.legend span.live{color:var(--ink);font-weight:600}
 .legend span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px;background:var(--c)}
-.fband{height:6px;border-radius:3px;margin-top:5px}
+.fband{height:5px;border-radius:3px;margin-top:4px}
 .sess{margin-top:12px;border-top:1px solid var(--rule)}
 .sess div{display:grid;grid-template-columns:10px 1fr auto;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--rule);font-size:13px}
 .sess .lamp{width:8px;height:8px}.sess .lamp.on{background:var(--c,var(--reg))}
