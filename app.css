@@ -615,3 +615,21 @@ footer{margin-top:28px;font-size:11.5px;line-height:1.55;color:var(--muted)}
 .subh{margin-top:14px}
 .morebtn{min-height:40px}
 .rev{margin-bottom:16px}
+/* ---------- markets: compact list ---------- */
+.shr{display:flex;align-items:center;gap:8px}
+#mview .i-chart{display:none}body.compact #mview .i-list{display:none}body.compact #mview .i-chart{display:block}
+body.compact #range{display:none}
+body.compact .list{gap:6px}
+.crow{position:relative;display:grid;grid-template-columns:46px 1fr auto;grid-template-areas:"b n p" "b x x";gap:0 12px;align-items:center;width:100%;border:0;background:var(--surface);border-radius:16px;padding:8px 14px 8px 8px;box-shadow:var(--shadow);color:var(--ink);font:inherit;text-align:left;cursor:pointer;transition:transform .15s}
+.crow:active{transform:scale(.985)}
+.crow .metal{grid-area:b;width:46px;height:46px;padding:2px;gap:0;border-radius:11px;align-self:center}
+.crow .metal svg{width:40px;height:30px}.crow .metal b{display:none}
+.crow .cn{grid-area:n;display:flex;flex-direction:column;min-width:0}
+.crow .cn b{font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.crow .cn small{font-size:11.5px;color:var(--muted);font-weight:600}
+.crow .cp{grid-area:p;display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+.crow .cp b{font-size:16px;font-weight:800;font-variation-settings:"wdth" 106}
+.crow .chg{font-style:normal;font-size:12px;font-weight:800;padding:2px 8px;border-radius:999px;background:var(--bg);color:var(--muted);font-variant-numeric:tabular-nums}
+.crow .chg.up{background:var(--upbg);color:var(--upink)}.crow .chg.down{background:var(--downbg);color:var(--downink)}
+.crow .cx{grid-area:x;font-size:11px;color:var(--muted);margin-top:3px}.crow .cx b{font-weight:800}.crow .cx b.up{color:var(--upink)}.crow .cx b.down{color:var(--downink)}
+.crow .cx:empty,.crow .cx[hidden]{display:none}

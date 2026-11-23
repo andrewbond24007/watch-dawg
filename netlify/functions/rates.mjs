@@ -138,6 +138,7 @@ async function fedFutures(months) {
       if (px > 80 && px < 100) out[`${y}-${String(m).padStart(2, '0')}`] = +(100 - px).toFixed(4);
     } catch (e) { /* missing month */ }
   }));
+  if (!Object.keys(out).length) throw new Error('no futures prices');
   return out;
 }
 // CME-style reading of the futures: for each meeting, the rate expected after it and the odds of a 25bp move

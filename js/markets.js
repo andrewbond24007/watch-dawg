@@ -221,8 +221,26 @@ function rowFor(item,kind,left){
  mini(r.querySelector('.w'),item.sym,item.c,item.name||item.n);
  return r;
 }
-function buildStocks(){const b=$('stocks');b.innerHTML='';if(!W.stocks.length)b.innerHTML='<div class="hint">No stocks yet. Tap the pencil to add some.</div>';W.stocks.forEach(s=>{const r=rowFor(s,'stock',stockBadge(s));if(!s.sym.startsWith('FOREXCOM:'))r.insertAdjacentHTML('beforeend',`<div class="ext" data-ext="${esc(s.sym)}" hidden></div>`);b.appendChild(r);});renderExt();}
-function buildMetals(){const b=$('metals');b.innerHTML='';if(!W.metals.length)b.innerHTML='<div class="hint">No metals yet. Tap the pencil to add some.</div>';W.metals.forEach(m=>b.appendChild(rowFor(m,'metal',`<div class="metal">${ingots()}<b>${esc(m.n)}</b></div>`)));}
+/* compact list view: one line per asset, tap for the full TradingView chart */
+let mview=store.get('wd.mview','charts');
+function priceFor(it){const q=it.q,l=liveMetal[q];if(q&&l&&l.price!=null&&Date.now()-l.at<10*60e3)return l.price;if(q&&quotes[q]&&!tdStale(q))return quotes[q].price;const y=yq[it.y];if(y&&y.price!=null)return y.price;return q&&quotes[q]?quotes[q].price:null;}
+const isIndex=s=>/^FOREXCOM:/.test(s.sym);
+function crowVals(it,kind){const p=isIndex(it)?null:priceFor(it),pct=pctFor(it);
+ return {p:p==null?(isIndex(it)?'Index':'—'):'$'+(+p).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}),pct,cls:pct>0?'up':pct<0?'down':''};}
+function crow(it,kind,badge){
+ const r=document.createElement('button');r.className='crow';r.style.setProperty('--c',colorVar(it.c));r.dataset.key=kind+':'+(it.sym||it.n);
+ r.setAttribute('aria-label',(it.name||it.n)+': open chart');
+ r.innerHTML=`${badge}<span class="cn"><b>${esc(kind==='metal'?it.n:it.name)}</b><small>${esc(kind==='metal'?'per troy ounce':it.tk||'')}</small></span><span class="cp"><b class="num"></b><em class="chg"></em></span>${kind==='stock'&&!isIndex(it)?`<span class="cx" data-ext="${esc(it.sym)}"></span>`:''}`;
+ r.addEventListener('click',()=>{buzz();openChart({kind,...it});});return r;}
+function renderCompact(){if(mview!=='compact')return;
+ [['stocks',W.stocks,'stock'],['metals',W.metals,'metal']].forEach(([id,list,kind])=>{const rows=$(id).querySelectorAll('.crow');list.forEach((it,i)=>{const r=rows[i];if(!r)return;const v=crowVals(it,kind);
+  r.querySelector('.cp b').textContent=v.p;const e=r.querySelector('.cp em');e.textContent=v.pct==null?'—':(v.pct>0?'+':v.pct<0?'−':'')+Math.abs(v.pct).toFixed(2)+'%';e.className='chg '+v.cls;
+  const x=r.querySelector('.cx');if(x){const t=extFor(it);x.innerHTML=t?`${esc(extLabel(t))} <b class="${t.chg>0?'up':t.chg<0?'down':''}">${t.chg>0?'+':t.chg<0?'−':''}${Math.abs(t.chg).toFixed(2)}%</b> $${(+t.price).toFixed(2)}`:'';x.hidden=!t;}});});}
+function setMview(v){mview=v;store.set('wd.mview',v);document.body.classList.toggle('compact',v==='compact');const b=$('mview');b.setAttribute('aria-pressed',v==='compact');b.setAttribute('aria-label',v==='compact'?'Switch to charts':'Switch to compact list');buildStocks();buildMetals();}
+$('mview').addEventListener('click',()=>{buzz();setMview(mview==='compact'?'charts':'compact');toast(mview==='compact'?'Compact list':'Charts');});
+document.body.classList.toggle('compact',mview==='compact');
+function buildStocks(){if(mview==='compact'){const b=$('stocks');b.innerHTML='';W.stocks.forEach(s=>b.appendChild(crow(s,'stock',stockBadge(s))));renderCompact();return;}const b=$('stocks');b.innerHTML='';if(!W.stocks.length)b.innerHTML='<div class="hint">No stocks yet. Tap the pencil to add some.</div>';W.stocks.forEach(s=>{const r=rowFor(s,'stock',stockBadge(s));if(!s.sym.startsWith('FOREXCOM:'))r.insertAdjacentHTML('beforeend',`<div class="ext" data-ext="${esc(s.sym)}" hidden></div>`);b.appendChild(r);});renderExt();}
+function buildMetals(){if(mview==='compact'){const b=$('metals');b.innerHTML='';W.metals.forEach(m=>b.appendChild(crow(m,'metal',`<div class="metal">${ingots()}<b>${esc(m.n)}</b></div>`)));renderCompact();return;}const b=$('metals');b.innerHTML='';if(!W.metals.length)b.innerHTML='<div class="hint">No metals yet. Tap the pencil to add some.</div>';W.metals.forEach(m=>b.appendChild(rowFor(m,'metal',`<div class="metal">${ingots()}<b>${esc(m.n)}</b></div>`)));}
 const tvCrypto=c=>c.tv||('BINANCE:'+c.s.toUpperCase()+'USDT');
 /* the scrolling ticker under the clock: built from the app's own prices, so it shows instantly with no
    blank gap while a third-party widget loads. Tap an item for its chart. */

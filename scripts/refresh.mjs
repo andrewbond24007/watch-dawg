@@ -6,6 +6,7 @@ import path from 'node:path';
 import health from '../netlify/functions/health.mjs';
 import housemap from '../netlify/functions/housemap.mjs';
 import nowcast from '../netlify/functions/nowcast.mjs';
+import rates from '../netlify/functions/rates.mjs';
 import { appendHistory, mergeHistory, updateStatus, SOURCE_NAMES } from '../lib/history.mjs';
 
 const dir = process.argv[2] || 'data-branch';
@@ -54,6 +55,14 @@ for (const a of ['uk', 'ni', 'us', 'ie', 'med']) {
 }
 try { const n = await call(nowcast, 'https://watchdawg.local/', '/.netlify/functions/nowcast'); if (n.error) throw new Error(n.error); write('nowcast.json', n); }
 catch (e) { errors.nowcast = String(e.message || e); }
+
+// rates and money: central banks, Fed futures, yields, mortgages, inflation
+try {
+  const r = await call(rates, 'https://watchdawg.local/', '/.netlify/functions/rates');
+  for (const e of r.errors || []) { const [k, ...m] = String(e).split(': '); errors['rates:' + k] = m.join(': ') || e; }
+  if (!r.banks?.length) throw new Error('no central-bank data');
+  write('rates.json', r);
+} catch (e) { errors['rates:all'] = String(e.message || e); }
 
 write('history.json', hist);
 const status = updateStatus(read('status.json', {}), errors, Object.keys(SOURCE_NAMES));

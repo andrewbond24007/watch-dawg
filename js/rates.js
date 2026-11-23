@@ -8,8 +8,12 @@ const LIVE_SYMS={us10:'^TNX',us30:'^TYX',gbpusd:'GBPUSD=X',eurusd:'EURUSD=X',eur
 async function loadRates(force){
  if(RATES.busy)return;if(!force&&RATES.data&&Date.now()-RATES.at<15*60e3){renderRates();return;}
  RATES.busy=true;renderRates();
- try{const j=await fetch('/.netlify/functions/rates'+(force?'?t='+Date.now():'')).then(r=>r.json());if(j&&Array.isArray(j.banks)){RATES.data=j;RATES.at=Date.now();RATES.err=false;store.set('wd.rates',j);}}
- catch(e){RATES.err=true;}
+ // the scheduled refresh pre-builds this every 30 minutes, so it opens instantly; the live source is the fallback
+ const take=j=>{if(j&&Array.isArray(j.banks)&&j.banks.length){RATES.data=j;RATES.at=Date.now();RATES.err=false;store.set('wd.rates',j);return true;}return false;};
+ let ok=false;
+ if(!force)try{const j=await fetch('/data/rates.json?t='+Math.floor(Date.now()/3e5)).then(r=>r.ok?r.json():null);if(j&&Date.now()-Date.parse(j.fetched)<90*60e3)ok=take(j);}catch(e){}
+ if(!ok)try{ok=take(await fetch('/.netlify/functions/rates'+(force?'?t='+Date.now():'')).then(r=>r.json()));}catch(e){}
+ if(!ok)RATES.err=true;
  RATES.busy=false;if(!RATES.data){const c=store.get('wd.rates',null);if(c)RATES.data=c;}
  rSeenCheck();renderRates();loadRatesLive();
 }
