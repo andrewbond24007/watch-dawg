@@ -4,6 +4,10 @@ const SRC={WatcherGuru:{n:'Watcher Guru',c:'#d99a00',i:'WG'},WalterBloomberg:{n:
 const CRYPTO_RX=/\$(BTC|ETH|SOL|XRP|DOGE|BNB|ADA|USDT|USDC|LKY)\b|bitcoin|ethereum|solana|luckycoin|crypto|stablecoin|binance|coinbase|blockchain|memecoin|tokeni[sz]/i;
 function timeAgo(t){const s=(Date.now()-new Date(t))/1000;if(s<60)return 'just now';if(s<3600)return Math.floor(s/60)+'m ago';if(s<86400)return Math.floor(s/3600)+'h ago';return Math.floor(s/86400)+'d ago';}
 function richText(t){return esc(t).replace(/(\$[A-Z]{2,6})\b/g,'<b class="cash">$1</b>').replace(/([+\-−]?\d[\d,]*(?:\.\d+)?%)/g,'<b>$1</b>').replace(/\n/g,'<br>');}
+// shouty ALL-CAPS headlines -> Title Case for quoting (acronyms and tickers stay upper case)
+const KEEPUP=new Set(['US','UK','EU','AI','VIX','S&P','ETF','ETFS','CPI','GDP','PCE','PPI','ECB','BOE','IPO','CEO','CFO','SEC','IMF','OPEC','NFP','FOMC','NYSE','USD','GBP','EUR','BTC','ETH','SOL','NVDA','ANT','TSMC','AMD','QQQ','SPY','DXY','LKY','XRP','UAE','NATO','IRS']);
+function calm(t){const L=t.replace(/[^A-Za-z]/g,''),U=t.replace(/[^A-Z]/g,'');if(L.length<8||U.length/L.length<0.7)return t;
+ return t.toLowerCase().replace(/[a-z&$][a-z&'.$]*/g,w=>{const u=w.toUpperCase().replace(/[.'$]+$/,'');return KEEPUP.has(u)||KEEPUP.has(u.replace(/^\$/,''))?w.toUpperCase():w.charAt(0).toUpperCase()+w.slice(1);});}
 function splitTag(t){const m=/^\s*(BREAKING|JUST IN)\s*:?\s*/i.exec(t);return m?{tag:m[1].toUpperCase(),body:t.slice(m[0].length)}:{tag:'',body:t};}
 function postCard(p,big){
  const s=SRC[p.src]||{n:p.source||p.src,c:'#7a7396',i:(p.source||'N').replace(/^the /i,'').split(/\s+/).map(w=>w[0]).join('').slice(0,2).toUpperCase()};const h=splitTag(p.text);

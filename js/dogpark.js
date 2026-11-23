@@ -239,7 +239,7 @@ function dogLines(it,fetched){
  const when=it.kind==='crypto'?'over the last 24 hours':it.kind==='stock'&&!usOpen()?'at the last close':'today';
  let first=pc==null?`I’m asleep: no price for ${name} yet.`:Math.abs(pc)<0.05?`I’m flat ${when}.`:`I’m ${pc>0?'up':'down'} ${Math.abs(pc).toFixed(1)}% ${when}`;
  if(pc!=null&&Math.abs(pc)>=0.05)first+=ex?`, and ${ex.chg>=0?'up':'down'} another ${Math.abs(ex.chg).toFixed(1)}% ${extLabel(ex).toLowerCase()}.`:'.';
- const w=whyFor(it,24),r=pickReason(w.direct),cut=t=>{const b=splitTag(t).body.split('\n')[0];return b.length>170?b.slice(0,167)+'…':b;};
+ const w=whyFor(it,24),r=pickReason(w.direct),cut=t=>{const b=calm(splitTag(t).body.split('\n')[0]);return b.length>170?b.slice(0,167)+'…':b;};
  let why;
  if(r)why=`Here’s why: “${cut(r.text)}”`;
  else if(!fetched)why='Sniffing out why…';

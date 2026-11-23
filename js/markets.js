@@ -221,12 +221,12 @@ function marketBrief(){
  const spx=find('S&P 500'),ndx=find('Nasdaq 100'),btc=find('Bitcoin'),gold=find('Gold');
  const p1=v=>(v>0?'+':'−')+Math.abs(v).toFixed(1)+'%',dir=(v,u,d)=>v>=0.3?u:v<=-0.3?d:'flat';
  const parts=[];
- if(spx)parts.push(`stocks ${dir(spx.pct,'rose','fell')} (S&P 500 ${p1(spx.pct)}${ndx?`, Nasdaq ${p1(ndx.pct)}`:''})`);
+ if(spx)parts.push(`stocks ${dir(spx.pct,'rose','fell')}${usOpen()?'':' in the last session'} (S&P 500 ${p1(spx.pct)}${ndx?`, Nasdaq ${p1(ndx.pct)}`:''})`);
  if(btc)parts.push(`crypto ${dir(btc.pct,'is up','is down')} (Bitcoin ${p1(btc.pct)})`);
  if(gold)parts.push(`gold ${p1(gold.pct)}`);
  const head=parts.length?parts.join(', ').replace(/^./,c=>c.toUpperCase())+'.':'';
  const sorted=items.slice().sort((a,b)=>b.pct-a.pct),best=sorted[0],worst=sorted.at(-1),bul=[];
- const reason=i=>{const r=pickReason(whyFor(i.item).direct);if(!r)return '';const b=splitTag(r.text).body.split('\n')[0];return ': '+(b.length>90?b.slice(0,87)+'…':b);};
+ const reason=i=>{const r=pickReason(whyFor(i.item).direct);if(!r)return '';const b=calm(splitTag(r.text).body.split('\n')[0]);return ': '+(b.length>90?b.slice(0,87)+'…':b);};
  if(worst&&worst.pct<=-1)bul.push(`<li><b>Biggest faller</b> ${esc(worst.label)} ${p1(worst.pct)}${esc(reason(worst))}</li>`);
  if(best&&best.pct>=1&&best!==worst)bul.push(`<li><b>Biggest riser</b> ${esc(best.label)} ${p1(best.pct)}${esc(reason(best))}</li>`);
  const ah=W.stocks.map(s=>[s,extFor(s)]).filter(([,e])=>e&&Math.abs(e.chg)>=0.5);
