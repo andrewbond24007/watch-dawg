@@ -103,6 +103,9 @@ async function ecb(countries) {
     if (!c[iV] || isNaN(+c[iV])) continue;
     (out[c[iA]] ||= []).push([c[iT] + '-01', +c[iV]]);
   }
+  // the ECB service sometimes leaves a country out of a combined answer: fetch any gaps from the backup
+  const missing = countries.filter((c) => !out[c]?.length);
+  if (missing.length) { try { Object.assign(out, await ecbBackup(missing)); } catch (e) { /* keep what we have */ } }
   return out;
 }
 async function ecbBackup(countries) {

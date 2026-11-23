@@ -47,3 +47,13 @@ test('a figure never steps back to an older release than the history holds', () 
   const m = d.sections[0].regions[0].metrics[0];
   assert.equal(m.date, '2026-09-01'); assert.equal(m.value, 6.2); assert.equal(m.prev, 6.0);
 });
+
+import { keepMissing } from '../lib/history.mjs';
+test('refresh keeps a figure a flaky source left out, in its place', () => {
+  const d = new Date().toISOString().slice(0, 8) + '01';
+  const prev = { sections: [{ id: 'housing', regions: [{ id: 'med', metrics: [{ id: 'ea_rate', value: 3.62, date: d }, { id: 'es_hpi', value: 12, date: d }] }] }] };
+  const now = { sections: [{ id: 'housing', regions: [{ id: 'med', metrics: [{ id: 'es_hpi', value: 12.1, date: d }] }] }] };
+  assert.equal(keepMissing(now, prev), 1);
+  assert.deepEqual(now.sections[0].regions[0].metrics.map((m) => m.id), ['ea_rate', 'es_hpi']);
+  assert.equal(now.sections[0].regions[0].metrics[1].value, 12.1);
+});

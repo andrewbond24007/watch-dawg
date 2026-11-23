@@ -7,7 +7,7 @@ import health from '../netlify/functions/health.mjs';
 import housemap from '../netlify/functions/housemap.mjs';
 import nowcast from '../netlify/functions/nowcast.mjs';
 import rates from '../netlify/functions/rates.mjs';
-import { appendHistory, mergeHistory, updateStatus, SOURCE_NAMES } from '../lib/history.mjs';
+import { appendHistory, mergeHistory, updateStatus, keepMissing, SOURCE_NAMES } from '../lib/history.mjs';
 
 const dir = process.argv[2] || 'data-branch';
 fs.mkdirSync(dir, { recursive: true });
@@ -40,6 +40,10 @@ try {
   const added = appendHistory(h, hist);
   mergeHistory(h, hist);
   h.built = 'scheduled';
+  // a figure that a flaky source leaves out this time keeps its last published value (it only changes when
+  // the source publishes a new one), so the app doesn't flicker between showing and hiding it
+  const kept = keepMissing(h, read('health.json', null));
+  if (kept) console.log(`kept ${kept} figure(s) a source left out this time`);
   write('health.json', h);
   Object.assign(errors, h.errors || {});
   console.log(`health ok, ${added} new history points, errors: ${JSON.stringify(h.errors)}`);
