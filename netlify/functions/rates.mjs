@@ -42,7 +42,7 @@ function dstNY(ymd) {
 // ---------- sources ----------
 // Fed target range and the effective rate, daily, from the New York Fed
 async function fed() {
-  const j = JSON.parse(await get('https://markets.newyorkfed.org/api/rates/unsecured/effr/last/1100.json'));
+  const j = JSON.parse(await get('https://markets.newyorkfed.org/api/rates/unsecured/effr/last/1000.json'));
   const rows = (j.refRates || []).map((r) => ({ d: r.effectiveDate, effr: +r.percentRate, lo: +r.targetRateFrom, hi: +r.targetRateTo })).filter((r) => r.d >= START).sort((a, b) => (a.d < b.d ? -1 : 1));
   if (!rows.length) throw new Error('no Fed data');
   return rows;
@@ -159,7 +159,17 @@ function decisions(series) { // [[date, value]] daily -> list of changes
 }
 const safe = async (p, errs, name) => { try { return await p; } catch (e) { errs.push(name + ': ' + String(e.message || e).slice(0, 80)); return null; } };
 
-export default async () => {
+export default async (req) => {
+  const pu = new URL(req.url);
+  if (pu.searchParams.get('probe')) {
+    const urls = ['https://data-api.ecb.europa.eu/service/data/ICP/M.U2.N.000000.4.ANR?format=csvdata&detail=dataonly&lastNObservations=2',
+      'https://data-api.ecb.europa.eu/service/data/ICP/M..N.000000.4.ANR?format=csvdata&detail=serieskeysonly&startPeriod=2026-06',
+      'https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/prc_hicp_manr?geo=EA&coicop=CP00&lastTimePeriod=2',
+      'https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/prc_hicp_minr?geo=EA&lastTimePeriod=2',
+      'https://markets.newyorkfed.org/api/rates/unsecured/effr/last/1000.json'];
+    const out = {}; await Promise.all(urls.map(async (u) => { try { const r = await fetch(u, { headers: UA, signal: T(15000) }); const t = await r.text(); out[u] = r.status + ' ' + t.slice(0, 700); } catch (e) { out[u] = String(e); } }));
+    return new Response(JSON.stringify(out, null, 1), { headers: { 'content-type': 'application/json' } });
+  }
   const errs = [], now = Date.now();
   const fomcLeft = FOMC.filter((d) => Date.parse(d) > now);
   const futMonths = []; { const d = new Date(); for (let i = 0; i < 9; i++) { const x = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + i, 1)); futMonths.push([x.getUTCFullYear(), x.getUTCMonth() + 1]); } }
