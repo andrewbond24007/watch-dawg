@@ -14,7 +14,7 @@ function calmLine(t){const L=t.replace(/[^A-Za-z]/g,''),U=t.replace(/[^A-Z]/g,''
   const core=w.replace(/[.'’]+$/,''),poss=/['’]s$/.test(core),stem=poss?core.slice(0,-2):core,tail=poss?core.slice(-2):'',U=stem.toUpperCase();
   if(KEEPUP.has(U))return w.replace(core,U+tail);if(NAMES.has(stem))return w.replace(core,NAMES.get(stem)+tail);return w;});
  // capital letter at the start and after full stops, question marks, colons and line breaks
- return out.replace(/(^[^a-z0-9$]*|[.!?:]\s+[*•]?\s*|\n[\s*•\-–—]*)([a-z])/g,(m,p,c)=>p+c.toUpperCase());}
+ return out.replace(/(^[^A-Za-z0-9$]*|[.!?:]\s+[*•]?\s*|\n[\s*•\-–—]*)([a-z])/g,(m,p,c)=>p+c.toUpperCase());}
 function splitTag(t){const m=/^\s*(BREAKING|JUST IN)\s*:?\s*/i.exec(t);return m?{tag:m[1].toUpperCase(),body:t.slice(m[0].length)}:{tag:'',body:t};}
 const srcOf=p=>SRC[p.src]||{n:p.source||p.src,c:'#7a7396',i:(p.source||'N').replace(/^the /i,'').split(/\s+/).map(w=>w[0]).join('').slice(0,2).toUpperCase()};
 function postCard(p,big,story){
