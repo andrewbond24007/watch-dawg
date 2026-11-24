@@ -173,9 +173,9 @@ async function loadSourceStatus(){if(DSRC.data&&Date.now()-DSRC.at<10*60e3)retur
 const SRCN={'rates:fed':'New York Fed policy rate','rates:boe':'Bank of England Bank Rate','rates:ecb':'ECB deposit rate','rates:treasury':'US Treasury yields','rates:freddie':'Freddie Mac (Rates tab)','rates:boe_mortgage':'BoE quoted mortgage rates','rates:gilts':'UK gilt yields','rates:ecb_yield':'Euro-area yields','rates:bls':'BLS inflation','rates:ons':'ONS inflation','rates:futures':'Fed funds futures','rates:all':'Rates tab',bis:'BIS house prices',bis_cre:'BIS commercial property prices',fed:'Federal Reserve arrears',freddie:'Freddie Mac mortgage rates',fhfa:'FHFA house prices',boe:'Bank of England',ecb:'ECB mortgage rates',trepp:'Trepp office arrears',kastle:'Kastle office attendance',zillow:'Zillow rents and values',oecd:'OECD rents',treasury:'US 10-year Treasury',ons:'ONS rents',landreg:'Land Registry UK prices',landreg_ni:'Land Registry NI prices',numbeo:'Numbeo rental yields',zillow_momentum:'Zillow sales momentum',hmrc:'HMRC home sales',cso_sales:'CSO Irish sales',nowcast:'Cleveland Fed nowcast','map:us':'US price map','map:uk':'UK price map','map:ni':'NI price map','map:ie':'Ireland price map','map:med':'Mediterranean price map',health:'Health data build'};
 function renderSources(){
  const d=DSRC.data;if(!d)return;const all=Object.entries(d.sources);
- // a source only counts as down after 3 hours of failing: one slow or refused check usually clears on the next
+ // a source only counts as down after a full day of failing: one slow or refused check usually clears on the next
  // refresh, and the last good figures stay on screen meanwhile
- const longFail=v=>!v.ok&&Date.now()-Date.parse(v.since||d.updated)>3*3600e3,down=all.filter(([,v])=>longFail(v));
+ const longFail=v=>!v.ok&&Date.now()-Date.parse(v.since||d.updated)>24*3600e3,down=all.filter(([,v])=>longFail(v));
  const st=$('healthStatus');st.querySelector('.srcchip')?.remove();
  if(down.length)st.insertAdjacentHTML('beforeend',`<button class="srcchip" aria-expanded="${srcOpen}">⚠ ${down.length} source${down.length>1?'s':''} down</button>`);
  const box=$('srcList');if(!box)return;
