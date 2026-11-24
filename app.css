@@ -666,3 +666,4 @@ body.compact .list{gap:6px}
 .nr .nm{font-size:13px;line-height:1.4;color:var(--muted);display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
 .nr img{width:64px;height:64px;object-fit:cover;border-radius:12px;margin-top:2px}
 .nr .brk{font-size:9.5px;padding:1px 6px}
+.src.slow span:first-child{color:var(--amberink,#b7791f);font-weight:800}
