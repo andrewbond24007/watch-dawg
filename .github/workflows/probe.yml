@@ -11,6 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          P="${{ inputs.path }}"; case "$P" in http*) U="$P";; *) U="https://watch-dawg-78h1.vercel.app$P";; esac
+          P="${{ inputs.path }}"; RAW=""; case "$P" in raw:*) RAW=1; P="${P#raw:}";; esac; case "$P" in http*) U="$P";; *) U="https://watch-dawg-78h1.vercel.app$P";; esac
           curl -sL -m 60 "$U" > /tmp/out
+          if [ -n "$RAW" ]; then grep -o "[^\"' ]*\(api\|json\|csv\|\.js\)[^\"' ]*" /tmp/out | sort -u | head -80; head -c 6000 /tmp/out; exit 0; fi
           case "$(head -c 200 /tmp/out)" in *"<html"*|*"<!DOCTYPE"*) echo "(page text, tags removed)"; sed -e "s/<script[^>]*>.*<\/script>//g" /tmp/out | tr "\n" " " | sed -e "s/<[^>]*>/ /g" -e "s/  */ /g" | head -c 30000;; *) head -c 20000 /tmp/out; echo; echo "---TAIL---"; tail -c 1500 /tmp/out;; esac
