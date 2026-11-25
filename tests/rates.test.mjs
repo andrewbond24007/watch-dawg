@@ -17,3 +17,11 @@ test('Meeting lists are in order and in the future-facing schedule', () => {
   for (const l of [FOMC, MPC, ECBM]) for (let i = 1; i < l.length; i++) assert.ok(Date.parse(l[i]) > Date.parse(l[i - 1]));
   assert.ok(!FOMC.some((d) => d.startsWith('2027-10-27')), 'October 2027 is strategy only');
 });
+import { readPoly } from '../netlify/functions/rates.mjs';
+test('Polymarket: outcome odds summed into cut / hold / rise', () => {
+  const ev = { slug: 'fed-decision-in-december-x', title: 'Fed Decision in December?', volume: 5e7, markets: [
+    { groupItemTitle: '25 bps decrease', outcomePrices: '["0.0025","0.9975"]' }, { groupItemTitle: 'No change', outcomePrices: '["0.044","0.956"]' },
+    { groupItemTitle: '25 bps increase', outcomePrices: '["0.935","0.065"]' }, { groupItemTitle: '50+ bps increase', outcomePrices: '["0.0225","0.9775"]' }] };
+  const r = readPoly(ev);
+  assert.equal(r.hike, 0.958); assert.equal(r.hold, 0.044); assert.equal(r.cut, 0.003); assert.equal(r.url, 'https://polymarket.com/event/fed-decision-in-december-x');
+});

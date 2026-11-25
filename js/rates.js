@@ -68,6 +68,18 @@ function fedOdds(b){
  const path=p.map(x=>{const mv=x.post-b.effective;return `<span><small>${new Date(x.date).toLocaleDateString('en-GB',{day:'numeric',month:'short'})}</small><b class="num">${x.post.toFixed(2)}%</b><em class="${rcls(mv)}">${Math.abs(mv)<0.005?'no change':bps(mv)}</em></span>`;}).join('');
  return `<div class="mom rodds"><div class="momh"><span>What markets expect</span></div><p class="oddsh">${head}</p>${bar}<div class="rpath">${path}</div><div class="hnote" style="margin-top:6px">From fed funds futures. The rate after each meeting is the market’s best guess, compared with today’s effective rate of ${rp(b.effective)}.</div></div>`;
 }
+/* Polymarket odds: betting markets on each meeting's outcome */
+const pct0=x=>Math.round((x||0)*100)+'%';
+const dshort=iso=>new Date(iso).toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+function pmLead(p){return p.hike>=Math.max(p.hold,p.cut)?['down',`${pct0(p.hike)} rise`]:p.cut>=p.hold?['up',`${pct0(p.cut)} cut`]:['',`${pct0(p.hold)} hold`];}
+function oddsHead(b){const p=(b.poly||[])[0],f=b.id==='fed'?(b.path||[])[0]:null;if(!p&&!f)return '';
+ const parts=[];if(p){const[c,t]=pmLead(p);parts.push(`Polymarket <b class="${c}">${t}</b>`);}
+ if(f){const h=Math.round(f.hike*100),c=Math.round(f.cut*100);parts.push(`futures <b class="${h>=5?'down':c>=5?'up':''}">${h>=5?h+'% rise':c>=5?c+'% cut':'hold'}</b>`);}
+ return `<p class="oddsh" style="margin:10px 2px 0">${dshort((p||f).date)}: ${parts.join(' · ')}</p>`;}
+function polyBlock(b){const ps=b.poly||[];if(!ps.length)return '';
+ return `<div class="mom rodds"><div class="momh"><span>Polymarket odds</span><a class="pmlink" href="${esc(ps[0].url)}" target="_blank" rel="noopener">Open ↗</a></div>${ps.map(p=>{const tot=p.cut+p.hold+p.hike||1,c=p.cut/tot*100,h=p.hold/tot*100,r=p.hike/tot*100;
+  return `<div class="pmm"><div class="pmd"><b>${dshort(p.date)}</b><span>$${(p.vol/1e6>=1?(p.vol/1e6).toFixed(1)+'m':Math.round(p.vol/1e3)+'k')} traded</span></div><div class="odds"><i class="up" style="width:${c}%"></i><i class="hold" style="width:${h}%"></i><i class="down" style="width:${r}%"></i></div><div class="oddsk"><span>Cut ${pct0(p.cut)}</span><span>Hold ${pct0(p.hold)}</span><span>Rise ${pct0(p.hike)}</span></div>
+  <div class="pmo">${p.outcomes.filter(o=>o.p>=0.005).sort((x,y)=>y.p-x.p).map(o=>`<span>${esc(o.label)} <b>${pct0(o.p)}</b></span>`).join('')}</div></div>`;}).join('')}<div class="hnote" style="margin-top:6px">People betting real money on the outcome. Odds can move fast; ${b.id==='fed'?'compare with the futures above, which are what professional traders pay.':'there are no free futures prices for this bank.'}</div></div>`;}
 function fedHead(b){const n=(b.path||[])[0];if(!n)return '';const when=new Date(n.date).toLocaleDateString('en-GB',{day:'numeric',month:'short'}),h=Math.round(n.hike*100),c=Math.round(n.cut*100);
  return `<p class="oddsh" style="margin:10px 2px 0">Markets: ${h>=5?`<b class="down">${h}%</b> chance of a rise on ${when}`:c>=5?`<b class="up">${c}%</b> chance of a cut on ${when}`:`no change expected on ${when}`}</p>`;}
 function bankCard(b){
@@ -77,11 +89,11 @@ function bankCard(b){
  return `<div class="card hreg rbank${nw?' isnew':''}" id="rb-${b.id}"><div class="hh"><span class="fl">${b.flag}</span><h3>${esc(b.name)}</h3><span class="sig ${sc}">${sw}</span></div>
   <div class="rbig"><div><small>${esc(b.what)}${nw?'<span class="newtag">New</span>':''}</small><b class="num">${bankRate(b)}</b></div>${b.real!=null?`<div class="rreal"><small>Real rate</small><b class="num ${b.real>0?'':'up'}">${b.real>0?'+':''}${b.real.toFixed(2)}%</b><span>after inflation</span></div>`:''}</div>
   ${b.next?`<div class="rnext"><div><small>Next decision</small><b>${rwhen(b.next)}</b></div>${cdEl(b.next,'big')}</div>`:''}
-  ${b.id==='fed'&&!open?fedHead(b):''}
+  ${!open?oddsHead(b):''}
   <div class="more"${open?'':' hidden'}><div class="why">${last}${b.effective!=null?` · effective rate ${rp(b.effective)}`:''}.</div>
-  ${b.id==='fed'?fedOdds(b):''}${stepChart(b)}
+  ${b.id==='fed'?fedOdds(b):''}${polyBlock(b)}${stepChart(b)}
   <div class="subh">Decisions since 2022</div>${hist||'<div class="hnote">No changes.</div>'}<div class="subh">Coming meetings</div><div class="rmeet">${(b.meetings||[]).map(m=>`<span>${new Date(m).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'2-digit'})}</span>`).join('')}</div><div class="hnote">${esc(b.note||'')}</div></div>
-  <button class="morebtn" data-rexp="${b.id}" aria-expanded="${open}">${open?'Show less':b.id==='fed'?'Details · market odds, history and dates':'Details · history and dates'}<span class="ch">▾</span></button></div>`;
+  <button class="morebtn" data-rexp="${b.id}" aria-expanded="${open}">${open?'Show less':'Details · market odds, history and dates'}<span class="ch">▾</span></button></div>`;
 }
 /* rows in the Health style: label, value, change, sparkline; tap for source and next update */
 function rRow(o){
@@ -108,8 +120,9 @@ function renderRates(){
  const ups=B.filter(b=>stance(b)[1]==='Raising').length,downs=B.filter(b=>stance(b)[1]==='Cutting').length;
  const head=ups>downs?'Interest rates are going up.':downs>ups?'Interest rates are coming down.':'Central banks are mostly holding rates.';
  const fp=fed?.path?.[0],fodd=fp?(fp.hike>=.05?`Markets see a ${Math.round(fp.hike*100)}% chance the Fed raises rates on ${new Date(fp.date).toLocaleDateString('en-GB',{day:'numeric',month:'short'})}`:fp.cut>=.05?`Markets see a ${Math.round(fp.cut*100)}% chance the Fed cuts on ${new Date(fp.date).toLocaleDateString('en-GB',{day:'numeric',month:'short'})}`:'Markets expect the Fed to hold at its next meeting'):'';
+ const pmb=B.filter(b=>b.id!=='fed'&&b.poly&&b.poly[0]).map(b=>`${b.short} ${pmLead(b.poly[0])[1]} on ${dshort(b.poly[0].date)}`);
  const us10=d.yields.find(y=>y.id==='us10'),m30=d.mortgages.find(m=>m.id==='us30m'),uk2=d.mortgages.find(m=>m.id==='IUMBV34');
- const bul=[`<li><b>Central banks</b> ${esc(moves.join(', '))}</li>`,fodd?`<li><b>Expectations</b> ${esc(fodd)}</li>`:'',
+ const bul=[`<li><b>Central banks</b> ${esc(moves.join(', '))}</li>`,(fodd||pmb.length)?`<li><b>Expectations</b> ${esc([fodd,pmb.length?'Polymarket: '+pmb.join(', '):''].filter(Boolean).join('. '))}</li>`:'',
   us10?`<li><b>Borrowing costs</b> US 10-year at ${rp(us10.value)} (${bps(us10.value-us10.y1)} on a year)${m30?`, US mortgages ${rp(m30.value)}`:''}${uk2?`, UK 2-year fixes ${rp(uk2.value)}`:''}</li>`:''].join('');
  const ev=[];B.forEach(b=>b.next&&ev.push([b.next,`${b.flag} ${b.short} decision`,'#rb-'+b.id]));
  (d.inflation||[]).filter(i=>i.next&&i.id!=='uscore').forEach(i=>ev.push([i.next,`${i.flag} ${i.id==='uscpi'?'US':'UK'} inflation`,'#rinfl']));

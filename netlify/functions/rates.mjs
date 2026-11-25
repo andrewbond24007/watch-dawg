@@ -159,6 +159,36 @@ export function fedPath(effr, fut, meetings) {
   return path;
 }
 
+// Polymarket: betting-market odds for each central-bank meeting (public API, no key). Each meeting is an
+// event with one yes/no market per outcome ("25 bps increase", "No change"...); the yes price is the odds.
+const PM_Q = { fed: 'fed decision', boe: 'bank of england decision', ecb: 'ecb interest rates' };
+const PM_BANK = { fed: /\bfed\b/i, boe: /bank of england/i, ecb: /\becb\b/i };
+const MONTHS = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+export function readPoly(ev) {
+  const outs = (ev.markets || []).filter((m) => !m.closed || ev.closed).map((m) => {
+    let pr = m.outcomePrices; try { pr = typeof pr === 'string' ? JSON.parse(pr) : pr; } catch (e) { pr = null; }
+    return { label: (m.groupItemTitle || m.question || '').replace(/^No Change$/i, 'No change'), p: pr ? +pr[0] : null };
+  }).filter((o) => o.p != null && o.label);
+  if (!outs.length) return null;
+  const sum = (rx) => +outs.filter((o) => rx.test(o.label)).reduce((a, o) => a + o.p, 0).toFixed(3);
+  return { cut: sum(/decrease|cut/i), hold: sum(/no change/i), hike: sum(/increase|hike/i), outcomes: outs, vol: Math.round(ev.volume || 0), url: `https://polymarket.com/event/${ev.slug}`, title: ev.title, closed: !!ev.closed };
+}
+async function polymarket(bank, meetings) {
+  const out = [];
+  for (const iso of meetings.slice(0, 2)) {
+    const d = new Date(iso), mon = MONTHS[d.getUTCMonth()];
+    try {
+      const j = JSON.parse(await get(`https://gamma-api.polymarket.com/public-search?q=${encodeURIComponent(PM_Q[bank] + ' ' + mon)}&limit_per_type=8`, 10000));
+      const ev = (j.events || []).filter((e) => PM_BANK[bank].test(e.title) && new RegExp(mon, 'i').test(e.title + ' ' + e.slug) && !/dissent|how many|chair|vote/i.test(e.title)
+        && Math.abs(Date.parse(e.endDate) - d.getTime()) < 4 * 864e5).sort((a, b) => (b.volume || 0) - (a.volume || 0))[0];
+      const r = ev && readPoly(ev);
+      if (r) out.push({ date: iso, ...r });
+    } catch (e) { /* this meeting has no market yet */ }
+  }
+  if (!out.length) throw new Error('no Polymarket odds');
+  return out;
+}
+
 // ---------- shaping ----------
 const lastOf = (s) => s?.length ? s[s.length - 1] : null;
 const before = (s, days) => { if (!s?.length) return null; const cut = Date.parse(s.at(-1)[0]) - days * 864e5; for (let i = s.length - 1; i >= 0; i--) if (Date.parse(s[i][0]) <= cut) return s[i][1]; return s[0][1]; };
@@ -173,18 +203,7 @@ function decisions(series, lag = 0) {
 }
 const safe = async (p, errs, name) => { try { return await p; } catch (e) { errs.push(name + ': ' + String(e.message || e).slice(0, 80)); return null; } };
 
-export default async (req) => {
-  if (req && new URL(req.url).searchParams.get('pmprobe')) {
-    const out = {};
-    for (const u of ['https://gamma-api.polymarket.com/public-search?q=fed%20decision%20december&limit_per_type=5',
-      'https://gamma-api.polymarket.com/public-search?q=bank%20of%20england%20decision&limit_per_type=5',
-      'https://gamma-api.polymarket.com/public-search?q=ecb%20decision&limit_per_type=5']) {
-      try { const j = await fetch(u, { headers: UA, signal: T(12000) }).then((r) => r.json());
-        out[u] = (j.events || []).map((e) => ({ slug: e.slug, title: e.title, end: e.endDate, closed: e.closed, active: e.active, vol: e.volume, markets: (e.markets || []).map((m) => [m.groupItemTitle || m.question, m.outcomePrices, m.closed]).slice(0, 8) })); }
-      catch (e) { out[u] = String(e); }
-    }
-    return new Response(JSON.stringify(out, null, 1), { headers: { 'content-type': 'application/json' } });
-  }
+export default async () => {
   const errs = [], now = Date.now();
   const fomcLeft = FOMC.filter((d) => Date.parse(d) > now);
   const futMonths = []; { const d = new Date(); for (let i = 0; i < 9; i++) { const x = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + i, 1)); futMonths.push([x.getUTCFullYear(), x.getUTCMonth() + 1]); } }
@@ -194,6 +213,8 @@ export default async (req) => {
     safe(boeDaily('IUDMNPY'), errs, 'gilts'), safe(ecbSeries('YC', 'B.U2.EUR.4F.G_N_A.SV_C_YM.SR_10Y'), errs, 'ecb_yield'),
     safe(usCpi(), errs, 'bls'), safe(ukCpi(), errs, 'ons'), euroInflation().catch(() => null), safe(fedFutures(futMonths), errs, 'futures'),
   ]);
+  const PM = {};
+  await Promise.all([['fed', FOMC], ['boe', MPC], ['ecb', ECBM]].map(async ([b, list]) => { PM[b] = await safe(polymarket(b, list.filter((d) => Date.parse(d) > now)), errs, 'polymarket_' + b); }));
   const banks = [];
   if (F) {
     const cur = F.at(-1), mid = F.map((r) => [r.d, r.hi]);
@@ -231,6 +252,7 @@ export default async (req) => {
     if (USC.core.length) infl.push({ id: 'uscore', name: 'US core inflation', flag: '🇺🇸', value: lastOf(USC.core)[1], date: lastOf(USC.core)[0], prev: USC.core.at(-2)?.[1], series: USC.core.slice(-36), next: nextOf(US_CPI), src: 'BLS', target: 2 }); }
   if (UKC?.series?.length) infl.push({ id: 'ukcpi', name: 'UK inflation (CPI)', flag: '🇬🇧', value: lastOf(UKC.series)[1], date: lastOf(UKC.series)[0], prev: UKC.series.at(-2)?.[1], series: UKC.series.slice(-36), next: UKC.next && Date.parse(UKC.next) > now ? UKC.next : null, src: 'ONS', target: 2 });
   if (EAC?.length) infl.push({ id: 'eahicp', name: 'Euro-area inflation', flag: '🇪🇺', value: lastOf(EAC)[1], date: lastOf(EAC)[0], prev: EAC.at(-2)?.[1], series: EAC.slice(-36), next: null, freq: 'Monthly, flash estimate at the start of the month', src: 'Eurostat via ECB', target: 2 });
+  banks.forEach((b) => { if (PM[b.id]) b.poly = PM[b.id]; });
   // real rate: policy rate minus inflation
   const realOf = { fed: 'uscpi', boe: 'ukcpi', ecb: 'eahicp' };
   banks.forEach((b) => { const i = infl.find((x) => x.id === realOf[b.id]); if (i) b.real = +((b.effective ?? b.value) - i.value).toFixed(2); });
