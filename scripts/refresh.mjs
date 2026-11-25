@@ -91,7 +91,23 @@ try {
       } catch (e) { /* one search failing is fine */ }
     }
   }));
-  const cds = mergeCds(read('cds.json', null), found);
+  // first time only: fill in the past year from monthly Google News searches, so the charts have history
+  const prevCds = read('cds.json', null);
+  if (!prevCds?.backfilled) {
+    const months = []; for (let i = 13; i >= 1; i--) { const a = new Date(); a.setUTCDate(1); a.setUTCMonth(a.getUTCMonth() - i); const b = new Date(a); b.setUTCMonth(b.getUTCMonth() + 1); months.push([a.toISOString().slice(0, 10), b.toISOString().slice(0, 10)]); }
+    for (const [, label] of CDS_NAMES) {
+      for (const [a, b] of months) {
+        const q = encodeURIComponent(`"${label}" ("credit default swap" OR "credit-default swap" OR CDS) (bps OR "basis points" OR "percentage points") after:${a} before:${b}`);
+        try {
+          const x = await fetch(`https://news.google.com/rss/search?q=${q}&hl=en-US&gl=US&ceid=US:en`, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(12000) }).then((r) => r.text());
+          for (const p of parseRss(x, 'Google News')) take(p, p.text);
+        } catch (e) { /* skip a month */ }
+        await new Promise((r) => setTimeout(r, 250));
+      }
+    }
+  }
+  const cds = mergeCds(prevCds, found);
+  if (!prevCds?.backfilled) cds.backfilled = new Date().toISOString();
   write('cds.json', cds);
   console.log(`CDS: ${found.length} quotes found, ${Object.keys(cds.names).length} companies tracked`);
 } catch (e) { errors['cds'] = String(e.message || e); }

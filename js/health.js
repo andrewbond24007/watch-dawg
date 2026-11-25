@@ -146,6 +146,23 @@ function avgBoxes(a){return a?`<div class="aiavg"><div><b class="num">${pc1(a.of
 /* AI credit risk: 5-year CDS levels quoted in the news, built up over time by the scheduled refresh */
 let CDS={data:null,at:0},CDSX=false;
 async function loadCds(){if(CDS.data&&Date.now()-CDS.at<15*60e3)return;try{const j=await fetch('/data/cds.json?t='+Math.floor(Date.now()/3e5)).then(r=>r.ok?r.json():null);if(j&&j.names){CDS={data:j,at:Date.now()};if(activeTab==='health'&&hSec==='ai')renderHealth();}}catch(e){}}
+const CDSC={oracle:'#8b93a3',coreweave:'#e4572e',meta:'#2f6fde',amazon:'#f59e0b',microsoft:'#10b981',alphabet:'#ef4444',broadcom:'#14b8a6',spacex:'#d946ef',nvidia:'#eab308',amd:'#64748b'};
+/* one chart with every company's reported levels over the past year, like the Bloomberg chart */
+function cdsChart(rows){
+ const rs=rows.filter(r=>r.p.length>=1);if(!rs.length)return '';
+ const t1=Date.now(),t0=t1-365*864e5,all=rs.flatMap(r=>r.p.map(x=>x.bp)),top=Math.max(100,Math.ceil(Math.max(...all)*1.1/100)*100);
+ const W=320,H=170,L=4,R=34,T=8,B=20,X=t=>L+(Math.max(t0,t)-t0)/(t1-t0)*(W-L-R),Y=v=>T+(1-v/top)*(H-T-B);
+ const step=top<=300?50:top<=800?100:top<=1600?200:500;let g='';
+ for(let v=0;v<=top;v+=step)g+=`<line x1="${L}" x2="${W-R}" y1="${Y(v)}" y2="${Y(v)}" class="gl"/><text x="${W-R+4}" y="${Y(v)+3.5}" class="gt">${v}</text>`;
+ for(let i=0;i<12;i+=3){const d=new Date(t1);d.setUTCDate(1);d.setUTCMonth(d.getUTCMonth()-i);g+=`<text x="${X(d.getTime())}" y="${H-5}" class="gt" text-anchor="middle">${d.toLocaleDateString('en-GB',{month:'short'})}</text>`;}
+ const ln=rs.map(r=>{const pts=r.p.filter(x=>Date.parse(x.date)>=t0).map(x=>[X(Date.parse(x.date+'T12:00:00Z')),Y(x.bp)]);if(!pts.length)return '';const c=CDSC[r.id]||'var(--accent)';
+  return (pts.length>1?`<polyline points="${pts.map(p=>p.map(v=>v.toFixed(1)).join(',')).join(' ')}" fill="none" stroke="${c}" stroke-width="2" stroke-linejoin="round"/>`:'')+pts.map(p=>`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="2.6" fill="${c}"/>`).join('');}).join('');
+ const leg=rs.map(r=>`<span><i style="background:${CDSC[r.id]||'var(--accent)'}"></i>${esc(r.n.label)}</span>`).join('');
+ return `<div class="cdsch"><svg viewBox="0 0 ${W} ${H}" aria-label="Five-year CDS levels reported over the past year">${g}${ln}</svg><div class="cdsleg">${leg}</div></div>`;
+}
+function cdsSpark(r){const p=r.p;if(p.length<2)return '';const t0=Date.parse(p[0].date),t1=Math.max(t0+864e5,Date.parse(p.at(-1).date)),mx=Math.max(...p.map(x=>x.bp))*1.05,mn=Math.min(...p.map(x=>x.bp))*0.9;
+ const pts=p.map(x=>[(Date.parse(x.date)-t0)/(t1-t0)*100,24-(x.bp-mn)/((mx-mn)||1)*22]);const c=CDSC[r.id]||'var(--accent)';
+ return `<svg class="cdssp" viewBox="0 0 100 26" preserveAspectRatio="none"><polyline points="${pts.map(q=>q.map(v=>v.toFixed(1)).join(',')).join(' ')}" fill="none" stroke="${c}" stroke-width="1.8" vector-effect="non-scaling-stroke"/></svg>`;}
 function cdsCard(){
  const d=CDS.data;if(!d)return '';
  const rows=Object.entries(d.names).map(([id,n])=>{const p=n.points||[],l=p.at(-1);if(!l)return null;
@@ -157,12 +174,12 @@ function cdsCard(){
  const sig=rows[0].l.bp>=200?'red':rows[0].l.bp>=100?'amber':'green';
  const list=rows.map(r=>{const old=Date.now()-Date.parse(r.l.date)>14*864e5;
   return `<div class="cdsr${old?' old':''}"><div class="nm">${esc(r.n.label)}<small>${new Date(r.l.date+'T12:00:00Z').toLocaleDateString('en-GB',{day:'numeric',month:'short'})} · ${esc(r.l.source||'')}</small></div>
-   <div class="r"><b class="num">${Math.round(r.l.bp)} bp</b>${r.ch!=null?` <em class="${r.ch>0?'down':r.ch<0?'up':''}">${r.ch>0?'+':r.ch<0?'−':''}${Math.abs(Math.round(r.ch))} in a month</em>`:''}</div>
-   <div class="bar" style="--c:${col(r.l.bp)}"><i style="width:${Math.min(100,r.l.bp/mx*100)}%"></i></div>
-   ${CDSX?`<div class="cdsp">${r.p.slice(-5).reverse().map(x=>`<a href="${esc(x.link)}" target="_blank" rel="noopener"><span>${x.date.slice(5)}</span><b>${Math.round(x.bp)}</b> ${esc(x.title.slice(0,110))}</a>`).join('')}</div>`:''}</div>`;}).join('');
+   <div class="r"><i class="cdsdot" style="background:${CDSC[r.id]||'var(--accent)'}"></i><b class="num">${Math.round(r.l.bp)} bp</b>${r.ch!=null?` <em class="${r.ch>0?'down':r.ch<0?'up':''}">${r.ch>0?'+':r.ch<0?'−':''}${Math.abs(Math.round(r.ch))} in a month</em>`:''}</div>
+   ${cdsSpark(r)}<div class="bar" style="--c:${col(r.l.bp)}"><i style="width:${Math.min(100,r.l.bp/mx*100)}%"></i></div>
+   ${CDSX?`<div class="cdsp">${r.p.slice(-8).reverse().map(x=>`<a href="${esc(x.link)}" target="_blank" rel="noopener"><span>${x.date.slice(5)}</span><b>${Math.round(x.bp)}</b> ${esc(x.title.slice(0,110))}</a>`).join('')}</div>`:''}</div>`;}).join('');
  return `<div class="card hreg" id="cdsCard"><div class="hh"><span class="fl">🛡️</span><h3>Credit default swaps</h3><span class="sig ${sig}">${SIG_WORD[sig]||''}</span></div>
   <div class="why">What it costs each year to insure $10m of a company's debt for 5 years, in basis points ($10,000 per 100 bp). Rising = lenders more worried about AI debt.</div>
-  ${list}
+  ${cdsChart(rows)}${list}
   <button class="morebtn" id="cdsMore" aria-expanded="${CDSX}">${CDSX?'Hide the reports':'Show the reports behind each figure'}<span class="ch">▾</span></button>
   <div class="hnote">There's no free live CDS feed, so these are the latest levels quoted in news reports (Bloomberg, Reuters and others via the app's news and Google News), collected every refresh. A company appears once a report quotes its level; greyed figures are over two weeks old. Green under 100 bp, amber to 200, red beyond.</div></div>`;
 }
