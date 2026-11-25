@@ -173,7 +173,18 @@ function decisions(series, lag = 0) {
 }
 const safe = async (p, errs, name) => { try { return await p; } catch (e) { errs.push(name + ': ' + String(e.message || e).slice(0, 80)); return null; } };
 
-export default async () => {
+export default async (req) => {
+  if (req && new URL(req.url).searchParams.get('pmprobe')) {
+    const out = {};
+    for (const u of ['https://gamma-api.polymarket.com/public-search?q=fed%20decision%20december&limit_per_type=5',
+      'https://gamma-api.polymarket.com/public-search?q=bank%20of%20england%20decision&limit_per_type=5',
+      'https://gamma-api.polymarket.com/public-search?q=ecb%20decision&limit_per_type=5']) {
+      try { const j = await fetch(u, { headers: UA, signal: T(12000) }).then((r) => r.json());
+        out[u] = (j.events || []).map((e) => ({ slug: e.slug, title: e.title, end: e.endDate, closed: e.closed, active: e.active, vol: e.volume, markets: (e.markets || []).map((m) => [m.groupItemTitle || m.question, m.outcomePrices, m.closed]).slice(0, 8) })); }
+      catch (e) { out[u] = String(e); }
+    }
+    return new Response(JSON.stringify(out, null, 1), { headers: { 'content-type': 'application/json' } });
+  }
   const errs = [], now = Date.now();
   const fomcLeft = FOMC.filter((d) => Date.parse(d) > now);
   const futMonths = []; { const d = new Date(); for (let i = 0; i < 9; i++) { const x = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + i, 1)); futMonths.push([x.getUTCFullYear(), x.getUTCMonth() + 1]); } }
