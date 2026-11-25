@@ -4,10 +4,12 @@ on:
   workflow_dispatch:
     inputs:
       path:
-        description: Path on the live app, e.g. /.netlify/functions/actuals
+        description: Path on the live app (e.g. /.netlify/functions/actuals) or a full https URL
         required: true
 jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - run: curl -s -m 60 "https://watch-dawg-78h1.vercel.app${{ inputs.path }}" | head -c 20000
+      - run: |
+          P="${{ inputs.path }}"; case "$P" in http*) U="$P";; *) U="https://watch-dawg-78h1.vercel.app$P";; esac
+          curl -sL -m 60 "$U" | head -c 20000; echo; echo "---TAIL---"; curl -sL -m 60 "$U" | tail -c 1500
