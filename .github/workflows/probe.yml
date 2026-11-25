@@ -12,4 +12,5 @@ jobs:
     steps:
       - run: |
           P="${{ inputs.path }}"; case "$P" in http*) U="$P";; *) U="https://watch-dawg-78h1.vercel.app$P";; esac
-          curl -sL -m 60 "$U" | head -c 20000; echo; echo "---TAIL---"; curl -sL -m 60 "$U" | tail -c 1500
+          curl -sL -m 60 "$U" > /tmp/out
+          case "$(head -c 200 /tmp/out)" in *"<html"*|*"<!DOCTYPE"*) echo "(page text, tags removed)"; sed -e "s/<script[^>]*>.*<\/script>//g" /tmp/out | tr "\n" " " | sed -e "s/<[^>]*>/ /g" -e "s/  */ /g" | head -c 30000;; *) head -c 20000 /tmp/out; echo; echo "---TAIL---"; tail -c 1500 /tmp/out;; esac
