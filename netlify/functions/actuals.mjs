@@ -33,8 +33,9 @@ export function parseBeaPio(html) {
 async function bea() {
   const home = parseBeaHome(await fetch('https://www.bea.gov/', { headers: UA, signal: AbortSignal.timeout(12000) }).then((r) => r.text()));
   let pio = {};
-  if (home.pioLink) pio = parseBeaPio(await fetch(home.pioLink, { headers: UA, signal: AbortSignal.timeout(12000) }).then((r) => r.text()));
-  return { home, pio };
+  let snip = null;
+  if (home.pioLink) { const h = await fetch(home.pioLink, { headers: UA, signal: AbortSignal.timeout(12000) }).then((r) => r.text()); pio = parseBeaPio(h); snip = [...text(h).matchAll(/.{0,260}(?:food and energy|PCE price index).{0,160}/g)].slice(0, 5).map((m) => m[0]); }
+  return { home, pio, snip };
 }
 // two decimals, worked out from the official index levels (BLS headlines round to one)
 const pct = (a, b) => (a != null && b) ? Math.round((a / b - 1) * 10000) / 100 : null;
