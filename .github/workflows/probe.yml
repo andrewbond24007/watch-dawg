@@ -1,0 +1,13 @@
+# Manual check: fetches one of the app's URLs from GitHub's servers and prints the answer to the log.
+name: Probe
+on:
+  workflow_dispatch:
+    inputs:
+      path:
+        description: Path on the live app, e.g. /.netlify/functions/actuals
+        required: true
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - run: curl -s -m 60 "https://watch-dawg-78h1.vercel.app${{ inputs.path }}" | head -c 20000
