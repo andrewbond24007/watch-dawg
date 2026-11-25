@@ -5,11 +5,12 @@ function switchTab(name){
  if(name===activeTab)return window.scrollTo({top:0,behavior:'smooth'});
  if(activeTab==='health')HFRESH.clear();
  if(activeTab==='rates')RFRESH.clear();
+ if(activeTab==='news')ACTFRESH.clear();
  activeTab=name;buzz();
  document.querySelectorAll('.tab').forEach(t=>t.setAttribute('aria-selected',t.dataset.tab===name));
  document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id==='v-'+name));
  window.scrollTo(0,0);
- if(name==='news'){renderNewsTab();loadCal();loadNews();}
+ if(name==='news'){renderNewsTab();loadCal();loadNews();clearNewsDot();}
  if(name==='park'){maybeGate();requestAnimationFrame(syncPark);loadQuotes();}
  else{const g=$('pgate');if(g&&!g.hidden&&!g.classList.contains('open')){g.hidden=true;document.body.style.overflow='';}}
  if(name==='rates'){rMarkSeen();renderRates();loadRates();loadRatesLive();}

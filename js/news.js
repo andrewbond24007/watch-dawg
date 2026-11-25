@@ -139,8 +139,11 @@ const FLAGS={USD:'🇺🇸',GBP:'🇬🇧',EUR:'🇪🇺',JPY:'🇯🇵',CNY:'�
 /* actual figures (BLS) and 30-minute market reaction for released events */
 let ACT={data:null,at:0,key:''},REACT=store.get('wd.react',{}),showEarlier=false;
 const ACT_MAP=[[/core cpi m\/m/i,['coreCpiMoM']],[/core cpi y\/y/i,['coreCpiYoY']],[/^cpi m\/m/i,['cpiMoM']],[/^cpi y\/y/i,['cpiYoY']],[/^cpi and core cpi/i,['coreCpiMoM','cpiYoY']],
- [/non-farm payrolls and unemployment/i,['nfp','unemp']],[/non-farm employment change/i,['nfp']],[/^unemployment rate/i,['unemp']],[/core ppi m\/m/i,['corePpiMoM']],[/^ppi m\/m|^ppi \(/i,['ppiMoM']]];
-const ACT_LABEL={coreCpiMoM:['Core CPI m/m','%','infl'],coreCpiYoY:['Core CPI y/y','%','infl'],cpiMoM:['CPI m/m','%','infl'],cpiYoY:['CPI y/y','%','infl'],nfp:['Jobs added','K','jobs'],unemp:['Unemployment','%','unemp'],ppiMoM:['PPI m/m','%','infl'],corePpiMoM:['Core PPI m/m','%','infl']};
+ [/non-farm payrolls and unemployment/i,['nfp','unemp']],[/non-farm employment change/i,['nfp']],[/^unemployment rate/i,['unemp']],[/core ppi m\/m/i,['corePpiMoM']],[/^ppi m\/m|^ppi \(/i,['ppiMoM']],
+ [/core pce price index m\/m/i,['corePceMoM']],[/core pce price index y\/y/i,['corePceYoY']],[/^core pce price index \(/i,['corePceMoM','corePceYoY']],[/^pce price index m\/m/i,['pceMoM']],[/^pce price index y\/y/i,['pceYoY']],[/\bgdp\b(?!.*price)/i,['gdp']]];
+const ACT_LABEL={coreCpiMoM:['Core CPI m/m','%','infl'],coreCpiYoY:['Core CPI y/y','%','infl'],cpiMoM:['CPI m/m','%','infl'],cpiYoY:['CPI y/y','%','infl'],nfp:['Jobs added','K','jobs'],unemp:['Unemployment','%','unemp'],ppiMoM:['PPI m/m','%','infl'],corePpiMoM:['Core PPI m/m','%','infl'],corePceMoM:['Core PCE m/m','%','infl'],corePceYoY:['Core PCE y/y','%','infl'],pceMoM:['PCE m/m','%','infl'],pceYoY:['PCE y/y','%','infl'],gdp:['GDP (annualised)','%','growth']};
+// GDP releases refer to the quarter that ended about 1–3 months earlier
+const refQuarter=d=>{const x=new Date(new Date(d).getTime()-90*864e5);return x.getUTCFullYear()+'-Q'+(Math.floor(x.getUTCMonth()/3)+1);};
 /* Cleveland Fed inflation nowcasts: 2-decimal expectations (and unrounded actuals) for CPI and PCE */
 let NOWC={data:null,at:0};
 const NOW_MAP=[[/^cpi and core cpi/i,[['CPI','mom','cpi'],['Core','mom','coreCpi'],['CPI y/y','yoy','cpi'],['Core y/y','yoy','coreCpi']]],
@@ -155,28 +158,43 @@ function nowcastFor(e){if(e.country!=='USD'||!NOWC.data)return null;const m=NOW_
  return items.some(x=>x.exp!=null||x.prev!=null||x.act!=null)?items:null;}
 function refMonth(d){const x=new Date(d);x.setUTCDate(1);x.setUTCMonth(x.getUTCMonth()-1);return x.getUTCFullYear()+'-'+String(x.getUTCMonth()+1).padStart(2,'0');}
 function actualsFor(e){
- if(e.country==='USD'&&/pce price index/i.test(e.title)){const nc=nowcastFor(e);if(!nc)return [];const fs=String(e.forecast||''),f=parseFloat(fs.replace(/[^0-9.\-]/g,'')),dec=(fs.split('.')[1]||'').replace(/[^0-9]/g,'').length;
+ if(e.country==='USD'&&/pce price index/i.test(e.title)&&!(ACT.data&&(ACT.data.corePceMoM||{}).p===refMonth(e.date))){const nc=nowcastFor(e);if(!nc)return [];const fs=String(e.forecast||''),f=parseFloat(fs.replace(/[^0-9.\-]/g,'')),dec=(fs.split('.')[1]||'').replace(/[^0-9]/g,'').length;
   return nc.filter(x=>x.act!=null).map((x,i,arr)=>{let tag='';if(arr.length===1&&!isNaN(f)){const d=+(x.act.toFixed(dec))-f;tag=Math.abs(d)<1e-9?'In line':d>0?'Hotter':'Cooler';}return {label:(x.lab||'PCE')+(x.kind==='mom'&&!/m\/m|y\/y/.test(x.lab)?' m/m':''),val:x.act.toFixed(2)+'%',tag,multi:arr.length>1};});}
  if(e.country!=='USD'||!ACT.data)return [];const m=ACT_MAP.find(([rx])=>rx.test(e.title));if(!m)return [];
- const want=refMonth(e.date);
+ const want=refMonth(e.date),wantQ=refQuarter(e.date);
  const NC_ID={cpiMoM:['mom','cpi'],coreCpiMoM:['mom','coreCpi'],cpiYoY:['yoy','cpi'],coreCpiYoY:['yoy','coreCpi']};
  return m[1].map(k=>{let a=ACT.data[k];
   if((!a||a.v==null)&&NC_ID[k]){const v=NOWC.data?.months?.[want]?.act?.[NC_ID[k][0]]?.[NC_ID[k][1]];if(v!=null)a={p:want,v};}
-  if(!a||a.v==null||a.p!==want)return null;
+  if(!a||a.v==null||a.p!==(k==='gdp'?wantQ:want))return null;
   const [label,unit,kind]=ACT_LABEL[k];const fs=String(e.forecast||''),f=m[1].length===1?parseFloat(fs.replace(/[^0-9.\-]/g,'')):NaN;
   const dec=(fs.split('.')[1]||'').replace(/[^0-9]/g,'').length,v=k==='unemp'&&a.v2!=null?a.v2:a.v;
-  let tag='';if(!isNaN(f)){const d=+(v.toFixed(dec))-f;tag=Math.abs(d)<1e-9?'In line':kind==='infl'?(d>0?'Hotter':'Cooler'):kind==='jobs'?(d>0?'Stronger':'Weaker'):(d>0?'Weaker':'Stronger');}
-  return {label,val:(kind==='jobs'?(v>0?'+':'')+v+'K':v.toFixed(2)+unit),tag,multi:m[1].length>1};}).filter(Boolean);
+  let tag='';if(!isNaN(f)){const d=+(v.toFixed(dec))-f;tag=Math.abs(d)<1e-9?'In line':kind==='infl'?(d>0?'Hotter':'Cooler'):kind==='jobs'||kind==='growth'?(d>0?'Stronger':'Weaker'):(d>0?'Weaker':'Stronger');}
+  return {label,val:(kind==='jobs'?(v>0?'+':'')+v+'K':kind==='growth'?(v>0?'+':'')+v.toFixed(1)+unit:v.toFixed(2)+unit),tag,multi:m[1].length>1};}).filter(Boolean);
 }
 async function loadActuals(){
  loadNowcast();const now=Date.now();
- const rel=CAL.events.filter(e=>e.country==='USD'&&ACT_MAP.some(([rx])=>rx.test(e.title))&&new Date(e.date)<now-3*60e3&&now-new Date(e.date)<12*864e5);
+ const rel=CAL.events.filter(e=>e.country==='USD'&&ACT_MAP.some(([rx])=>rx.test(e.title))&&new Date(e.date)<now-60e3&&now-new Date(e.date)<12*864e5);
  if(!rel.length)return;
- const key=rel.map(e=>e.date.slice(0,13)).sort().pop();
+ // a figure due in the last 6 hours that hasn't shown up yet: ask again every 2 minutes (fresh, not the cached copy)
+ const waiting=rel.filter(e=>now-new Date(e.date)<6*3600e3&&!actualsFor(e).length);
+ const key=rel.map(e=>e.date.slice(0,13)).sort().pop()+(waiting.length?'|'+Math.floor(now/120e3):'');
  if(ACT.key===key&&ACT.data&&!ACT.data.error&&now-ACT.at<60*60e3)return;
- if(ACT.key===key&&now-ACT.at<10*60e3)return;
- try{const j=await fetch('/.netlify/functions/actuals?r='+encodeURIComponent(key)).then(r=>r.json());ACT={data:j,at:Date.now(),key};renderNewsTab();}catch(e){ACT.at=Date.now();ACT.key=key;}
+ if(ACT.key===key&&now-ACT.at<(waiting.length?100e3:10*60e3))return;
+ try{const j=await fetch('/.netlify/functions/actuals?r='+encodeURIComponent(key)).then(r=>r.json());ACT={data:j,at:Date.now(),key};checkNewActuals();renderNewsTab();}catch(e){ACT.at=Date.now();ACT.key=key;}
 }
+/* alert when a scheduled figure comes out: a dot on the News tab, a "New" tag on the event and a short banner */
+let ACTSEEN=store.get('wd.actseen',null);const ACTFRESH=new Set();
+const evId=e=>e.title+'@'+e.date.slice(0,16);
+function checkNewActuals(){
+ const got=CAL.events.filter(e=>actualsFor(e).length).map(evId);
+ if(!ACTSEEN){ACTSEEN=Object.fromEntries(got.map(k=>[k,1]));store.set('wd.actseen',ACTSEEN);return;}
+ const fresh=got.filter(k=>!ACTSEEN[k]);
+ if(fresh.length){fresh.forEach(k=>{ACTFRESH.add(k);ACTSEEN[k]=1;});store.set('wd.actseen',ACTSEEN);
+  if(!(activeTab==='news'&&newsMode==='calendar')){const tab=document.querySelector('.tab[data-tab="news"]');if(tab&&!tab.querySelector('.ndot')){const d=document.createElement('i');d.className='ndot';tab.appendChild(d);}}
+  const e=CAL.events.find(x=>evId(x)===fresh[0]),a=e&&actualsFor(e)[0];
+  if(a)toast(`${e.title.replace(/\s*\(.*\)$/,'')}: ${a.val}${a.tag?' · '+a.tag:''}${fresh.length>1?` (+${fresh.length-1} more)`:''}`);}
+}
+function clearNewsDot(){if(newsMode==='calendar')document.querySelector('.tab[data-tab="news"] .ndot')?.remove();}
 async function loadReactions(){
  const now=Date.now();
  const todo=CAL.events.filter(e=>e.key&&new Date(e.date)<now-31*60e3&&now-new Date(e.date)<10*864e5).map(e=>Math.floor(new Date(e.date)/1000)).filter((t,i,a)=>a.indexOf(t)===i&&!(REACT[t]&&REACT[t].done));
@@ -188,8 +206,8 @@ async function loadReactions(){
  if(todo.length)renderNewsTab();
 }
 function resultRows(e){
- const acts=actualsFor(e);const r=REACT[Math.floor(new Date(e.date)/1000)];let h='';
- if(acts.length)h+=`<div class="evres">${acts.map(a=>`<span>${a.multi?esc(a.label)+' ':'Actual '}<b>${esc(a.val)}</b>${a.tag?` <i class="tg">${a.tag}</i>`:''}</span>`).join('')}</div>`;
+ const acts=actualsFor(e);const nw=ACTFRESH.has(evId(e));const r=REACT[Math.floor(new Date(e.date)/1000)];let h='';
+ if(acts.length)h+=`<div class="evres${nw?' isnew':''}">${nw?'<span class="newtag">Just out</span>':''}${acts.map(a=>`<span>${a.multi?esc(a.label)+' ':'Actual '}<b>${esc(a.val)}</b>${a.tag?` <i class="tg">${a.tag}</i>`:''}</span>`).join('')}</div>`;
  if(r&&r.done){const parts=[['S&P fut.',r.spx],['Gold',r.gold],['BTC',r.btc]].filter(x=>x[1]!=null);
   if(parts.length)h+=`<div class="evrx">30 min after: ${parts.map(([n,v])=>`${n} <b class="${v>0?'up':v<0?'down':''}">${fmtPct(v)}</b>`).join(' · ')}</div>`;}
  return h;
@@ -267,7 +285,7 @@ function renderNewsTab(){
   const nm=$('newsMore');if(nm)nm.onclick=()=>{newsShown+=40;buzz();renderNewsTab();};
  }
 }
-$('newsSeg').addEventListener('click',e=>{const b=e.target.closest('button');if(!b||b.dataset.n===newsMode)return;newsMode=b.dataset.n;[...$('newsSeg').children].forEach(x=>x.classList.toggle('on',x===b));buzz();renderNewsTab();window.scrollTo({top:0,behavior:'smooth'});});
+$('newsSeg').addEventListener('click',e=>{const b=e.target.closest('button');if(!b||b.dataset.n===newsMode)return;newsMode=b.dataset.n;clearNewsDot();[...$('newsSeg').children].forEach(x=>x.classList.toggle('on',x===b));buzz();renderNewsTab();window.scrollTo({top:0,behavior:'smooth'});});
 $('newsRefresh').addEventListener('click',async e=>{const b=e.currentTarget;b.classList.remove('spin');void b.offsetWidth;b.classList.add('spin');buzz();await Promise.all([loadNews(true),loadCal(true)]);toast('News refreshed');});
 /* match breaking posts to an asset: direct words first, then broader market words */
 const ALIAS={'S&P 500':['S&P','SPX','SPY','S&P 500','Wall Street','stocks','equities','Dow'],'Nasdaq 100':['Nasdaq','NDX','QQQ','tech stocks'],

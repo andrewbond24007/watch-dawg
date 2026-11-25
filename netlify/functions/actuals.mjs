@@ -26,23 +26,23 @@ export function parseBeaPio(html) {
   const mon = /Personal Income and Outlays,? ([A-Z][a-z]+) (\d{4})/.exec(t);
   const dn = (re) => re && /decreased/i.test(re[0]) ? -1 : 1;
   if (mon) { const m = MONTHS.indexOf(mon[1].toLowerCase()) + 1; if (m) out.p = `${mon[2]}-${String(m).padStart(2, '0')}`; }
-  if (mm) { out.pceMoM = num(mm[1]); out.corePceMoM = num(mm[2]); }
+  // the release's table: 'PCE price index 0.5 0.3 PCE price index excluding food and energy 0.3 0.3' (latest month last)
+  const tb = /PCE price index (-?[\d.]+) (-?[\d.]+) PCE price index excluding food and energy (-?[\d.]+) (-?[\d.]+)/i.exec(t);
+  if (tb) { out.pceMoM = num(tb[2]); out.corePceMoM = num(tb[4]); }
+  else if (mm) { out.pceMoM = num(mm[1]) * dn(mm); out.corePceMoM = num(mm[2]); }
   if (yy) { out.pceYoY = num(yy[1]); out.corePceYoY = num(yy[2]); }
   return out;
 }
 async function bea() {
   const home = parseBeaHome(await fetch('https://www.bea.gov/', { headers: UA, signal: AbortSignal.timeout(12000) }).then((r) => r.text()));
   let pio = {};
-  let snip = null;
-  if (home.pioLink) { const h = await fetch(home.pioLink, { headers: UA, signal: AbortSignal.timeout(12000) }).then((r) => r.text()); pio = parseBeaPio(h); snip = [...text(h).matchAll(/.{0,260}(?:food and energy|PCE price index).{0,160}/g)].slice(0, 5).map((m) => m[0]); }
-  return { home, pio, snip };
+  if (home.pioLink) pio = parseBeaPio(await fetch(home.pioLink, { headers: UA, signal: AbortSignal.timeout(12000) }).then((r) => r.text()));
+  return { home, pio };
 }
 // two decimals, worked out from the official index levels (BLS headlines round to one)
 const pct = (a, b) => (a != null && b) ? Math.round((a / b - 1) * 10000) / 100 : null;
 export default async (req) => {
-  const pu = new URL(req.url);
   const B = await bea().catch((e) => ({ error: String(e).slice(0, 100) }));
-  if (pu.searchParams.get('debug')) return new Response(JSON.stringify(B, null, 1), { headers: { 'content-type': 'application/json' } });
   let res, ok = false;
   try {
     const r = await fetch('https://api.bls.gov/publicAPI/v1/timeseries/data/', {
@@ -67,6 +67,9 @@ export default async (req) => {
     unemp: at('unemp', 0) ? { p: at('unemp', 0).p, v: at('unemp', 0).v, v2: at('unempN', 0) && at('labour', 0) && at('unempN', 0).p === at('unemp', 0).p ? Math.round(at('unempN', 0).v / at('labour', 0).v * 10000) / 100 : null } : null,
     ppiMoM: mom('ppi'), corePpiMoM: mom('corePpi'),
   } : { error: res?.message?.[0] || res?.error || 'BLS unavailable' };
+  // BEA figures ride along whether or not BLS answered
+  const P = B.pio || {}, wrap = (v) => v != null && P.p ? { p: P.p, v } : null;
+  Object.assign(out, { pceMoM: wrap(P.pceMoM), corePceMoM: wrap(P.corePceMoM), pceYoY: wrap(P.pceYoY), corePceYoY: wrap(P.corePceYoY), gdp: B.home?.gdp || null, beaError: B.error || null });
   // Cache for 6h once data is in; retry sooner if BLS failed.
   const ttl = ok ? 21600 : 300;
   return new Response(JSON.stringify(out), { headers: { 'content-type': 'application/json', 'cache-control': 'public, max-age=300', 'netlify-cdn-cache-control': `public, s-maxage=${ttl}`, 'access-control-allow-origin': '*', 'netlify-vary': 'query' } });

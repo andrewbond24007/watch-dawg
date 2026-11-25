@@ -54,3 +54,16 @@ test('Telegram: post text, time and link', () => {
   const [p] = parseTg(h, 'financialjuice');
   assert.equal(p.text, 'US CPI & core\nbeat'); assert.equal(p.link, 'https://t.me/financialjuice/123');
 });
+
+import { parseBeaHome, parseBeaPio } from '../netlify/functions/actuals.mjs';
+test('BEA home page: GDP tile and the latest personal income release link', () => {
+  const h = '<h3>Gross Domestic Product</h3><div>Q3 2026 (2nd)</div><div>+4.3%</div><a href="/news/2026/personal-income-and-outlays-october-2026">View</a>';
+  const r = parseBeaHome(h);
+  assert.deepEqual(r.gdp, { p: '2026-Q3', est: '2nd', v: 4.3 });
+  assert.equal(r.pioLink, 'https://www.bea.gov/news/2026/personal-income-and-outlays-october-2026');
+});
+test('BEA personal income release: PCE and core PCE, month and year', () => {
+  const h = '<h1>Personal Income and Outlays, October 2026</h1><p>From the preceding month, the PCE price index for October increased 0.3 percent . Excluding food and energy, the PCE price index also increased 0.3 percent. From the same month one year ago, the PCE price index for October increased 3.8 percent . Excluding food and energy, the PCE price index increased 3.3 percent from one year ago.</p><table><tr><td>PCE price index</td><td>0.5</td><td>0.3</td></tr><tr><td>PCE price index excluding food and energy</td><td>0.3</td><td>0.2</td></tr></table>';
+  const r = parseBeaPio(h);
+  assert.equal(r.p, '2026-10'); assert.equal(r.pceMoM, 0.3); assert.equal(r.corePceMoM, 0.2); assert.equal(r.pceYoY, 3.8); assert.equal(r.corePceYoY, 3.3);
+});
