@@ -21,3 +21,4 @@ setInterval(()=>{if(activeTab==='markets')renderTape();},10e3);
 // scheduled figures: check for newly released numbers every minute wherever you are in the app
 const relTick=async()=>{if(!CAL.at||Date.now()-CAL.at>15*60e3){if(!CAL.busy){CAL.busy=true;try{const j=await fetch('/.netlify/functions/calendar').then(r=>r.json());if(Array.isArray(j.events)){CAL.events=j.events;CAL.at=Date.now();}}catch(e){}CAL.busy=false;}}loadActuals();};
 setTimeout(relTick,8000);setInterval(relTick,60e3);
+setInterval(()=>ratesDueCheck(),60e3);

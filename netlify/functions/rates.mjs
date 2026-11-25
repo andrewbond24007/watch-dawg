@@ -1,3 +1,4 @@
+import { freddieSeries } from '../../lib/freddie.mjs';
 // WatchDawg rates and money: central-bank rates and their decision history, what futures
 // markets expect from the Fed, government bond yields, mortgage rates and inflation, each
 // with the date of its next scheduled update. All official sources, no API keys.
@@ -32,6 +33,10 @@ export function nextFreddie(now = Date.now()) {
   }
   return null;
 }
+// the most recent survey release at or before now (to spot a figure that's out but not yet in the data)
+export function lastFreddie(now = Date.now()) { const t = nextFreddie(now - 8 * 864e5); let x = t; while (x) { const n = nextFreddie(Date.parse(x) + 60e3); if (!n || Date.parse(n) > now) break; x = n; } return x && Date.parse(x) <= now ? x : null; }
+// next figure for a weekly series: the release just gone if the data hasn't caught up with it yet, else next week's
+function freddieNext(lastDate, now = Date.now()) { const lr = lastFreddie(now); return lr && lastDate < lr.slice(0, 10) && now - Date.parse(lr) < 3 * 864e5 ? lr : nextFreddie(now); }
 // US daylight saving: second Sunday of March to first Sunday of November
 function dstNY(ymd) {
   const y = +ymd.slice(0, 4), sun = (m, n) => { const d = new Date(Date.UTC(y, m, 1)); return 1 + ((7 - d.getUTCDay()) % 7) + 7 * (n - 1); };
@@ -91,10 +96,7 @@ async function treasury() {
   if (!out.y10.length) throw new Error('no Treasury data');
   return out;
 }
-async function freddie() {
-  const t = await get('https://www.freddiemac.com/pmms/docs/PMMS_history.csv', 12000);
-  return t.trim().split(/\r?\n/).slice(1).map((l) => l.split(',')).map(([d, v30, , v15]) => { const m = /(\d+)\/(\d+)\/(\d{4})/.exec(d); return m && v30 && !isNaN(+v30) ? [`${m[3]}-${m[1].padStart(2, '0')}-${m[2].padStart(2, '0')}`, +v30, v15 && !isNaN(+v15) ? +v15 : null] : null; }).filter((p) => p && p[0] >= START);
-}
+const freddie = () => freddieSeries(START, 12000);
 // BLS CPI index -> 12-month change
 async function usCpi() {
   const y = new Date().getUTCFullYear();
@@ -244,8 +246,8 @@ export default async () => {
   ].filter(Boolean);
   if (TR?.y2?.length && TR?.y10?.length) yields.curve = { us: +(lastOf(TR.y10)[1] - lastOf(TR.y2)[1]).toFixed(2), usY1: before(TR.y10, 365) != null && before(TR.y2, 365) != null ? +(before(TR.y10, 365) - before(TR.y2, 365)).toFixed(2) : null };
   const mort = [];
-  if (FM?.length) { const s = FM.map((r) => [r[0], r[1]]); mort.push({ id: 'us30m', name: 'US 30-year fixed', flag: '🇺🇸', value: lastOf(s)[1], date: lastOf(s)[0], prev: s.at(-2)?.[1], y1: before(s, 365), series: thin(s.filter((p) => Date.parse(p[0]) > now - 400 * 864e5), 1), next: nextFreddie(), freq: 'Weekly, Thursdays', src: 'Freddie Mac' });
-    const s15 = FM.filter((r) => r[2] != null).map((r) => [r[0], r[2]]); if (s15.length) mort.push({ id: 'us15m', name: 'US 15-year fixed', flag: '🇺🇸', value: lastOf(s15)[1], date: lastOf(s15)[0], prev: s15.at(-2)?.[1], y1: before(s15, 365), series: thin(s15.filter((p) => Date.parse(p[0]) > now - 400 * 864e5), 1), next: nextFreddie(), freq: 'Weekly, Thursdays', src: 'Freddie Mac' }); }
+  if (FM?.length) { const s = FM.map((r) => [r[0], r[1]]); mort.push({ id: 'us30m', name: 'US 30-year fixed', flag: '🇺🇸', value: lastOf(s)[1], date: lastOf(s)[0], prev: s.at(-2)?.[1], y1: before(s, 365), series: thin(s.filter((p) => Date.parse(p[0]) > now - 400 * 864e5), 1), next: freddieNext(lastOf(s)[0]), freq: 'Weekly, Thursdays', src: 'Freddie Mac' });
+    const s15 = FM.filter((r) => r[2] != null).map((r) => [r[0], r[2]]); if (s15.length) mort.push({ id: 'us15m', name: 'US 15-year fixed', flag: '🇺🇸', value: lastOf(s15)[1], date: lastOf(s15)[0], prev: s15.at(-2)?.[1], y1: before(s15, 365), series: thin(s15.filter((p) => Date.parse(p[0]) > now - 400 * 864e5), 1), next: freddieNext(lastOf(s15)[0]), freq: 'Weekly, Thursdays', src: 'Freddie Mac' }); }
   if (UKM) for (const [k, nm] of [['IUMBV34', 'UK 2-year fixed (75% LTV)'], ['IUMBV42', 'UK 5-year fixed (75% LTV)']]) { const s = UKM[k]; if (s?.length) mort.push({ id: k, name: nm, flag: '🇬🇧', value: lastOf(s)[1], date: lastOf(s)[0], prev: s.at(-2)?.[1], y1: before(s, 365), series: s.slice(-24), next: null, freq: 'Monthly, early in the month', src: 'Bank of England' }); }
   const infl = [];
   if (USC) { infl.push({ id: 'uscpi', name: 'US inflation (CPI)', flag: '🇺🇸', value: lastOf(USC.all)[1], date: lastOf(USC.all)[0], prev: USC.all.at(-2)?.[1], series: USC.all.slice(-36), next: nextOf(US_CPI), src: 'BLS', target: 2 });

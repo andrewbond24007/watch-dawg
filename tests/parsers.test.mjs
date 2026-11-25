@@ -67,3 +67,12 @@ test('BEA personal income release: PCE and core PCE, month and year', () => {
   const r = parseBeaPio(h);
   assert.equal(r.p, '2026-10'); assert.equal(r.pceMoM, 0.3); assert.equal(r.corePceMoM, 0.2); assert.equal(r.pceYoY, 3.8); assert.equal(r.corePceYoY, 3.3);
 });
+
+import { parsePmmsCsv, parsePmmsPage } from '../lib/freddie.mjs';
+test('Freddie Mac: quoted and unquoted history rows, and the survey page', () => {
+  const csv = 'date,pmms30,pmms30p,pmms15\n11/3/2022,6.95, ,6.29\n"10/8/2026","7.4","","6.73","","",""\n';
+  assert.deepEqual(parsePmmsCsv(csv), [['2022-11-03', 6.95, 6.29], ['2026-10-08', 7.4, 6.73]]);
+  const page = '{ "@type": "FinancialProduct", "description": "Average rates as of November 25, 2026", "name": "30 - Year", "category": "Mortgage", "interestRate": "7.21" } { "@type": "FinancialProduct", "description": "Average rates as of November 25, 2026", "name": "15 - Year", "category": "Mortgage", "interestRate": "6.54" }';
+  const txt = ' The 30-year fixed-rate mortgage &nbsp;averaged 7.21% as of November 25, 2026, down from last week when it averaged 7.28%. The 15-year fixed-rate mortgage &nbsp;averaged 6.54%, down from last week when it averaged 6.66%.';
+  assert.deepEqual(parsePmmsPage(page + txt), { date: '2026-11-25', v30: 7.21, v15: 6.54, prev30: 7.28, prev15: 6.66 });
+});

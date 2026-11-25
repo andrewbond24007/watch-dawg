@@ -25,3 +25,8 @@ test('Polymarket: outcome odds summed into cut / hold / rise', () => {
   const r = readPoly(ev);
   assert.equal(r.hike, 0.958); assert.equal(r.hold, 0.044); assert.equal(r.cut, 0.003); assert.equal(r.url, 'https://polymarket.com/event/fed-decision-in-december-x');
 });
+import { lastFreddie } from '../netlify/functions/rates.mjs';
+test('Freddie Mac: the release just gone (Wednesday in Thanksgiving week)', () => {
+  assert.equal(lastFreddie(Date.parse('2026-11-25T19:00:00Z')), '2026-11-25T12:00:00-05:00');
+  assert.equal(lastFreddie(Date.parse('2026-11-25T16:00:00Z')), '2026-11-19T12:00:00-05:00');
+});

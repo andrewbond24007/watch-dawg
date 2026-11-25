@@ -27,7 +27,21 @@ async function loadRatesLive(){
 function rKeys(d){const k={};(d.banks||[]).forEach(b=>{const l=b.decisions?.at(-1);if(l)k['bank:'+b.id]=l.date;});
  (d.inflation||[]).forEach(i=>k['infl:'+i.id]=i.date);(d.mortgages||[]).forEach(m=>k['mort:'+m.id]=m.date);return k;}
 function rUnseen(){const d=RATES.data;if(!d||!RSEEN)return [];const k=rKeys(d);return Object.keys(k).filter(x=>RSEEN[x]&&k[x]>RSEEN[x]);}
+/* after a scheduled release time passes, ask the live source every 2 minutes (from any tab) until the new figure
+   shows up, then say so with a banner and the dot */
+let rDueAt=0;
+async function ratesDueCheck(){const d=RATES.data;if(!d||RATES.busy)return;const now=Date.now();
+ const due=[...(d.banks||[]),...(d.mortgages||[]),...(d.inflation||[])].some(x=>x.next&&Date.parse(x.next)<now-60e3&&now-Date.parse(x.next)<4*3600e3);
+ if(due&&now-rDueAt>110e3){rDueAt=now;await loadRates(true);}}
+const RTOLD=new Set();
+function rToast(d,keys){const msgs=keys.map(k=>{const[t,id]=k.split(':');
+  if(t==='mort'){const m=d.mortgages.find(x=>x.id===id);return m&&`${m.name}: ${rp(m.value)}${m.prev!=null?` (${bps(m.value-m.prev)})`:''}`;}
+  if(t==='infl'){const i=d.inflation.find(x=>x.id===id);return i&&`${i.name}: ${rp(i.value,1)}`;}
+  if(t==='bank'){const b=d.banks.find(x=>x.id===id),l=b&&b.decisions.at(-1);return l&&`${b.short} ${l.change>0?'raised':'cut'} to ${bankRate(b)}`;}}).filter(Boolean);
+ if(msgs.length)toast(msgs[0]+(msgs.length>1?` (+${msgs.length-1} more)`:''));}
 function rSeenCheck(){const d=RATES.data;if(!d)return;const k=rKeys(d);
+ const fresh=RSEEN?Object.keys(k).filter(x=>RSEEN[x]&&k[x]>RSEEN[x]&&!RTOLD.has(x+k[x])):[];
+ if(fresh.length){fresh.forEach(x=>RTOLD.add(x+k[x]));rToast(d,fresh);}
  if(!RSEEN){RSEEN=k;store.set('wd.rseen',RSEEN);}else{let ch=false;for(const x in k)if(!RSEEN[x]){RSEEN[x]=k[x];ch=true;}if(ch)store.set('wd.rseen',RSEEN);}
  if(activeTab==='rates')rMarkSeen();updateRatesDot();}
 function rMarkSeen(){const d=RATES.data;if(!d)return;const k=rKeys(d);let ch=false;for(const x in k)if(k[x]>(RSEEN[x]||'')){RFRESH.add(x);RSEEN[x]=k[x];ch=true;}if(ch)store.set('wd.rseen',RSEEN);}

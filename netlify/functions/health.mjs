@@ -3,6 +3,7 @@
 // and the ECB (FRED blocks cloud servers, so it isn't used), plus share prices from Yahoo.
 import * as XLSX from 'xlsx';
 import { loadHistory, mergeHistory } from '../../lib/history.mjs';
+import { freddieSeries } from '../../lib/freddie.mjs';
 const UA = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36' };
 const T = (ms) => AbortSignal.timeout(ms);
 const START = '2019-01-01';
@@ -51,13 +52,7 @@ async function fedDelinq() {
   return { res: asc(res), com: asc(com) };
 }
 // Freddie Mac weekly 30-year fixed mortgage rate.
-async function freddie() {
-  const r = await fetch('https://www.freddiemac.com/pmms/docs/PMMS_history.csv', { headers: UA, signal: T(9000) });
-  if (!r.ok) throw new Error('Freddie ' + r.status);
-  return (await r.text()).trim().split(/\r?\n/).slice(1).map((l) => l.split(',')).map(([d, v]) => {
-    const m = /(\d+)\/(\d+)\/(\d{4})/.exec(d); return m && v && !isNaN(+v) ? [`${m[3]}-${m[1].padStart(2, '0')}-${m[2].padStart(2, '0')}`, +v] : null;
-  }).filter((p) => p && p[0] >= START);
-}
+async function freddie() { return (await freddieSeries(START, 9000)).map(([d, v]) => [d, v]); }
 // FHFA purchase-only house price index for the whole US, monthly (seasonally adjusted).
 async function fhfa() {
   const r = await fetch('https://www.fhfa.gov/hpi/download/monthly/hpi_master.csv', { headers: UA, signal: T(9000) });
