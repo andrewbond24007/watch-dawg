@@ -143,6 +143,29 @@ function ddList(st){
   return `<div class="dd"><div class="nm">${esc(x.name)}<small>${esc(x.sym)}${x.dy>0?' · '+x.dy.toFixed(1)+'% yield':''}</small></div><div class="r"><b class="${tcls(x.m3)}">${pc1(x.m3)}</b> 3m · <b class="down">${pc1(x.offHigh,0)}</b> off high</div><div class="bar" style="--c:${c}"><i style="width:${off}%"></i></div></div>`;}).join('');
 }
 function avgBoxes(a){return a?`<div class="aiavg"><div><b class="num">${pc1(a.offHigh,0)}</b><small>vs 12-month high</small></div><div><b class="num" style="color:var(--${a.m3>0?'upink':a.m3<0?'downink':'ink'})">${pc1(a.m3,0)}</b><small>3 months</small></div><div><b class="num" style="color:var(--${a.y1>0?'upink':a.y1<0?'downink':'ink'})">${pc1(a.y1,0)}</b><small>1 year</small></div></div>`:'';}
+/* AI credit risk: 5-year CDS levels quoted in the news, built up over time by the scheduled refresh */
+let CDS={data:null,at:0},CDSX=false;
+async function loadCds(){if(CDS.data&&Date.now()-CDS.at<15*60e3)return;try{const j=await fetch('/data/cds.json?t='+Math.floor(Date.now()/3e5)).then(r=>r.ok?r.json():null);if(j&&j.names){CDS={data:j,at:Date.now()};if(activeTab==='health'&&hSec==='ai')renderHealth();}}catch(e){}}
+function cdsCard(){
+ const d=CDS.data;if(!d)return '';
+ const rows=Object.entries(d.names).map(([id,n])=>{const p=n.points||[],l=p.at(-1);if(!l)return null;
+  const m1=p.slice().reverse().find(x=>Date.parse(l.date)-Date.parse(x.date)>=25*864e5),ch=m1?l.bp-m1.bp:null;return {id,n,p,l,ch};}).filter(Boolean)
+  .sort((a,b)=>b.l.bp-a.l.bp);
+ if(!rows.length)return `<div class="card hreg"><div class="hh"><span class="fl">🛡️</span><h3>Credit default swaps</h3></div><div class="why">Collecting: levels appear here as the news reports them.</div></div>`;
+ const mx=Math.max(350,...rows.map(r=>r.l.bp));
+ const col=bp=>bp>=200?'var(--down)':bp>=100?'#d99a00':'var(--up)';
+ const sig=rows[0].l.bp>=200?'red':rows[0].l.bp>=100?'amber':'green';
+ const list=rows.map(r=>{const old=Date.now()-Date.parse(r.l.date)>14*864e5;
+  return `<div class="cdsr${old?' old':''}"><div class="nm">${esc(r.n.label)}<small>${new Date(r.l.date+'T12:00:00Z').toLocaleDateString('en-GB',{day:'numeric',month:'short'})} · ${esc(r.l.source||'')}</small></div>
+   <div class="r"><b class="num">${Math.round(r.l.bp)} bp</b>${r.ch!=null?` <em class="${r.ch>0?'down':r.ch<0?'up':''}">${r.ch>0?'+':r.ch<0?'−':''}${Math.abs(Math.round(r.ch))} in a month</em>`:''}</div>
+   <div class="bar" style="--c:${col(r.l.bp)}"><i style="width:${Math.min(100,r.l.bp/mx*100)}%"></i></div>
+   ${CDSX?`<div class="cdsp">${r.p.slice(-5).reverse().map(x=>`<a href="${esc(x.link)}" target="_blank" rel="noopener"><span>${x.date.slice(5)}</span><b>${Math.round(x.bp)}</b> ${esc(x.title.slice(0,110))}</a>`).join('')}</div>`:''}</div>`;}).join('');
+ return `<div class="card hreg" id="cdsCard"><div class="hh"><span class="fl">🛡️</span><h3>Credit default swaps</h3><span class="sig ${sig}">${SIG_WORD[sig]||''}</span></div>
+  <div class="why">What it costs each year to insure $10m of a company's debt for 5 years, in basis points ($10,000 per 100 bp). Rising = lenders more worried about AI debt.</div>
+  ${list}
+  <button class="morebtn" id="cdsMore" aria-expanded="${CDSX}">${CDSX?'Hide the reports':'Show the reports behind each figure'}<span class="ch">▾</span></button>
+  <div class="hnote">There's no free live CDS feed, so these are the latest levels quoted in news reports (Bloomberg, Reuters and others via the app's news and Google News), collected every refresh. A company appears once a report quotes its level; greyed figures are over two weeks old. Green under 100 bp, amber to 200, red beyond.</div></div>`;
+}
 function aiCard(r){
  const a=r.avg||{},st=(r.stocks||[]).slice().sort((x,y)=>(x.offHigh??0)-(y.offHigh??0));
  return `<div class="card hreg"><div class="hh"><span class="fl">🤖</span><h3>AI shares</h3><span class="sig ${r.signal}">${SIG_WORD[r.signal]||''}</span></div>
@@ -151,7 +174,7 @@ function aiCard(r){
   <div class="hnote">The bar shows how far each share is below its 12-month high. Green under 12%, amber to 30%, red beyond. Signal is based on the average drop.</div></div>`;
 }
 function renderHealth(){
- if(activeTab!=='health')return;const d=HEALTH.data;
+ if(activeTab!=='health')return;const d=HEALTH.data;if(hSec==='ai')loadCds();
  $('healthStatus').innerHTML=d?`<span>Updated <b>${timeAgo(d.fetched)}</b></span>${HEALTH.err?'<span class="bad">Couldn’t refresh; showing the last copy</span>':''}${HEALTH.busy?'<span>Refreshing…</span>':''}`:'';
  if(!d){$('healthBox').innerHTML=`<div class="empty" style="margin-top:12px">${HEALTH.err?'Market health can’t load in this viewer.':'Loading market health…'}</div>`;$('healthOv').innerHTML='';}
  else{
@@ -160,7 +183,7 @@ function renderHealth(){
   $('healthOv').innerHTML=d.sections.map(s=>{const g=overallSig(s);return `<button role="tab" aria-selected="${s.id===hSec}" class="${s.id===hSec?'on':''}" data-s="${s.id}">${unseen[s.id]?'<i class="ndot" aria-label="New updates"></i>':''}<span class="ic">${s.icon}</span><b>${esc(s.id==='cre'?'Commercial property':s.id==='ai'?'AI bubble':s.title)}</b><span class="sig ${g}">${SIG_WORD[g]}</span></button>`;}).join('');
   const sec=d.sections.find(s=>s.id===hSec);
   let grp='';
-  $('healthBox').innerHTML=sectionBrief(sec)+(sec.id==='ai'?sec.regions.map(aiCard).join(''):sec.regions.map(r=>{const h=r.group&&r.group!==grp?`<div class="hgroup">${esc(r.group)}</div>`:'';grp=r.group||grp;return h+regionCard(r);}).join(''));
+  $('healthBox').innerHTML=sectionBrief(sec)+(sec.id==='ai'?sec.regions.map(aiCard).join('')+cdsCard():sec.regions.map(r=>{const h=r.group&&r.group!==grp?`<div class="hgroup">${esc(r.group)}</div>`:'';grp=r.group||grp;return h+regionCard(r);}).join(''));
   const all=Object.fromEntries(sec.regions.flatMap(r=>r.metrics||[]).map(m=>[m.id,m]));
   $('healthBox').querySelectorAll('svg[data-sp]').forEach(s=>{const m=all[s.dataset.sp];spark(s,(m?.series||[]).map(p=>p[1]),s.dataset.v);});
  }
@@ -265,3 +288,4 @@ $('mapZoom').addEventListener('click',()=>{const b=$('mapBox'),on=b.classList.to
 $('mapSheet').addEventListener('click',e=>{const p=e.target.closest('[data-id]');if(p&&$('mapSheet').contains(p)){mapSel=p.dataset.id===mapSel?null:p.dataset.id;buzz();renderMap();return;}
  const b=e.target.closest('#mapSeg button');if(b&&b.dataset.a!==mapArea){mapArea=b.dataset.a;mapSel=null;buzz();renderMap();}});
 $('healthBox').addEventListener('click',e=>{const b=e.target.closest('[data-map]');if(b){buzz();openMap(b.dataset.map);}});
+$('healthBox').addEventListener('click',e=>{if(e.target.closest('#cdsMore')){CDSX=!CDSX;buzz();renderHealth();}});

@@ -77,11 +77,19 @@ try {
   const feed = await call(news, 'https://watchdawg.local/', '/.netlify/functions/news').catch(() => ({ items: [] }));
   for (const p of feed.items || []) take(p, p.text);
   await Promise.all(CDS_NAMES.map(async ([, label]) => {
-    const q = encodeURIComponent(`"${label}" ("credit default swap" OR "credit-default swap" OR CDS) when:14d`);
-    try {
-      const x = await fetch(`https://news.google.com/rss/search?q=${q}&hl=en-US&gl=US&ceid=US:en`, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(12000) }).then((r) => r.text());
-      for (const p of parseRss(x, 'Google News')) take(p, p.text);
-    } catch (e) { /* one company's search failing is fine */ }
+    // two searches per company over the last month; headlines and the related-coverage snippets are both read
+    for (const q0 of [`"${label}" ("credit default swap" OR "credit-default swap" OR "default swaps") when:30d`, `"${label}" CDS (bps OR "basis points") when:30d`]) {
+      try {
+        const x = await fetch(`https://news.google.com/rss/search?q=${encodeURIComponent(q0)}&hl=en-US&gl=US&ceid=US:en`, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(12000) }).then((r) => r.text());
+        for (const p of parseRss(x, 'Google News')) take(p, p.text);
+        for (const it of x.split('<item>').slice(1)) {
+          const when = (it.match(/<pubDate>([^<]+)/) || [])[1], link = (it.match(/<link>([^<]+)/) || [])[1];
+          const desc = ((it.match(/<description>([\s\S]*?)<\/description>/) || [])[1] || '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+          if (!when || !desc) continue;
+          for (const a of desc.split(/<li>/)) { const tt = a.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(); if (tt) take({ time: new Date(when).toISOString(), link, source: 'Google News' }, tt); }
+        }
+      } catch (e) { /* one search failing is fine */ }
+    }
   }));
   const cds = mergeCds(read('cds.json', null), found);
   write('cds.json', cds);
