@@ -7,6 +7,8 @@ import health from '../netlify/functions/health.mjs';
 import housemap from '../netlify/functions/housemap.mjs';
 import nowcast from '../netlify/functions/nowcast.mjs';
 import rates from '../netlify/functions/rates.mjs';
+import news, { parseRss } from '../netlify/functions/news.mjs';
+import { CDS_NAMES, extractCds, mergeCds } from '../lib/cds.mjs';
 import { appendHistory, mergeHistory, updateStatus, keepMissing, SOURCE_NAMES } from '../lib/history.mjs';
 
 const dir = process.argv[2] || 'data-branch';
@@ -67,6 +69,24 @@ try {
   if (!r.banks?.length) throw new Error('no central-bank data');
   write('rates.json', r);
 } catch (e) { errors['rates:all'] = String(e.message || e); }
+
+// AI credit risk: 5-year CDS levels quoted in the news (app feed + a Google News search per company)
+try {
+  const found = [], seen = new Set();
+  const take = (p, title) => { for (const f of extractCds(title)) { const k = f.id + f.bp + p.time.slice(0, 13); if (seen.has(k)) continue; seen.add(k); found.push({ ...f, date: p.time, title, link: p.link, source: p.source || p.src }); } };
+  const feed = await call(news, 'https://watchdawg.local/', '/.netlify/functions/news').catch(() => ({ items: [] }));
+  for (const p of feed.items || []) take(p, p.text);
+  await Promise.all(CDS_NAMES.map(async ([, label]) => {
+    const q = encodeURIComponent(`"${label}" ("credit default swap" OR "credit-default swap" OR CDS) when:14d`);
+    try {
+      const x = await fetch(`https://news.google.com/rss/search?q=${q}&hl=en-US&gl=US&ceid=US:en`, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(12000) }).then((r) => r.text());
+      for (const p of parseRss(x, 'Google News')) take(p, p.text);
+    } catch (e) { /* one company's search failing is fine */ }
+  }));
+  const cds = mergeCds(read('cds.json', null), found);
+  write('cds.json', cds);
+  console.log(`CDS: ${found.length} quotes found, ${Object.keys(cds.names).length} companies tracked`);
+} catch (e) { errors['cds'] = String(e.message || e); }
 
 write('history.json', hist);
 // the data branch is only read through raw GitHub links: tell Vercel never to deploy it (each deploy counts
