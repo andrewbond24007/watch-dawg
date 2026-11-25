@@ -7,6 +7,16 @@ const SERIES = {
 // two decimals, worked out from the official index levels (BLS headlines round to one)
 const pct = (a, b) => (a != null && b) ? Math.round((a / b - 1) * 10000) / 100 : null;
 export default async (req) => {
+  const pu = new URL(req.url);
+  if (pu.searchParams.get('probe')) {
+    const urls = ['https://www.bea.gov/data/gdp/gross-domestic-product', 'https://www.bea.gov/data/personal-consumption-expenditures-price-index-excluding-food-and-energy', 'https://www.bea.gov/data/personal-consumption-expenditures-price-index', 'https://www.bea.gov/'];
+    const out = {};
+    await Promise.all(urls.map(async (u) => { try { const r = await fetch(u, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36' }, signal: AbortSignal.timeout(15000) }); const t = await r.text();
+      const txt = t.replace(/<script[\s\S]*?<\/script>/g, '').replace(/<[^>]+>/g, ' | ').replace(/\s+/g, ' ');
+      const hits = [...txt.matchAll(/.{0,160}(?:[+−-]\d+\.\d%).{0,120}/g)].slice(0, 6).map((m) => m[0]);
+      out[u] = { status: r.status, len: t.length, hits }; } catch (e) { out[u] = String(e); } }));
+    return new Response(JSON.stringify(out, null, 1), { headers: { 'content-type': 'application/json' } });
+  }
   let res, ok = false;
   try {
     const r = await fetch('https://api.bls.gov/publicAPI/v1/timeseries/data/', {
