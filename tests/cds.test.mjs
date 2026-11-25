@@ -9,6 +9,7 @@ test('CDS levels are read from reports, changes are not', () => {
   assert.deepEqual(extractCds('CoreWeave 5Y CDS hits 720bp as AI trade unwinds'), [{ id: 'coreweave', bp: 720 }]);
   assert.deepEqual(extractCds('Meta and Amazon CDS both widened to 100 bps'), []); // two companies in one sentence
   assert.deepEqual(extractCds('Oracle shares rise 5% after earnings'), []);
+  assert.deepEqual(extractCds('CoreWeave Five-Year CDS Spread Falls to 1,041.4 Basis Points'), [{ id: 'coreweave', bp: 1041.4 }]);
 });
 test('CDS history keeps one point per company per day', () => {
   let h = mergeCds(null, [{ id: 'oracle', bp: 290, date: '2026-11-24T10:00:00Z', title: 'a', link: 'x', source: 'R' }], new Date('2026-11-25'));
