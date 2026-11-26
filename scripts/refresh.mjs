@@ -6,7 +6,8 @@ import path from 'node:path';
 import health from '../netlify/functions/health.mjs';
 import housemap from '../netlify/functions/housemap.mjs';
 import nowcast from '../netlify/functions/nowcast.mjs';
-import rates from '../netlify/functions/rates.mjs';
+import rates, { FOMC, MPC, ECBM, US_CPI } from '../netlify/functions/rates.mjs';
+import { SCHEDULE, HEALTH } from '../netlify/functions/calendar.mjs';
 import news, { parseRss } from '../netlify/functions/news.mjs';
 import { CDS_NAMES, extractCds, mergeCds } from '../lib/cds.mjs';
 import { DTCC_NAMES, dtccUrl, parseCsv, printsFrom, buildDaily } from '../lib/dtcc.mjs';
@@ -171,10 +172,17 @@ try {
 } catch (e) { errors['cds'] = String(e.message || e); }
 
 if (!FAST) write('history.json', hist);
+// release dates that are typed in by hand: warn (through the source checks) when a list is about to run out
+const schedKeys = [];
+for (const [k, list] of Object.entries({ 'schedule:us_releases': SCHEDULE.map((e) => e.date), 'schedule:health': HEALTH.map((e) => e.date), 'schedule:fomc': FOMC, 'schedule:mpc': MPC, 'schedule:ecb': ECBM, 'schedule:us_cpi': US_CPI })) {
+  schedKeys.push(k);
+  const last = Math.max(...list.map((d) => Date.parse(d)));
+  if (last - Date.now() < 40 * 864e5) errors[k] = `dates run out on ${new Date(last).toISOString().slice(0, 10)}: add the next ones`;
+}
 // the data branch is only read through raw GitHub links: tell Vercel never to deploy it (each deploy counts
 // towards the free plan's 100 a day)
 fs.writeFileSync(path.join(dir, 'vercel.json'), JSON.stringify({ git: { deploymentEnabled: false } }));
-const status = updateStatus(read('status.json', {}), errors, [...Object.keys(SOURCE_NAMES), ...newsKeys].filter((k) => !FAST || /^(rates:|cds)/.test(k)));
+const status = updateStatus(read('status.json', {}), errors, [...Object.keys(SOURCE_NAMES), ...newsKeys, ...schedKeys].filter((k) => !FAST || /^(rates:|cds)/.test(k)));
 status.seconds = Math.round((Date.now() - t0) / 1000);
 write('status.json', status);
 const down = Object.entries(status.sources).filter(([, v]) => !v.ok);
