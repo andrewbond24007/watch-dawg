@@ -28,3 +28,7 @@ test('sign follows the previous level', () => {
   assert.equal(levelOf({ q: [], c: [[190, 20]] }, 30)[0], 20);
   assert.equal(levelOf({ q: [], c: [[190, 20]] }, 150)[0], 190);
 });
+test('a lone off-scale print is skipped and does not flip the next day', () => {
+  const d = buildDaily({ '2026-11-17': { x: { q: [49], c: [] } }, '2026-11-18': { x: { q: [], c: [[13075, 13000]] } }, '2026-11-19': { x: { q: [], c: [[166, 52]] } } });
+  assert.deepEqual(d.x.map((r) => r[1]), [49, 52]);
+});
