@@ -11,6 +11,23 @@ import { SCHEDULE, HEALTH } from '../netlify/functions/calendar.mjs';
 import news, { parseRss } from '../netlify/functions/news.mjs';
 import { CDS_NAMES, extractCds, mergeCds } from '../lib/cds.mjs';
 import { mergeArchive } from '../lib/newsarchive.mjs';
+import { updateMood, dayMood, londonDay } from '../lib/sentiment.mjs';
+// days before the archive began: score each from that day's market headlines on Google News (a few days per run)
+async function backfillMood(mood) {
+  const todo = [];
+  for (let i = 1; i <= 120 && todo.length < 25; i++) { const d = londonDay(new Date(Date.now() - i * 864e5).toISOString()); if (!mood.days[d]) todo.push(d); }
+  for (const d of todo) {
+    const next = new Date(Date.parse(d + 'T12:00:00Z') + 864e5).toISOString().slice(0, 10), items = [];
+    for (const q of ['stocks OR "stock market" OR "Wall Street"', 'bitcoin OR crypto OR markets OR Fed']) {
+      try {
+        const x = await fetch(`https://news.google.com/rss/search?q=${encodeURIComponent(`${q} after:${d} before:${next}`)}&hl=en-US&gl=US&ceid=US:en`, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(12000) }).then((r) => r.text());
+        for (const p of parseRss(x, 'Google News')) if (londonDay(p.time) === d) items.push(p);
+      } catch (e) { /* try again next run */ }
+      await new Promise((r) => setTimeout(r, 300));
+    }
+    if (items.length >= 15) mood.days[d] = { ...dayMood(items), src: 'search' };
+  }
+}
 import { DTCC_NAMES, dtccUrl, parseCsv, printsFrom, buildDaily } from '../lib/dtcc.mjs';
 import { execFileSync } from 'node:child_process';
 import os from 'node:os';
@@ -111,7 +128,14 @@ try {
   const take = (p, title) => { for (const f of extractCds(title)) { const k = f.id + f.bp + p.time.slice(0, 13); if (seen.has(k)) continue; seen.add(k); found.push({ ...f, date: p.time, title, link: p.link, source: p.source || p.src }); } };
   const feed = await call(news, 'https://watchdawg.local/', '/.netlify/functions/news').catch(() => ({ items: [] }));
   // a week of stories for the News tab (every pass, so fast Telegram channels don't slip past between runs)
-  if (feed.items?.length) { const a = mergeArchive(read('news-archive.json', null), feed.items); write('news-archive.json', a); console.log(`news archive: ${a.items.length} stories`); }
+  if (feed.items?.length) {
+    const a = mergeArchive(read('news-archive.json', null), feed.items); write('news-archive.json', a);
+    // daily news mood (bullish/bearish, 0-100) for the News tab calendar
+    const mood = updateMood(read('news-mood.json', null), a.items);
+    if (!FAST) await backfillMood(mood);
+    write('news-mood.json', mood);
+    console.log(`news archive: ${a.items.length} stories; mood today ${mood.days[londonDay(new Date().toISOString())]?.s ?? '-'}, ${Object.keys(mood.days).length} days`);
+  }
   for (const p of FAST ? [] : feed.items || []) take(p, p.text);
   // news feeds that returned nothing (blocked, renamed or closed) show up in the source checks
   if (!FAST) for (const [k, n] of Object.entries(feed.sources || {})) { newsKeys.push('news:' + k); if (!n) errors['news:' + k] = 'no posts returned'; }

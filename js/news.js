@@ -1,5 +1,5 @@
 /* ---------- news + big events (own cards) ---------- */
-let NEWS={items:[],at:0,busy:false,err:false,arch:[],archAt:0},newsDays=2,CAL={events:[],at:0,busy:false,err:false},newsMode='headlines';
+let NEWS={items:[],at:0,busy:false,err:false,arch:[],archAt:0},CAL={events:[],at:0,busy:false,err:false},newsMode='headlines';
 const SRC={WatcherGuru:{n:'Watcher Guru',c:'#d99a00',i:'WG'},WalterBloomberg:{n:'Walter Bloomberg',c:'#2f6fde',i:'WB'},financialjuice:{n:'FinancialJuice',c:'#e2462f',i:'FJ'},marketfeed:{n:'Market Feed',c:'#15806b',i:'MF'},unfolded:{n:'Unfolded',c:'#8a4fd8',i:'UF'},bwenews:{n:'BWEnews',c:'#c2410c',i:'BW'},cointelegraph:{n:'Cointelegraph',c:'#3d8f3d',i:'CT'}};
 const CRYPTO_RX=/\$(BTC|ETH|SOL|XRP|DOGE|BNB|ADA|USDT|USDC|LKY)\b|bitcoin|ethereum|solana|luckycoin|crypto|stablecoin|binance|coinbase|blockchain|memecoin|tokeni[sz]/i;
 function timeAgo(t){const s=(Date.now()-new Date(t))/1000;if(s<60)return 'just now';if(s<3600)return Math.floor(s/60)+'m ago';if(s<86400)return Math.floor(s/3600)+'h ago';return Math.floor(s/86400)+'d ago';}
@@ -121,10 +121,10 @@ function newsRow(t){
 async function loadNewsArchive(){
  if(NEWS.archBusy||Date.now()-NEWS.archAt<10*60e3)return;NEWS.archBusy=true;
  try{const j=await fetch('/data/news-archive.json?t='+Math.floor(Date.now()/3e5)).then(r=>r.ok?r.json():null);if(j&&Array.isArray(j.items)){NEWS.arch=j.items;NEWS.archAt=Date.now();}}catch(e){}
- NEWS.archBusy=false;if(activeTab==='news'&&newsMode!=='calendar')renderNewsTab();
+ NEWS.archBusy=false;if(activeTab==='news'&&newsMode==='headlines')renderNewsTab();
 }
-// live stories plus archived ones from the chosen number of days (newest copy of each wins)
-function newsPool(){const cut=Date.now()-newsDays*864e5,seen=new Set(),out=[];
+// live stories plus archived ones, for 48 hours after each story came out (newest copy of each wins)
+function newsPool(){const cut=Date.now()-48*3600e3,seen=new Set(),out=[];
  for(const p of [...NEWS.items,...NEWS.arch]){if(Date.parse(p.time)<cut)continue;const k=p.id||p.link||p.text;if(seen.has(k))continue;seen.add(k);out.push(p);}
  return out;}
 async function loadNews(force){
@@ -263,9 +263,46 @@ function renderNewsCats(){
  const day2=Date.now()-48*3600e3,recent=NEWS.items.filter(p=>new Date(p.time)>day2);
  el.innerHTML=NCATS.map(([k,l])=>{const n=k==='all'?recent.length:recent.filter(p=>inCat(p,k)).length;return `<button data-c="${k}" class="${k===newsCat?'on':''}" aria-pressed="${k===newsCat}">${l}${n?` <span>${n}</span>`:''}</button>`;}).join('');
 }
-$('newsCats').addEventListener('click',e=>{const b=e.target.closest('button');if(!b||b.dataset.c===newsCat)return;newsCat=b.dataset.c;newsShown=40;newsDays=2;store.set('wd.newscat',newsCat);buzz();renderNewsTab();});
+$('newsCats').addEventListener('click',e=>{const b=e.target.closest('button');if(!b||b.dataset.c===newsCat)return;newsCat=b.dataset.c;newsShown=40;store.set('wd.newscat',newsCat);buzz();renderNewsTab();});
+/* News mood: was the day's market news bullish or bearish? 0-100, worked out by the scheduled refresh */
+let MOOD={data:null,at:0},moodMonth=null,moodSel=null;
+async function loadMood(){if(Date.now()-MOOD.at<5*60e3)return;MOOD.at=Date.now();
+ try{const j=await fetch('/data/news-mood.json?t='+Math.floor(Date.now()/3e5)).then(r=>r.ok?r.json():null);if(j&&j.days){MOOD.data=j;if(activeTab==='news'&&newsMode==='mood')renderNewsTab();}}catch(e){MOOD.at=0;}}
+const MOODC=['#d03b3b','#ef7d32','#a3a3a3','#8bc34a','#0ca30c'];
+const moodBand=s=>s<25?0:s<45?1:s<=55?2:s<=75?3:4;
+const moodLab=s=>['Very bearish','Bearish','Neutral','Bullish','Very bullish'][moodBand(s)];
+const ldnDay=d=>new Date(d).toLocaleDateString('en-CA',{timeZone:'Europe/London'});
+function moodGauge(v){const cx=74,cy=76,R=62,pt=a=>[cx+R*Math.cos(a),cy-R*Math.sin(a)];let arcs='';
+ for(let i=0;i<5;i++){const a1=Math.PI-i*Math.PI/5-0.03,a2=Math.PI-(i+1)*Math.PI/5+0.03;const[p1,q1]=pt(a1),[p2,q2]=pt(a2);arcs+=`<path d="M${p1.toFixed(1)} ${q1.toFixed(1)} A${R} ${R} 0 0 1 ${p2.toFixed(1)} ${q2.toFixed(1)}" stroke="${MOODC[i]}" stroke-width="13" fill="none" stroke-linecap="round"/>`;}
+ return `<svg viewBox="0 0 148 86" aria-hidden="true">${arcs}<g class="needle" style="transform:rotate(${-90+v*1.8}deg);transform-origin:${cx}px ${cy}px"><path d="M${cx-4} ${cy} L${cx} ${cy-52} L${cx+4} ${cy} Z" fill="var(--ink)"/><circle cx="${cx}" cy="${cy}" r="6" fill="var(--ink)"/></g></svg>`;}
+function moodDetail(d,m){if(!m)return `<div class="mdet"><b>${new Date(d+'T12:00:00Z').toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'})}</b><p class="hint">No score for this day.</p></div>`;
+ const li=a=>a.map(x=>`<li>${x.l?`<a href="${esc(x.l)}" target="_blank" rel="noopener">${esc(calm(x.t))}</a>`:esc(calm(x.t))}</li>`).join('');
+ return `<div class="mdet"><div class="mhead"><b>${new Date(d+'T12:00:00Z').toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'})}</b><span class="mpill" style="background:${MOODC[moodBand(m.s)]}">${m.s} · ${moodLab(m.s)}</span></div>
+  <p class="hint">${m.live?'So far today: ':''}${m.n} stories read, ${m.k} with a clear lean (bullish weight ${m.b}, bearish ${m.r})${m.src==='search'?'. Scored from that day’s market headlines on Google News (before the full feed was kept)':''}.</p>
+  ${m.up?.length?`<div class="mlist up"><small>Most bullish</small><ul>${li(m.up)}</ul></div>`:''}${m.dn?.length?`<div class="mlist dn"><small>Most bearish</small><ul>${li(m.dn)}</ul></div>`:''}</div>`;}
+function renderMood(box){
+ loadMood();const D=MOOD.data?.days;if(!D){box.innerHTML='<div class="empty">Loading the news mood…</div>';return;}
+ const today=ldnDay(Date.now()),t=D[today],yd=D[ldnDay(Date.now()-864e5)];
+ const last7=Object.keys(D).sort().filter(k=>k<today).slice(-7).map(k=>D[k].s),avg7=last7.length?Math.round(last7.reduce((a,b)=>a+b,0)/last7.length):null;
+ if(!moodMonth)moodMonth=today.slice(0,7);if(!moodSel)moodSel=today;
+ const [y,m]=moodMonth.split('-').map(Number),first=new Date(Date.UTC(y,m-1,1)),days=new Date(Date.UTC(y,m,0)).getUTCDate(),lead=(first.getUTCDay()+6)%7;
+ let cells='';for(let i=0;i<lead;i++)cells+='<span></span>';
+ for(let d=1;d<=days;d++){const k=`${moodMonth}-${String(d).padStart(2,'0')}`,x=D[k],fut=k>today;
+  cells+=`<button class="mcell${k===today?' today':''}${k===moodSel?' sel':''}${x?'':' none'}" data-d="${k}" ${fut?'disabled':''} style="${x?`--c:${MOODC[moodBand(x.s)]}`:''}" aria-label="${k}${x?': '+x.s+' '+moodLab(x.s):''}"><i>${d}</i>${x?`<b>${x.s}</b>`:''}</button>`;}
+ const has=k=>Object.keys(D).some(d=>d.startsWith(k));
+ const pm=new Date(Date.UTC(y,m-2,1)).toISOString().slice(0,7),nm=new Date(Date.UTC(y,m,1)).toISOString().slice(0,7);
+ box.innerHTML=`${t?`<div class="card fng mood"><div>${moodGauge(t.s)}</div><div><div class="hint">News mood today</div><div class="val num" style="color:${MOODC[moodBand(t.s)]}">${t.s}</div><div class="cls">${moodLab(t.s)}</div><div class="hist num">${yd?`Yesterday ${yd.s}`:''}${avg7!=null?` · 7-day average ${avg7}`:''}</div></div></div>`:''}
+  <div class="card mcal"><div class="mnav"><button class="iconbtn" id="mPrev" ${has(pm)?'':'disabled'} aria-label="Previous month">‹</button><b>${first.toLocaleDateString('en-GB',{month:'long',year:'numeric',timeZone:'UTC'})}</b><button class="iconbtn" id="mNext" ${nm<=today.slice(0,7)?'':'disabled'} aria-label="Next month">›</button></div>
+  <div class="mgrid mwk">${['M','T','W','T','F','S','S'].map(x=>`<span>${x}</span>`).join('')}</div><div class="mgrid">${cells}</div>
+  <div class="mkey">${[0,1,2,3,4].map(i=>`<span><i style="background:${MOODC[i]}"></i>${['Very bearish','Bearish','Neutral','Bullish','Very bullish'][i]}</span>`).join('')}</div></div>
+  ${moodDetail(moodSel,D[moodSel])}
+  <p class="hint" style="margin-top:10px">Every headline and post is read for market words: moves (surges, plunges), results (beats, misses, record high), policy (rate cut, hike, tariffs) and shocks (war, default, hack). A rise in something bad for markets, like yields, inflation or oil, counts as bearish. The score is the bullish share of those signals: 50 is balanced. Days are UK days; today’s score moves as the news comes in.</p>`;
+ box.querySelectorAll('.mcell[data-d]').forEach(b=>b.onclick=()=>{moodSel=b.dataset.d;buzz();renderNewsTab();});
+ const pv=$('mPrev'),nx=$('mNext');if(pv)pv.onclick=()=>{moodMonth=pm;buzz();renderNewsTab();};if(nx)nx.onclick=()=>{moodMonth=nm;buzz();renderNewsTab();};
+}
 function renderNewsTab(){
  if(activeTab!=='news')return;const box=$('newsBox');renderNewsCats();
+ if(newsMode==='mood'){$('newsHint').textContent='How bullish or bearish each day’s market news was, out of 100. Tap a day to see the stories that moved it.';renderMood(box);return;}
  if(newsMode==='calendar'){
   $('newsHint').textContent='High-impact releases and central-bank decisions in UK time. This week’s come from the Forex Factory calendar with forecasts; later dates come from the official BLS, Fed, BEA, Bank of England and ECB schedules. Highlighted cards are the big market movers.';
   const start=new Date();start.setHours(0,0,0,0);
@@ -283,7 +320,7 @@ function renderNewsTab(){
   const eb=$('earlierBtn');if(eb)eb.onclick=()=>{showEarlier=!showEarlier;buzz();renderNewsTab();};
   loadActuals();loadReactions();
  }else{
-  $('newsHint').textContent='The last 48 hours (earlier days kept for a week, at the bottom) from fast news accounts (Watcher Guru, FinancialJuice and others, via their public Telegram channels) and headlines from CNBC, Reuters, Bloomberg, the FT, MarketWatch, BBC, CoinDesk, HousingWire and more. Reports on the same story are grouped into one, with the most widely covered at the top; tap a story’s sources to see who reported what, and when. Updates every 2 minutes. Tap one to open it.';
+  $('newsHint').textContent='The last 48 hours from fast news accounts (Watcher Guru, FinancialJuice and others, via their public Telegram channels) and headlines from CNBC, Reuters, Bloomberg, the FT, MarketWatch, BBC, CoinDesk, HousingWire and more. Reports on the same story are grouped into one, with the most widely covered at the top; tap a story’s sources to see who reported what, and when. Updates every 2 minutes. Tap one to open it.';
   loadNewsArchive();
   const pool=newsPool(),items=pool.filter(p=>inCat(p,newsCat)),label=NCATS.find(c=>c[0]===newsCat)?.[1]||'All';
   if(!NEWS.items.length){box.innerHTML=`<div class="empty">${NEWS.err?'News can’t load in this viewer.':'Loading news…'}</div>`;return;}
@@ -299,12 +336,9 @@ function renderNewsTab(){
   let cur='';shown.forEach(t=>{const b=bucket(t);if(b!==cur){html+=(cur?'</div>':'')+`<div class="day">${b}</div><div class="nlist">`;cur=b;}html+=newsRow(t);});
   if(cur)html+='</div>';
   if(more>0)html+=`<button class="linkbtn earlier" id="newsMore">Show more (${more} left)</button>`;
-  // older days stay out of the way until asked for, one day at a time (a week is kept)
-  else if(newsDays<7&&NEWS.arch.some(p=>Date.parse(p.time)<now-newsDays*864e5)){const d=new Date(now-newsDays*864e5);html+=`<button class="linkbtn earlier" id="newsDay">Show ${d.toLocaleDateString('en-GB',{weekday:'long'})}’s stories</button>`;}
   box.innerHTML=html;
   box.querySelectorAll('.scf').forEach(b=>b.onclick=()=>{const l=b.nextElementSibling,o=l.hidden;l.hidden=!o;b.setAttribute('aria-expanded',o);buzz();});
   const nm=$('newsMore');if(nm)nm.onclick=()=>{newsShown+=40;buzz();renderNewsTab();};
-  const nd=$('newsDay');if(nd)nd.onclick=()=>{newsDays++;newsShown+=40;buzz();renderNewsTab();};
  }
 }
 $('newsSeg').addEventListener('click',e=>{const b=e.target.closest('button');if(!b||b.dataset.n===newsMode)return;newsMode=b.dataset.n;clearNewsDot();[...$('newsSeg').children].forEach(x=>x.classList.toggle('on',x===b));buzz();renderNewsTab();window.scrollTo({top:0,behavior:'smooth'});});

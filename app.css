@@ -683,3 +683,29 @@ body.compact .list{gap:6px}
 .cdsch svg{width:100%;height:auto;display:block;overflow:visible}.cdsch .gl{stroke:var(--rule);stroke-width:1}.cdsch .gt{font-size:8.5px;fill:var(--muted)}
 .cdsleg{display:flex;flex-wrap:wrap;gap:6px 12px;margin:8px 4px 0;font-size:11.5px;color:var(--muted)}.cdsleg i,.cdsdot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:0}
 .cdssp{width:100%;height:26px;display:block;margin:2px 0 5px}
+
+/* news mood calendar */
+.mood{margin-top:0}
+.mcal{padding:12px 12px 10px;margin-top:10px}
+.mnav{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.mnav b{font-size:15px}
+.mnav .iconbtn{font-size:22px;line-height:1;width:34px;height:34px}
+.mnav .iconbtn:disabled{opacity:.3}
+.mgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.mwk span{text-align:center;font-size:11px;color:var(--muted);font-weight:700;padding-bottom:2px}
+.mcell{aspect-ratio:1;border:0;border-radius:10px;background:color-mix(in srgb,var(--c,transparent) 22%,var(--card2,transparent));color:var(--ink);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:0;font:inherit}
+.mcell i{font-style:normal;font-size:11px;color:var(--muted)}
+.mcell b{font-size:14px;font-weight:800;color:var(--c)}
+.mcell.none{background:transparent}
+.mcell:disabled{opacity:.35}
+.mcell.today{outline:2px solid var(--accent);outline-offset:-2px}
+.mcell.sel{box-shadow:inset 0 0 0 2px var(--ink)}
+.mkey{display:flex;flex-wrap:wrap;gap:6px 12px;margin-top:10px;font-size:11.5px;color:var(--muted)}
+.mkey i{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:4px;vertical-align:-1px}
+.mdet{margin-top:12px}
+.mhead{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.mpill{color:#fff;font-weight:800;font-size:12.5px;border-radius:999px;padding:3px 10px;white-space:nowrap}
+.mlist small{display:block;font-weight:800;font-size:12px;margin:10px 0 4px}
+.mlist.up small{color:var(--up)}.mlist.dn small{color:var(--down)}
+.mlist ul{margin:0;padding-left:18px}.mlist li{font-size:13.5px;line-height:1.4;margin:3px 0}
+.mlist a{color:inherit}
