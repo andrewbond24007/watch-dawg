@@ -9,6 +9,24 @@ import nowcast from '../netlify/functions/nowcast.mjs';
 import rates from '../netlify/functions/rates.mjs';
 import news, { parseRss } from '../netlify/functions/news.mjs';
 import { CDS_NAMES, extractCds, mergeCds } from '../lib/cds.mjs';
+import { DTCC_NAMES, dtccUrl, parseCsv, printsFrom, buildDaily } from '../lib/dtcc.mjs';
+import { execFileSync } from 'node:child_process';
+import os from 'node:os';
+// one day's DTCC credit trades, only the rows naming a tracked company (the files hold every credit swap)
+const DTCC_RX = /oracle|coreweave|meta platforms|amazon|microsoft|alphabet|google|broadcom|nvidia|advanced micro|space exploration|6EC42L|239FAV|0C27GT|1C248K|6D76CM|0C5448/i;
+async function dtccDay(ymd) {
+  const r = await fetch(dtccUrl(ymd), { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(60000) });
+  if (r.status === 404 || r.status === 400) return null;
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  const buf = Buffer.from(await r.arrayBuffer());
+  if (buf.slice(0, 2).toString() !== 'PK') return null;
+  const f = path.join(os.tmpdir(), `dtcc-${ymd}.zip`); fs.writeFileSync(f, buf);
+  try {
+    const text = execFileSync('unzip', ['-p', f], { maxBuffer: 1 << 30 }).toString();
+    const lines = text.split('\n'); const keep = [lines[0], ...lines.slice(1).filter((l) => DTCC_RX.test(l))];
+    return parseCsv(keep.join('\n'));
+  } finally { fs.rmSync(f, { force: true }); }
+}
 import { appendHistory, mergeHistory, updateStatus, keepMissing, SOURCE_NAMES } from '../lib/history.mjs';
 
 const dir = process.argv[2] || 'data-branch';
@@ -108,6 +126,29 @@ try {
   }
   const cds = mergeCds(prevCds, found);
   if (!prevCds?.backfilled) cds.backfilled = new Date().toISOString();
+  // traded levels from DTCC's public swap tape: one file per day; the last few days are re-read each run (late
+  // reports), and the past year is filled in a chunk per run so no single run takes long
+  try {
+    const days = read('cds-trades.json', {}); // raw daily prints, kept apart so the app's file stays small
+    const want = [];
+    for (let i = 0; i < 380; i++) { const d = new Date(Date.now() - i * 864e5); if (d.getUTCDay() % 6 === 0) continue; const ymd = d.toISOString().slice(0, 10); if (i < 4 || !(ymd in days)) want.push(ymd); }
+    const todo = want.slice(0, 30);
+    let got = 0;
+    for (let i = 0; i < todo.length; i += 5) {
+      await Promise.all(todo.slice(i, i + 5).map(async (ymd) => {
+        try {
+          const rows = await dtccDay(ymd);
+          if (rows) { days[ymd] = printsFrom(rows); got++; } else if (Date.now() - Date.parse(ymd) > 4 * 864e5) days[ymd] = {}; // holiday: no file
+        } catch (e) { console.warn(`DTCC ${ymd}: ${e.message}`); }
+      }));
+    }
+    write('cds-trades.json', days);
+    const anchors = Object.fromEntries(Object.entries(cds.names).map(([id, v]) => [id, v.points || []]));
+    const daily = buildDaily(days, anchors);
+    for (const [id, s] of Object.entries(daily)) { const label = (DTCC_NAMES.find((x) => x[0] === id) || [])[1]; (cds.names[id] ||= { label, points: [] }).daily = s; }
+    cds.dtccAt = new Date().toISOString();
+    console.log(`CDS: DTCC ${got}/${todo.length} days read, ${Object.keys(days).length} stored, ${Object.keys(daily).length} companies with traded levels`);
+  } catch (e) { errors['cds:dtcc'] = String(e.message || e); }
   write('cds.json', cds);
   console.log(`CDS: ${found.length} quotes found, ${Object.keys(cds.names).length} companies tracked`);
 } catch (e) { errors['cds'] = String(e.message || e); }
