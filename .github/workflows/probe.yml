@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       path:
-        description: Path on the live app (e.g. /.netlify/functions/actuals) or a full https URL; prefix raw: for script URLs, head: for cache headers
+        description: "Path on the live app or a full https URL (prefix raw for script URLs, head for cache headers)"
         required: true
       grep:
         description: For zip files, a pattern to pick rows (case-insensitive)
