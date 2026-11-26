@@ -2,7 +2,7 @@
 // (1) searches inside the Telegram channels that mirror the X accounts and
 // (2) Google News headlines from the last couple of days.
 // e.g. ?q=Silver,XAG&hours=48
-const CHANNELS = ['WalterBloomberg', 'WatcherGuru'];
+const CHANNELS = ['WatcherGuru', 'financialjuice'];
 const ENT = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' };
 const decode = (s) => s.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
   .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(+n))

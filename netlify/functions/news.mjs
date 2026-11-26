@@ -8,8 +8,9 @@ const UA = { 'User-Agent': 'Mozilla/5.0 (compatible; WatchDawg/1.0)', 'Accept-La
 const get = (u, ms = 9000) => fetch(u, { headers: UA, signal: AbortSignal.timeout(ms) }).then((r) => { if (!r.ok) throw new Error(r.status); return r.text(); });
 
 // channel: pages of history to read (each page is about 20 posts), category hint
+// (WalterBloomberg was dropped in Nov 2026: Telegram marked it as a fake channel and stopped showing its posts)
 export const CHANNELS = [
-  ['WalterBloomberg', 2], ['WatcherGuru', 2], ['financialjuice', 2],
+  ['WatcherGuru', 2], ['financialjuice', 3],
   ['marketfeed', 1], ['unfolded', 1, 'crypto'], ['bwenews', 1, 'crypto'], ['cointelegraph', 1, 'crypto'],
 ];
 const GN = (q) => `https://news.google.com/rss/search?q=${encodeURIComponent(q + ' when:2d')}&hl=en-GB&gl=GB&ceid=GB:en`;

@@ -50,6 +50,7 @@ const call = async (fn, url, remotePath) => {
 // FAST=1: the quick pass run between full refreshes (rates, odds and today's CDS trades only)
 const FAST = process.env.FAST === '1';
 const hist = read('history.json', {});
+const newsKeys = [];
 const errors = {};
 const t0 = Date.now();
 
@@ -108,6 +109,8 @@ try {
   const take = (p, title) => { for (const f of extractCds(title)) { const k = f.id + f.bp + p.time.slice(0, 13); if (seen.has(k)) continue; seen.add(k); found.push({ ...f, date: p.time, title, link: p.link, source: p.source || p.src }); } };
   const feed = FAST ? { items: [] } : await call(news, 'https://watchdawg.local/', '/.netlify/functions/news').catch(() => ({ items: [] }));
   for (const p of feed.items || []) take(p, p.text);
+  // news feeds that returned nothing (blocked, renamed or closed) show up in the source checks
+  for (const [k, n] of Object.entries(feed.sources || {})) { newsKeys.push('news:' + k); if (!n) errors['news:' + k] = 'no posts returned'; }
   if (!FAST) await Promise.all(CDS_NAMES.map(async ([, label]) => {
     // two searches per company over the last month; headlines and the related-coverage snippets are both read
     for (const q0 of [`"${label}" ("credit default swap" OR "credit-default swap" OR "default swaps") when:30d`, `"${label}" CDS (bps OR "basis points") when:30d`]) {
@@ -171,7 +174,7 @@ if (!FAST) write('history.json', hist);
 // the data branch is only read through raw GitHub links: tell Vercel never to deploy it (each deploy counts
 // towards the free plan's 100 a day)
 fs.writeFileSync(path.join(dir, 'vercel.json'), JSON.stringify({ git: { deploymentEnabled: false } }));
-const status = updateStatus(read('status.json', {}), errors, Object.keys(SOURCE_NAMES).filter((k) => !FAST || /^(rates:|cds)/.test(k)));
+const status = updateStatus(read('status.json', {}), errors, [...Object.keys(SOURCE_NAMES), ...newsKeys].filter((k) => !FAST || /^(rates:|cds)/.test(k)));
 status.seconds = Math.round((Date.now() - t0) / 1000);
 write('status.json', status);
 const down = Object.entries(status.sources).filter(([, v]) => !v.ok);
