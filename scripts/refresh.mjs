@@ -10,6 +10,7 @@ import rates, { FOMC, MPC, ECBM, US_CPI } from '../netlify/functions/rates.mjs';
 import { SCHEDULE, HEALTH } from '../netlify/functions/calendar.mjs';
 import news, { parseRss } from '../netlify/functions/news.mjs';
 import { CDS_NAMES, extractCds, mergeCds } from '../lib/cds.mjs';
+import { mergeArchive } from '../lib/newsarchive.mjs';
 import { DTCC_NAMES, dtccUrl, parseCsv, printsFrom, buildDaily } from '../lib/dtcc.mjs';
 import { execFileSync } from 'node:child_process';
 import os from 'node:os';
@@ -108,10 +109,12 @@ try {
 try {
   const found = [], seen = new Set();
   const take = (p, title) => { for (const f of extractCds(title)) { const k = f.id + f.bp + p.time.slice(0, 13); if (seen.has(k)) continue; seen.add(k); found.push({ ...f, date: p.time, title, link: p.link, source: p.source || p.src }); } };
-  const feed = FAST ? { items: [] } : await call(news, 'https://watchdawg.local/', '/.netlify/functions/news').catch(() => ({ items: [] }));
-  for (const p of feed.items || []) take(p, p.text);
+  const feed = await call(news, 'https://watchdawg.local/', '/.netlify/functions/news').catch(() => ({ items: [] }));
+  // a week of stories for the News tab (every pass, so fast Telegram channels don't slip past between runs)
+  if (feed.items?.length) { const a = mergeArchive(read('news-archive.json', null), feed.items); write('news-archive.json', a); console.log(`news archive: ${a.items.length} stories`); }
+  for (const p of FAST ? [] : feed.items || []) take(p, p.text);
   // news feeds that returned nothing (blocked, renamed or closed) show up in the source checks
-  for (const [k, n] of Object.entries(feed.sources || {})) { newsKeys.push('news:' + k); if (!n) errors['news:' + k] = 'no posts returned'; }
+  if (!FAST) for (const [k, n] of Object.entries(feed.sources || {})) { newsKeys.push('news:' + k); if (!n) errors['news:' + k] = 'no posts returned'; }
   if (!FAST) await Promise.all(CDS_NAMES.map(async ([, label]) => {
     // two searches per company over the last month; headlines and the related-coverage snippets are both read
     for (const q0 of [`"${label}" ("credit default swap" OR "credit-default swap" OR "default swaps") when:30d`, `"${label}" CDS (bps OR "basis points") when:30d`]) {

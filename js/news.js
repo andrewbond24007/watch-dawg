@@ -1,5 +1,5 @@
 /* ---------- news + big events (own cards) ---------- */
-let NEWS={items:[],at:0,busy:false,err:false},CAL={events:[],at:0,busy:false,err:false},newsMode='headlines';
+let NEWS={items:[],at:0,busy:false,err:false,arch:[],archAt:0},newsDays=2,CAL={events:[],at:0,busy:false,err:false},newsMode='headlines';
 const SRC={WatcherGuru:{n:'Watcher Guru',c:'#d99a00',i:'WG'},WalterBloomberg:{n:'Walter Bloomberg',c:'#2f6fde',i:'WB'},financialjuice:{n:'FinancialJuice',c:'#e2462f',i:'FJ'},marketfeed:{n:'Market Feed',c:'#15806b',i:'MF'},unfolded:{n:'Unfolded',c:'#8a4fd8',i:'UF'},bwenews:{n:'BWEnews',c:'#c2410c',i:'BW'},cointelegraph:{n:'Cointelegraph',c:'#3d8f3d',i:'CT'}};
 const CRYPTO_RX=/\$(BTC|ETH|SOL|XRP|DOGE|BNB|ADA|USDT|USDC|LKY)\b|bitcoin|ethereum|solana|luckycoin|crypto|stablecoin|binance|coinbase|blockchain|memecoin|tokeni[sz]/i;
 function timeAgo(t){const s=(Date.now()-new Date(t))/1000;if(s<60)return 'just now';if(s<3600)return Math.floor(s/60)+'m ago';if(s<86400)return Math.floor(s/3600)+'h ago';return Math.floor(s/86400)+'d ago';}
@@ -117,7 +117,18 @@ function newsRow(t){
  return `<div class="nr"><a href="${esc(h.link)}" target="_blank" rel="noopener"><span class="nt">${hm(h.time)}</span><span class="nb"><span class="ns"><i style="background:${o.c}"></i>${esc(o.n)}${t.brk?' <em class="brk">Breaking</em>':''}</span><span class="nh">${richText(txt)}</span>${more?`<span class="nm">${esc(more)}</span>`:''}</span>${h.img?`<img src="${esc(h.img)}" alt="" loading="lazy" onerror="this.remove()">`:''}</a>
   ${t.n>1?`<button class="scf mini" aria-expanded="false">${avStack(t.all,3)}<span>${ns>1?`Also ${ns-1} other source${ns>2?'s':''}`:`${t.n} updates`}</span><span class="ch">▾</span></button>${coverage(t)}`:''}</div>`;
 }
+/* the scheduled refresh keeps a week of stories, so ones a source has since dropped stay in the list */
+async function loadNewsArchive(){
+ if(NEWS.archBusy||Date.now()-NEWS.archAt<10*60e3)return;NEWS.archBusy=true;
+ try{const j=await fetch('/data/news-archive.json?t='+Math.floor(Date.now()/3e5)).then(r=>r.ok?r.json():null);if(j&&Array.isArray(j.items)){NEWS.arch=j.items;NEWS.archAt=Date.now();}}catch(e){}
+ NEWS.archBusy=false;if(activeTab==='news'&&newsMode!=='calendar')renderNewsTab();
+}
+// live stories plus archived ones from the chosen number of days (newest copy of each wins)
+function newsPool(){const cut=Date.now()-newsDays*864e5,seen=new Set(),out=[];
+ for(const p of [...NEWS.items,...NEWS.arch]){if(Date.parse(p.time)<cut)continue;const k=p.id||p.link||p.text;if(seen.has(k))continue;seen.add(k);out.push(p);}
+ return out;}
 async function loadNews(force){
+ if(activeTab==='news')loadNewsArchive();
  if(NEWS.busy)return;if(!force&&NEWS.at&&Date.now()-NEWS.at<90e3){renderAllNews();return;}
  NEWS.busy=true;
  try{const j=await fetch('/.netlify/functions/news').then(r=>r.json());if(Array.isArray(j.items)){NEWS.items=j.items;NEWS.at=Date.now();NEWS.err=false;}}catch(e){NEWS.err=true;}
@@ -252,7 +263,7 @@ function renderNewsCats(){
  const day2=Date.now()-48*3600e3,recent=NEWS.items.filter(p=>new Date(p.time)>day2);
  el.innerHTML=NCATS.map(([k,l])=>{const n=k==='all'?recent.length:recent.filter(p=>inCat(p,k)).length;return `<button data-c="${k}" class="${k===newsCat?'on':''}" aria-pressed="${k===newsCat}">${l}${n?` <span>${n}</span>`:''}</button>`;}).join('');
 }
-$('newsCats').addEventListener('click',e=>{const b=e.target.closest('button');if(!b||b.dataset.c===newsCat)return;newsCat=b.dataset.c;newsShown=40;store.set('wd.newscat',newsCat);buzz();renderNewsTab();});
+$('newsCats').addEventListener('click',e=>{const b=e.target.closest('button');if(!b||b.dataset.c===newsCat)return;newsCat=b.dataset.c;newsShown=40;newsDays=2;store.set('wd.newscat',newsCat);buzz();renderNewsTab();});
 function renderNewsTab(){
  if(activeTab!=='news')return;const box=$('newsBox');renderNewsCats();
  if(newsMode==='calendar'){
@@ -272,8 +283,9 @@ function renderNewsTab(){
   const eb=$('earlierBtn');if(eb)eb.onclick=()=>{showEarlier=!showEarlier;buzz();renderNewsTab();};
   loadActuals();loadReactions();
  }else{
-  $('newsHint').textContent='The last 48 hours from fast news accounts (Walter Bloomberg, Watcher Guru, FinancialJuice and others, via their public Telegram channels) and headlines from CNBC, Reuters, Bloomberg, the FT, MarketWatch, BBC, CoinDesk, HousingWire and more. Reports on the same story are grouped into one, with the most widely covered at the top; tap a story’s sources to see who reported what, and when. Updates every 2 minutes. Tap one to open it.';
-  const items=NEWS.items.filter(p=>inCat(p,newsCat)),label=NCATS.find(c=>c[0]===newsCat)?.[1]||'All';
+  $('newsHint').textContent='The last 48 hours (earlier days kept for a week, at the bottom) from fast news accounts (Watcher Guru, FinancialJuice and others, via their public Telegram channels) and headlines from CNBC, Reuters, Bloomberg, the FT, MarketWatch, BBC, CoinDesk, HousingWire and more. Reports on the same story are grouped into one, with the most widely covered at the top; tap a story’s sources to see who reported what, and when. Updates every 2 minutes. Tap one to open it.';
+  loadNewsArchive();
+  const pool=newsPool(),items=pool.filter(p=>inCat(p,newsCat)),label=NCATS.find(c=>c[0]===newsCat)?.[1]||'All';
   if(!NEWS.items.length){box.innerHTML=`<div class="empty">${NEWS.err?'News can’t load in this viewer.':'Loading news…'}</div>`;return;}
   if(!items.length){box.innerHTML=`<div class="empty">No ${esc(label.toLowerCase())} news in the latest posts.</div>`;return;}
   const day=Date.now()-24*3600e3;
@@ -287,9 +299,12 @@ function renderNewsTab(){
   let cur='';shown.forEach(t=>{const b=bucket(t);if(b!==cur){html+=(cur?'</div>':'')+`<div class="day">${b}</div><div class="nlist">`;cur=b;}html+=newsRow(t);});
   if(cur)html+='</div>';
   if(more>0)html+=`<button class="linkbtn earlier" id="newsMore">Show more (${more} left)</button>`;
+  // older days stay out of the way until asked for, one day at a time (a week is kept)
+  else if(newsDays<7&&NEWS.arch.some(p=>Date.parse(p.time)<now-newsDays*864e5)){const d=new Date(now-newsDays*864e5);html+=`<button class="linkbtn earlier" id="newsDay">Show ${d.toLocaleDateString('en-GB',{weekday:'long'})}’s stories</button>`;}
   box.innerHTML=html;
   box.querySelectorAll('.scf').forEach(b=>b.onclick=()=>{const l=b.nextElementSibling,o=l.hidden;l.hidden=!o;b.setAttribute('aria-expanded',o);buzz();});
   const nm=$('newsMore');if(nm)nm.onclick=()=>{newsShown+=40;buzz();renderNewsTab();};
+  const nd=$('newsDay');if(nd)nd.onclick=()=>{newsDays++;newsShown+=40;buzz();renderNewsTab();};
  }
 }
 $('newsSeg').addEventListener('click',e=>{const b=e.target.closest('button');if(!b||b.dataset.n===newsMode)return;newsMode=b.dataset.n;clearNewsDot();[...$('newsSeg').children].forEach(x=>x.classList.toggle('on',x===b));buzz();renderNewsTab();window.scrollTo({top:0,behavior:'smooth'});});
@@ -342,7 +357,7 @@ function renderSymbolNews(it,fetched){
  const pc=it.kind==='crypto'?cryptoData[it.id]?.pct:pctFor(it);
  $('chNewsH').textContent=items.length&&pc!=null&&Math.abs(pc)>=1.5?'Why it’s moving':'Latest news';
  const box=$('chNews');
- if(items.length)box.innerHTML=`<div class="posts">${items.map(p=>postCard(p,false)).join('')}</div><p class="hint" style="margin-top:8px">From the last 48 hours: Walter Bloomberg and Watcher Guru posts, plus news headlines.</p>`;
+ if(items.length)box.innerHTML=`<div class="posts">${items.map(p=>postCard(p,false)).join('')}</div><p class="hint" style="margin-top:8px">From the last 48 hours: Watcher Guru and FinancialJuice posts, plus news headlines.</p>`;
  else box.innerHTML=`<div class="empty">${fetched?'No news about '+esc(it.n||it.name)+' in the last 48 hours.':'Finding the latest news…'}</div>`;
  if(!fetched)loadAssetNews(it).then(()=>{if(chItem&&assetKey(chItem)===assetKey(it))renderSymbolNews(it,true);});
 }
