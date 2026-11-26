@@ -6,6 +6,10 @@ on:
       path:
         description: Path on the live app (e.g. /.netlify/functions/actuals) or a full https URL
         required: true
+      grep:
+        description: For zip files, a pattern to pick rows (case-insensitive)
+        required: false
+        default: ''
 jobs:
   probe:
     runs-on: ubuntu-latest
@@ -13,5 +17,6 @@ jobs:
       - run: |
           P="${{ inputs.path }}"; RAW=""; case "$P" in raw:*) RAW=1; P="${P#raw:}";; esac; case "$P" in http*) U="$P";; *) U="https://watch-dawg-78h1.vercel.app$P";; esac
           curl -sL -m 60 "$U" > /tmp/out
+          if head -c 2 /tmp/out | grep -q "PK"; then mkdir -p /tmp/z && cd /tmp/z && unzip -o -q /tmp/out && for f in *; do echo "== $f ($(wc -l < "$f") rows)"; head -1 "$f"; [ -n "${{ inputs.grep }}" ] && grep -i -E "${{ inputs.grep }}" "$f" | head -40; done; exit 0; fi
           if [ -n "$RAW" ]; then grep -o "[^\"' ]*\(api\|json\|csv\|\.js\)[^\"' ]*" /tmp/out | sort -u | head -80; head -c 6000 /tmp/out; exit 0; fi
           case "$(head -c 200 /tmp/out)" in *"<html"*|*"<!DOCTYPE"*) echo "(page text, tags removed)"; sed -e "s/<script[^>]*>.*<\/script>//g" /tmp/out | tr "\n" " " | sed -e "s/<[^>]*>/ /g" -e "s/  */ /g" | head -c 30000;; *) head -c 20000 /tmp/out; echo; echo "---TAIL---"; tail -c 1500 /tmp/out;; esac
