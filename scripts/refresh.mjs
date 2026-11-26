@@ -47,10 +47,13 @@ const call = async (fn, url, remotePath) => {
   const r = await fn(new Request(url)); return r.json();
 };
 
+// FAST=1: the quick pass run between full refreshes (rates, odds and today's CDS trades only)
+const FAST = process.env.FAST === '1';
 const hist = read('history.json', {});
 const errors = {};
 const t0 = Date.now();
 
+if (!FAST) {
 // health: built without history, history extended, then merged back in
 try {
   const h = await call(health, 'https://watchdawg.local/?nohist=1', '/.netlify/functions/health?nohist=1');
@@ -80,9 +83,20 @@ for (const a of ['uk', 'ni', 'us', 'ie', 'med']) {
 try { const n = await call(nowcast, 'https://watchdawg.local/', '/.netlify/functions/nowcast'); if (n.error) throw new Error(n.error); write('nowcast.json', n); }
 catch (e) { errors.nowcast = String(e.message || e); }
 
+}
+
 // rates and money: central banks, Fed futures, yields, mortgages, inflation
 try {
-  const r = await call(rates, 'https://watchdawg.local/', '/.netlify/functions/rates');
+  // US CPI (BLS) only when a release is due or the copy is over 8 hours old: its keyless API allows ~25 calls a day
+  const prevR = read('rates.json', null), pUs = (prevR?.inflation || []).filter((i) => i.id === 'uscpi' || i.id === 'uscore');
+  const blsDue = !pUs.length || !prevR.blsAt || Date.now() - Date.parse(prevR.blsAt) > 8 * 3600e3 || pUs.some((i) => i.next && Date.parse(i.next) < Date.now());
+  const q = blsDue ? '' : '?nobls=1';
+  const r = await call(rates, 'https://watchdawg.local/' + q, '/.netlify/functions/rates' + q);
+  if (!r.inflation?.some((i) => i.id === 'uscpi') && pUs.length) {
+    r.inflation = [...pUs, ...(r.inflation || [])]; r.blsAt = prevR.blsAt;
+    const fed = r.banks?.find((b) => b.id === 'fed'), c = pUs.find((i) => i.id === 'uscpi');
+    if (fed && c) fed.real = +((fed.effective ?? fed.value) - c.value).toFixed(2);
+  }
   for (const e of r.errors || []) { const [k, ...m] = String(e).split(': '); errors['rates:' + k] = m.join(': ') || e; }
   if (!r.banks?.length) throw new Error('no central-bank data');
   write('rates.json', r);
@@ -92,9 +106,9 @@ try {
 try {
   const found = [], seen = new Set();
   const take = (p, title) => { for (const f of extractCds(title)) { const k = f.id + f.bp + p.time.slice(0, 13); if (seen.has(k)) continue; seen.add(k); found.push({ ...f, date: p.time, title, link: p.link, source: p.source || p.src }); } };
-  const feed = await call(news, 'https://watchdawg.local/', '/.netlify/functions/news').catch(() => ({ items: [] }));
+  const feed = FAST ? { items: [] } : await call(news, 'https://watchdawg.local/', '/.netlify/functions/news').catch(() => ({ items: [] }));
   for (const p of feed.items || []) take(p, p.text);
-  await Promise.all(CDS_NAMES.map(async ([, label]) => {
+  if (!FAST) await Promise.all(CDS_NAMES.map(async ([, label]) => {
     // two searches per company over the last month; headlines and the related-coverage snippets are both read
     for (const q0 of [`"${label}" ("credit default swap" OR "credit-default swap" OR "default swaps") when:30d`, `"${label}" CDS (bps OR "basis points") when:30d`]) {
       try {
@@ -111,7 +125,7 @@ try {
   }));
   // first time only: fill in the past year from monthly Google News searches, so the charts have history
   const prevCds = read('cds.json', null);
-  if (!prevCds?.backfilled) {
+  if (!FAST && !prevCds?.backfilled) {
     const months = []; for (let i = 13; i >= 1; i--) { const a = new Date(); a.setUTCDate(1); a.setUTCMonth(a.getUTCMonth() - i); const b = new Date(a); b.setUTCMonth(b.getUTCMonth() + 1); months.push([a.toISOString().slice(0, 10), b.toISOString().slice(0, 10)]); }
     for (const [, label] of CDS_NAMES) {
       for (const [a, b] of months) {
@@ -132,7 +146,7 @@ try {
     const days = read('cds-trades.json', {}); // raw daily prints, kept apart so the app's file stays small
     const want = [];
     for (let i = 0; i < 380; i++) { const d = new Date(Date.now() - i * 864e5); if (d.getUTCDay() % 6 === 0) continue; const ymd = d.toISOString().slice(0, 10); if (i < 4 || !(ymd in days)) want.push(ymd); }
-    const todo = want.slice(0, 30);
+    const todo = want.slice(0, FAST ? 2 : 30);
     let got = 0;
     for (let i = 0; i < todo.length; i += 5) {
       await Promise.all(todo.slice(i, i + 5).map(async (ymd) => {
@@ -153,11 +167,11 @@ try {
   console.log(`CDS: ${found.length} quotes found, ${Object.keys(cds.names).length} companies tracked`);
 } catch (e) { errors['cds'] = String(e.message || e); }
 
-write('history.json', hist);
+if (!FAST) write('history.json', hist);
 // the data branch is only read through raw GitHub links: tell Vercel never to deploy it (each deploy counts
 // towards the free plan's 100 a day)
 fs.writeFileSync(path.join(dir, 'vercel.json'), JSON.stringify({ git: { deploymentEnabled: false } }));
-const status = updateStatus(read('status.json', {}), errors, Object.keys(SOURCE_NAMES));
+const status = updateStatus(read('status.json', {}), errors, Object.keys(SOURCE_NAMES).filter((k) => !FAST || /^(rates:|cds)/.test(k)));
 status.seconds = Math.round((Date.now() - t0) / 1000);
 write('status.json', status);
 const down = Object.entries(status.sources).filter(([, v]) => !v.ok);

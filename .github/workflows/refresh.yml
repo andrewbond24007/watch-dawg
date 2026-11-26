@@ -11,7 +11,7 @@ permissions:
 jobs:
   refresh:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 70
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -23,13 +23,15 @@ jobs:
         run: |
           git fetch origin data --depth=1 && git worktree add data-branch origin/data && (cd data-branch && git switch -c data) \
             || (git worktree add --detach data-branch && cd data-branch && git switch --orphan data && git rm -rfq . || true)
-      - run: node scripts/refresh.mjs data-branch
-      - name: Save
-        working-directory: data-branch
+      # one full refresh, then quick passes (rates, odds, today's CDS trades) every 15 minutes until the next run
+      # is due: GitHub often starts scheduled runs an hour or more apart, so this keeps the figures fresh anyway
+      - name: Refresh
         run: |
-          git config user.name "watchdawg-bot"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git diff --cached --quiet && exit 0
-          git commit -qm "Data refresh $(date -u +%FT%TZ)"
-          git push -q origin data
+          save() {
+            (cd data-branch && git config user.name "watchdawg-bot" && git config user.email "41898282+github-actions[bot]@users.noreply.github.com" \
+              && git add -A && { git diff --cached --quiet || { git commit -qm "Data refresh $(date -u +%FT%TZ)$1" && git push -q origin data; }; })
+          }
+          node scripts/refresh.mjs data-branch; save ""
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            for i in 1 2 3; do sleep 840; FAST=1 node scripts/refresh.mjs data-branch || true; save " (quick)"; done
+          fi

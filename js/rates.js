@@ -154,9 +154,9 @@ function renderRates(){
    detail:`<b>${esc(m.name)}</b><br>${m.id.startsWith('IUMBV')?rmonth(m.date):'Week to '+rdate(m.date)} · ${esc(m.src)} · ${esc(m.freq)}${m.next?'<br>Next figure '+rwhen(m.next):''}<br>A year ago ${rp(m.y1)}.`};});
  // inflation
  const iI=(d.inflation||[]).map(i=>{const ch=i.prev!=null?i.value-i.prev:0;RSER[i.id]=i.series;
-  const stale=i.id.startsWith('us')&&i.date==='2026-09-01'?'<br><i>October’s yearly rate wasn’t published: there is no October 2025 figure to compare with after last year’s shutdown.</i>':'';
+  const stale=i.est?'<br><i>Estimated: BLS published no yearly rate for this month because no prices were collected a year earlier (2025 shutdown). The year-ago level is taken as the average of the months either side, as BLS suggests.</i>':'';
   const nm=(n=>n.charAt(0).toUpperCase()+n.slice(1))(i.name.replace(/^(US|UK) /,''));
-  return {id:i.id,key:'infl:'+i.id,flag:i.flag,name:nm,short:nm.replace(' (CPI)',''),val:rp(i.value,1),chg:i.prev!=null?`<b class="${rcls(ch)}">${ch>0?'+':ch<0?'−':''}${Math.abs(ch).toFixed(1)} pts</b> · target 2%`:'',chgShort:`${rmonth(i.date).split(' ')[0]}`,trend:ch,next:i.next,sub:i.freq||'',
+  return {id:i.id,key:'infl:'+i.id,flag:i.flag,name:nm,short:nm.replace(' (CPI)',''),val:(i.est?'≈':'')+rp(i.value,1),chg:i.prev!=null?`<b class="${rcls(ch)}">${ch>0?'+':ch<0?'−':''}${Math.abs(ch).toFixed(1)} pts</b> · target 2%`:'',chgShort:`${rmonth(i.date).split(' ')[0]}`,trend:ch,next:i.next,sub:i.freq||'',
    detail:`<b>${esc(i.name)}</b>, 12-month rate<br>${rmonth(i.date)} · ${esc(i.src)}${i.next?'<br>Next figure '+rwhen(i.next):''}${stale}`};});
  // currencies
  const FX=[['gbpusd','🇬🇧🇺🇸 Pound in dollars','£ in $',4],['eurusd','🇪🇺🇺🇸 Euro in dollars','€ in $',4],['eurgbp','🇪🇺🇬🇧 Euro in pounds','€ in £',4],['dxy','🇺🇸 Dollar index','Dollar index',2]];

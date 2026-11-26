@@ -97,6 +97,21 @@ async function treasury() {
   return out;
 }
 const freddie = () => freddieSeries(START, 12000);
+// one month's 12-month change from a {YYYY-MM: index} map. BLS collected no prices in October 2025 (shutdown), so
+// for October 2026 it publishes no annual rate; we approximate the missing base month as the geometric mean of the
+// months either side (BLS's own suggested approach) and flag the point as an estimate.
+const ym = (y, m) => `${y}-${String(m).padStart(2, '0')}`;
+export function yoyPoint(idx, k) {
+  const [yy, mm] = k.split('-').map(Number);
+  let b = idx[ym(yy - 1, mm)], est = false;
+  if (!b) {
+    const pm = mm === 1 ? ym(yy - 2, 12) : ym(yy - 1, mm - 1), nm = mm === 12 ? ym(yy, 1) : ym(yy - 1, mm + 1);
+    if (idx[pm] && idx[nm]) { b = Math.sqrt(idx[pm] * idx[nm]); est = true; }
+  }
+  if (!b) return null;
+  const v = +((idx[k] / b - 1) * 100).toFixed(1);
+  return est ? [`${k}-01`, v, 1] : [`${k}-01`, v];
+}
 // BLS CPI index -> 12-month change
 async function usCpi() {
   const y = new Date().getUTCFullYear();
@@ -104,7 +119,7 @@ async function usCpi() {
   const j = await r.json(), out = {};
   for (const s of j?.Results?.series || []) {
     const idx = {}; s.data.filter((p) => /^M(0\d|1[0-2])$/.test(p.period) && p.value !== '-').forEach((p) => (idx[`${p.year}-${p.period.slice(1)}`] = +p.value));
-    out[s.seriesID] = Object.keys(idx).sort().map((k) => { const [yy, mm] = k.split('-'), b = idx[`${+yy - 1}-${mm}`]; return b ? [`${k}-01`, +((idx[k] / b - 1) * 100).toFixed(1)] : null; }).filter(Boolean);
+    out[s.seriesID] = Object.keys(idx).sort().map((k) => yoyPoint(idx, k)).filter(Boolean);
   }
   if (!out.CUUR0000SA0?.length) throw new Error('no BLS data');
   return { all: out.CUUR0000SA0, core: out.CUUR0000SA0L1E || [] };
@@ -205,15 +220,17 @@ function decisions(series, lag = 0) {
 }
 const safe = async (p, errs, name) => { try { return await p; } catch (e) { errs.push(name + ': ' + String(e.message || e).slice(0, 80)); return null; } };
 
-export default async () => {
+export default async (req) => {
   const errs = [], now = Date.now();
+  // BLS's keyless API allows about 25 calls a day, so the scheduled refresh skips it (?nobls=1) between releases
+  const noBls = (() => { try { return new URL(req.url).searchParams.get('nobls') === '1'; } catch { return false; } })();
   const fomcLeft = FOMC.filter((d) => Date.parse(d) > now);
   const futMonths = []; { const d = new Date(); for (let i = 0; i < 9; i++) { const x = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + i, 1)); futMonths.push([x.getUTCFullYear(), x.getUTCMonth() + 1]); } }
   const [F, BR, DFR, TR, FM, UKM, UKG, EAY, USC, UKC, EAC, FUT] = await Promise.all([
     safe(fed(), errs, 'fed'), safe(boeDaily('IUDBEDR'), errs, 'boe'), safe(ecbSeries('FM', 'D.U2.EUR.4F.KR.DFR.LEV'), errs, 'ecb'),
     safe(treasury(), errs, 'treasury'), safe(freddie(), errs, 'freddie'), safe(boeMonthly(['IUMBV34', 'IUMBV42']), errs, 'boe_mortgage'),
     safe(boeDaily('IUDMNPY'), errs, 'gilts'), safe(ecbSeries('YC', 'B.U2.EUR.4F.G_N_A.SV_C_YM.SR_10Y'), errs, 'ecb_yield'),
-    safe(usCpi(), errs, 'bls'), safe(ukCpi(), errs, 'ons'), euroInflation().catch(() => null), safe(fedFutures(futMonths), errs, 'futures'),
+    noBls ? null : safe(usCpi(), errs, 'bls'), safe(ukCpi(), errs, 'ons'), euroInflation().catch(() => null), safe(fedFutures(futMonths), errs, 'futures'),
   ]);
   const PM = {};
   await Promise.all([['fed', FOMC], ['boe', MPC], ['ecb', ECBM]].map(async ([b, list]) => { PM[b] = await safe(polymarket(b, list.filter((d) => Date.parse(d) > now)), errs, 'polymarket_' + b); }));
@@ -250,15 +267,15 @@ export default async () => {
     const s15 = FM.filter((r) => r[2] != null).map((r) => [r[0], r[2]]); if (s15.length) mort.push({ id: 'us15m', name: 'US 15-year fixed', flag: '🇺🇸', value: lastOf(s15)[1], date: lastOf(s15)[0], prev: s15.at(-2)?.[1], y1: before(s15, 365), series: thin(s15.filter((p) => Date.parse(p[0]) > now - 400 * 864e5), 1), next: freddieNext(lastOf(s15)[0]), freq: 'Weekly, Thursdays', src: 'Freddie Mac' }); }
   if (UKM) for (const [k, nm] of [['IUMBV34', 'UK 2-year fixed (75% LTV)'], ['IUMBV42', 'UK 5-year fixed (75% LTV)']]) { const s = UKM[k]; if (s?.length) mort.push({ id: k, name: nm, flag: '🇬🇧', value: lastOf(s)[1], date: lastOf(s)[0], prev: s.at(-2)?.[1], y1: before(s, 365), series: s.slice(-24), next: null, freq: 'Monthly, early in the month', src: 'Bank of England' }); }
   const infl = [];
-  if (USC) { infl.push({ id: 'uscpi', name: 'US inflation (CPI)', flag: '🇺🇸', value: lastOf(USC.all)[1], date: lastOf(USC.all)[0], prev: USC.all.at(-2)?.[1], series: USC.all.slice(-36), next: nextOf(US_CPI), src: 'BLS', target: 2 });
-    if (USC.core.length) infl.push({ id: 'uscore', name: 'US core inflation', flag: '🇺🇸', value: lastOf(USC.core)[1], date: lastOf(USC.core)[0], prev: USC.core.at(-2)?.[1], series: USC.core.slice(-36), next: nextOf(US_CPI), src: 'BLS', target: 2 }); }
+  if (USC) { infl.push({ id: 'uscpi', name: 'US inflation (CPI)', flag: '🇺🇸', value: lastOf(USC.all)[1], date: lastOf(USC.all)[0], prev: USC.all.at(-2)?.[1], series: USC.all.slice(-36), next: nextOf(US_CPI), src: 'BLS', target: 2, est: !!lastOf(USC.all)[2] });
+    if (USC.core.length) infl.push({ id: 'uscore', name: 'US core inflation', flag: '🇺🇸', value: lastOf(USC.core)[1], date: lastOf(USC.core)[0], prev: USC.core.at(-2)?.[1], series: USC.core.slice(-36), next: nextOf(US_CPI), src: 'BLS', target: 2, est: !!lastOf(USC.core)[2] }); }
   if (UKC?.series?.length) infl.push({ id: 'ukcpi', name: 'UK inflation (CPI)', flag: '🇬🇧', value: lastOf(UKC.series)[1], date: lastOf(UKC.series)[0], prev: UKC.series.at(-2)?.[1], series: UKC.series.slice(-36), next: UKC.next && Date.parse(UKC.next) > now ? UKC.next : null, src: 'ONS', target: 2 });
   if (EAC?.length) infl.push({ id: 'eahicp', name: 'Euro-area inflation', flag: '🇪🇺', value: lastOf(EAC)[1], date: lastOf(EAC)[0], prev: EAC.at(-2)?.[1], series: EAC.slice(-36), next: null, freq: 'Monthly, flash estimate at the start of the month', src: 'Eurostat via ECB', target: 2 });
   banks.forEach((b) => { if (PM[b.id]) b.poly = PM[b.id]; });
   // real rate: policy rate minus inflation
   const realOf = { fed: 'uscpi', boe: 'ukcpi', ecb: 'eahicp' };
   banks.forEach((b) => { const i = infl.find((x) => x.id === realOf[b.id]); if (i) b.real = +((b.effective ?? b.value) - i.value).toFixed(2); });
-  const body = { fetched: new Date().toISOString(), banks, yields, curve: yields.curve || null, mortgages: mort, inflation: infl, errors: errs };
+  const body = { fetched: new Date().toISOString(), blsAt: USC ? new Date().toISOString() : undefined, banks, yields, curve: yields.curve || null, mortgages: mort, inflation: infl, errors: errs };
   return new Response(JSON.stringify(body), {
     headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'cache-control': 'public, max-age=300', 'netlify-cdn-cache-control': 'public, s-maxage=1800, stale-while-revalidate=3600' },
   });

@@ -30,3 +30,11 @@ test('Freddie Mac: the release just gone (Wednesday in Thanksgiving week)', () =
   assert.equal(lastFreddie(Date.parse('2026-11-25T19:00:00Z')), '2026-11-25T12:00:00-05:00');
   assert.equal(lastFreddie(Date.parse('2026-11-25T16:00:00Z')), '2026-11-19T12:00:00-05:00');
 });
+
+import { yoyPoint } from '../netlify/functions/rates.mjs';
+test('CPI yearly rate when the year-ago month is missing is estimated from its neighbours', () => {
+  const idx = { '2025-09': 324.8, '2025-11': 325.0, '2026-10': 337.0, '2026-09': 336.0, '2025-08': 323.9 };
+  const p = yoyPoint(idx, '2026-10');
+  assert.equal(p[2], 1); assert.ok(p[1] > 3.6 && p[1] < 3.8, String(p[1]));
+  assert.deepEqual(yoyPoint(idx, '2026-09'), ['2026-09-01', 3.4]);
+});
