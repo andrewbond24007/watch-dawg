@@ -17,6 +17,8 @@ jobs:
       - run: |
           P="${{ inputs.path }}"; RAW="";
           if [ "${P#head:}" != "$P" ]; then P="${P#head:}"; U="$P"; [ "${P#http}" = "$P" ] && U="https://watch-dawg-78h1.vercel.app$P"; for i in 1 2 3; do curl -s -o /dev/null -D - "$U" | grep -i "x-vercel-cache\|^age\|cdn-cache\|x-vercel-id"; echo --; sleep 2; done; exit 0; fi
+          case "$P" in raw:*) RAW=1; P="${P#raw:}";; esac
+          case "$P" in http*) U="$P";; *) U="https://watch-dawg-78h1.vercel.app$P";; esac
           curl -sL -m 60 "$U" > /tmp/out
           if head -c 2 /tmp/out | grep -q "PK"; then mkdir -p /tmp/z && cd /tmp/z && unzip -o -q /tmp/out && for f in *; do echo "== $f ($(wc -l < "$f") rows)"; head -1 "$f"; [ -n "${{ inputs.grep }}" ] && grep -i -E "${{ inputs.grep }}" "$f" | head -40; done; exit 0; fi
           if [ -n "$RAW" ]; then grep -o "[^\"' ]*\(api\|json\|csv\|\.js\)[^\"' ]*" /tmp/out | sort -u | head -80; head -c 6000 /tmp/out; exit 0; fi
