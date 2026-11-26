@@ -9,14 +9,19 @@ async function loadRates(force){
  if(RATES.busy)return;if(!force&&RATES.data&&Date.now()-RATES.at<15*60e3){renderRates();return;}
  RATES.busy=true;renderRates();
  // the scheduled refresh pre-builds this every 30 minutes, so it opens instantly; the live source is the fallback
- const take=j=>{if(j&&Array.isArray(j.banks)&&j.banks.length){RATES.data=j;RATES.at=Date.now();RATES.err=false;store.set('wd.rates',j);return true;}return false;};
+ const take=j=>{if(j&&Array.isArray(j.banks)&&j.banks.length){const us=(j.inflation||[]).filter(i=>i.id.startsWith('us'));if(us.length)store.set('wd.ratesUs',us);RATES.data=j;RATES.at=Date.now();RATES.err=false;store.set('wd.rates',j);return true;}return false;};
  let ok=false;
  if(!force)try{const j=await fetch('/data/rates.json?t='+Math.floor(Date.now()/3e5)).then(r=>r.ok?r.json():null);if(j&&Date.now()-Date.parse(j.fetched)<90*60e3)ok=take(j);}catch(e){}
- if(!ok)try{ok=take(await fetch('/.netlify/functions/rates'+(force?'?t='+Date.now():'')).then(r=>r.json()));}catch(e){}
+ if(!ok)try{ok=take(await fetch('/.netlify/functions/rates'+(force?`?b=${Math.floor(Date.now()/12e4)}${usCpiDue()?'':'&nobls=1'}`:'')).then(r=>r.json()));
+  // a live copy fetched without BLS keeps the last US inflation figures
+  if(ok&&force&&!RATES.data.inflation.some(i=>i.id==='uscpi')){const c=store.get('wd.ratesUs',null);if(c){RATES.data.inflation=[...c,...RATES.data.inflation];}}}catch(e){}
  if(!ok)RATES.err=true;
  RATES.busy=false;if(!RATES.data){const c=store.get('wd.rates',null);if(c)RATES.data=c;}
  rSeenCheck();renderRates();loadRatesLive();
 }
+// a US CPI release in the last four hours: only then does a live refresh need BLS (its free API allows ~25 calls a day,
+// and every device in a 2-minute slot shares one cached answer)
+function usCpiDue(){const i=(RATES.data?.inflation||[]).find(x=>x.id==='uscpi');return !i||(i.next&&Date.parse(i.next)<Date.now()&&Date.now()-Date.parse(i.next)<4*3600e3);}
 async function loadRatesLive(){
  if(Date.now()-rlAt<90e3)return;rlAt=Date.now();
  try{const j=await fetch('/.netlify/functions/quotes?s='+encodeURIComponent(Object.values(LIVE_SYMS).join(','))).then(r=>r.json());

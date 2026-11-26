@@ -42,9 +42,11 @@ async function bea() {
 // two decimals, worked out from the official index levels (BLS headlines round to one)
 const pct = (a, b) => (a != null && b) ? Math.round((a / b - 1) * 10000) / 100 : null;
 export default async (req) => {
-  const B = await bea().catch((e) => ({ error: String(e).slice(0, 100) }));
+  // ?only=bea or ?only=bls while waiting on one release, so BLS's ~25 calls a day aren't spent on a BEA wait
+  const only = (() => { try { return new URL(req.url).searchParams.get('only') || ''; } catch { return ''; } })();
+  const B = only === 'bls' ? {} : await bea().catch((e) => ({ error: String(e).slice(0, 100) }));
   let res, ok = false;
-  try {
+  if (only === 'bea') res = { error: 'skipped' }; else try {
     const r = await fetch('https://api.bls.gov/publicAPI/v1/timeseries/data/', {
       method: 'POST', headers: { 'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0 (compatible; WatchDawg/1.0)' },
       body: JSON.stringify({ seriesid: Object.values(SERIES) }),
@@ -59,7 +61,9 @@ export default async (req) => {
       .sort((a, b) => (a.p < b.p ? 1 : -1));
   }
   const at = (id, i) => by[SERIES[id]]?.[i];
-  const yoy = (id) => { const a = at(id, 0); if (!a) return null; const [y, m] = a.p.split('-'); const b = by[SERIES[id]].find((d) => d.p === `${+y - 1}-${m}`); return b ? { p: a.p, v: pct(a.v, b.v) } : null; };
+  // year-ago month missing (no prices were collected in October 2025): use the months either side, flagged as an estimate
+  const yoy = (id) => { const a = at(id, 0); if (!a) return null; const [y, m] = a.p.split('-').map(Number); const f = (yy, mm) => { const d = new Date(Date.UTC(yy, mm - 1, 1)); return by[SERIES[id]].find((x) => x.p === d.toISOString().slice(0, 7))?.v; };
+    const b = f(y - 1, m); if (b) return { p: a.p, v: pct(a.v, b) }; const lo = f(y - 1, m - 1), hi = f(y - 1, m + 1); return lo && hi ? { p: a.p, v: pct(a.v, Math.sqrt(lo * hi)), est: true } : null; };
   const mom = (id) => { const a = at(id, 0), b = at(id, 1); return a && b ? { p: a.p, v: pct(a.v, b.v) } : null; };
   const out = ok ? {
     cpiMoM: mom('cpi'), coreCpiMoM: mom('core'), cpiYoY: yoy('cpiNsa'), coreCpiYoY: yoy('coreNsa'),
@@ -71,6 +75,6 @@ export default async (req) => {
   const P = B.pio || {}, wrap = (v) => v != null && P.p ? { p: P.p, v } : null;
   Object.assign(out, { pceMoM: wrap(P.pceMoM), corePceMoM: wrap(P.corePceMoM), pceYoY: wrap(P.pceYoY), corePceYoY: wrap(P.corePceYoY), gdp: B.home?.gdp || null, beaError: B.error || null });
   // Cache for 6h once data is in; retry sooner if BLS failed.
-  const ttl = ok ? 21600 : 300;
+  const ttl = ok ? 21600 : only ? 120 : 300;
   return new Response(JSON.stringify(out), { headers: { 'content-type': 'application/json', 'cache-control': 'public, max-age=300', 'netlify-cdn-cache-control': `public, s-maxage=${ttl}`, 'access-control-allow-origin': '*', 'netlify-vary': 'query' } });
 };

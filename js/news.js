@@ -177,10 +177,17 @@ async function loadActuals(){
  if(!rel.length)return;
  // a figure due in the last 6 hours that hasn't shown up yet: ask again every 2 minutes (fresh, not the cached copy)
  const waiting=rel.filter(e=>now-new Date(e.date)<6*3600e3&&!actualsFor(e).length);
- const key=rel.map(e=>e.date.slice(0,13)).sort().pop()+(waiting.length?'|'+Math.floor(now/120e3):'');
+ // poll every 2 minutes for the first half hour after a release, then every 10; only the agency that's late is asked
+ const fresh30=waiting.some(e=>now-new Date(e.date)<30*60e3),step=fresh30?120e3:600e3;
+ const isBea=e=>/\bpce\b|\bgdp\b|personal (income|spending)/i.test(e.title);
+ const only=waiting.length&&ACT.data&&!ACT.data.error?(waiting.every(isBea)?'bea':waiting.some(isBea)?'':'bls'):'';
+ const key=rel.map(e=>e.date.slice(0,13)).sort().pop()+(waiting.length?'|'+Math.floor(now/step)+(only?'|'+only:''):'');
  if(ACT.key===key&&ACT.data&&!ACT.data.error&&now-ACT.at<60*60e3)return;
- if(ACT.key===key&&now-ACT.at<(waiting.length?100e3:10*60e3))return;
- try{const j=await fetch('/.netlify/functions/actuals?r='+encodeURIComponent(key)).then(r=>r.json());ACT={data:j,at:Date.now(),key};checkNewActuals();renderNewsTab();}catch(e){ACT.at=Date.now();ACT.key=key;}
+ if(ACT.key===key&&now-ACT.at<(waiting.length?step-20e3:10*60e3))return;
+ try{const j=await fetch('/.netlify/functions/actuals?r='+encodeURIComponent(key)+(only?'&only='+only:'')).then(r=>r.json());
+  // a one-agency answer keeps the other agency's figures from the last full one
+  if(only&&ACT.data&&!ACT.data.error){for(const k in ACT.data)if(j[k]==null)j[k]=ACT.data[k];delete j.error;}
+  ACT={data:j,at:Date.now(),key};checkNewActuals();renderNewsTab();}catch(e){ACT.at=Date.now();ACT.key=key;}
 }
 /* alert when a scheduled figure comes out: a dot on the News tab, a "New" tag on the event and a short banner */
 let ACTSEEN=store.get('wd.actseen',null);const ACTFRESH=new Set();
