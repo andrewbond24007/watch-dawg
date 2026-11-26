@@ -135,8 +135,11 @@ async function ukCpi() {
 // Euro-area inflation: the ECB's own series, or Eurostat's via DBnomics when the ECB copy is behind
 async function euroInflation() {
   const fresh = (s) => s?.length && Date.now() - Date.parse(s.at(-1)[0]) < 100 * 864e5;
-  const a = await ecbSeries('ICP', 'M.U2.N.000000.4.ANR').catch(() => null);
-  if (fresh(a)) return a;
+  // the ECB replaced its ICP dataset with HICP (new methodology) in February 2026
+  for (const [flow, key] of [['HICP', 'M.U2.N.000000.4D0.ANR'], ['ICP', 'M.U2.N.000000.4.ANR']]) {
+    const a = await ecbSeries(flow, key).catch(() => null);
+    if (fresh(a)) return a;
+  }
   const j = JSON.parse(await get('https://api.db.nomics.world/v22/series/Eurostat/prc_hicp_manr/M.RCH_A.CP00.EA?observations=1', 12000));
   const d = j.series?.docs?.[0], b = d ? d.period.map((p, i) => [p + '-01', d.value[i]]).filter((x) => x[0] >= START && typeof x[1] === 'number') : null;
   if (fresh(b)) return b;
@@ -230,7 +233,7 @@ export default async (req) => {
     safe(fed(), errs, 'fed'), safe(boeDaily('IUDBEDR'), errs, 'boe'), safe(ecbSeries('FM', 'D.U2.EUR.4F.KR.DFR.LEV'), errs, 'ecb'),
     safe(treasury(), errs, 'treasury'), safe(freddie(), errs, 'freddie'), safe(boeMonthly(['IUMBV34', 'IUMBV42']), errs, 'boe_mortgage'),
     safe(boeDaily('IUDMNPY'), errs, 'gilts'), safe(ecbSeries('YC', 'B.U2.EUR.4F.G_N_A.SV_C_YM.SR_10Y'), errs, 'ecb_yield'),
-    noBls ? null : safe(usCpi(), errs, 'bls'), safe(ukCpi(), errs, 'ons'), euroInflation().catch(() => null), safe(fedFutures(futMonths), errs, 'futures'),
+    noBls ? null : safe(usCpi(), errs, 'bls'), safe(ukCpi(), errs, 'ons'), safe(euroInflation(), errs, 'ecb_hicp'), safe(fedFutures(futMonths), errs, 'futures'),
   ]);
   const PM = {};
   await Promise.all([['fed', FOMC], ['boe', MPC], ['ecb', ECBM]].map(async ([b, list]) => { PM[b] = await safe(polymarket(b, list.filter((d) => Date.parse(d) > now)), errs, 'polymarket_' + b); }));

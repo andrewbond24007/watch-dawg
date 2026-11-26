@@ -291,6 +291,20 @@ async function csoSales() {
   if (!s.length) throw new Error('CSO: no sales');
   return s;
 }
+// CSO Residential Property Price Index, 12-month change, national (monthly, about two months behind)
+async function csoRppi() {
+  const q = { jsonrpc: '2.0', method: 'PxStat.Data.Cube_API.ReadDataset', params: { class: 'query', id: ['STATISTIC', 'C02803V03373'],
+    dimension: { STATISTIC: { category: { index: ['HPM09C04'] } }, C02803V03373: { category: { index: ['-'] } } },
+    extension: { pivot: null, codes: true, language: { code: 'en' }, format: { type: 'JSON-stat', version: '2.0' }, matrix: 'HPM09' }, version: '2.0' } };
+  const url = 'https://ws.cso.ie/public/api.jsonrpc?data=' + encodeURIComponent(JSON.stringify(q));
+  let j = null;
+  for (let i = 0; i < 2 && !j; i++) j = await fetch(url, { headers: UA, signal: T(15000) }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+  if (!j?.result) throw new Error('CSO price index unavailable');
+  const ds = j.result, kT = ds.id.find((k) => /TLIST/.test(k)), times = ds.dimension[kT].category.index;
+  const s = times.map((t, i) => [`${t.slice(0, 4)}-${t.slice(4, 6)}-01`, ds.value[i]]).filter((p) => typeof p[1] === 'number' && p[0] >= '2017');
+  if (!s.length) throw new Error('CSO: no price index');
+  return s;
+}
 const sum3 = (s) => s.slice(2).map((p, i) => [p[0], s[i][1] + s[i + 1][1] + p[1]]);
 async function oecdMeasure(measure) {
   const u = `https://sdmx.oecd.org/public/rest/data/OECD.ECO.MPD,DSD_AN_HOUSE_PRICES@DF_HOUSE_PRICES,1.0/${Object.keys(OECD_CC).join('+')}.Q.${measure}.?startPeriod=2017-Q1&format=csvfile`;
@@ -354,6 +368,8 @@ async function yahoo(sym) {
 }
 
 // ---------- helpers ----------
+// 12-month change matched by date (for series with gaps or mixed spacing)
+const yoyByDate = (s) => { const m = new Map(s.map((p) => [p[0].slice(0, 7), p[1]])); return s.map((p) => { const d = new Date(p[0]); d.setUTCFullYear(d.getUTCFullYear() - 1); const b = m.get(d.toISOString().slice(0, 7)); return b ? [p[0], +((p[1] / b - 1) * 100).toFixed(2)] : null; }).filter(Boolean); };
 const yoy = (s, per) => s.slice(per).map((p, i) => [p[0], +((p[1] / s[i][1] - 1) * 100).toFixed(2)]);
 function lastAt(s, monthsBack) {
   if (!s.length) return null;
@@ -434,7 +450,7 @@ const MED_EXTRA = [['AL', '🇦🇱', 'Albania'], ['ME', '🇲🇪', 'Montenegro
 export default async (req) => {
   const allSyms = [...new Set(Object.values(STOCKS).flat())];
   const PX = ['GB', 'IE', ...MED.map((m) => m[0])];
-  const [BS, BC, FD, FM, FH, B, E, Y, TR, KS, ZY, OE, TNX, ON, LRU, LRN, NB, ZMO, HM, CS] = await Promise.all([
+  const [BS, BC, FD, FM, FH, B, E, Y, TR, KS, ZY, OE, TNX, ON, LRU, LRN, NB, ZMO, HM, CS, CP] = await Promise.all([
     safe(bis('WS_SPP', `Q.${PX.join("+")}.N.628`)),
     safe(bis('WS_CPP', 'Q.US.0.A.0.2.6.0')),
     safe(fedDelinq()), safe(freddie()), safe(fhfa()),
@@ -443,7 +459,7 @@ export default async (req) => {
     Promise.all(allSyms.map((s) => safe(yahoo(s)))).then((a) => Object.fromEntries(allSyms.map((s, i) => [s, a[i] && !a[i].error ? { ...a[i], name: NAMES[s] || s } : null]))),
     safe(trepp()), safe(kastle()), safe(usYield()), safe(oecdRent()), safe(yahoo('^TNX')),
     safe(onsRents()), safe(lrPrice('united-kingdom')), safe(lrPrice('northern-ireland')), safe(numbeo()),
-    safe(zillowMomentum()), safe(hmrcSales()), safe(csoSales()),
+    safe(zillowMomentum()), safe(hmrcSales()), safe(csoSales()), safe(csoRppi()),
   ]);
   const ok = (x) => (x && !x.error ? x : null);
   const F = {
@@ -451,7 +467,7 @@ export default async (req) => {
     COMRE: ok(BC)?.US || null,
   };
   const errors = {};
-  [['bis', BS], ['bis_cre', BC], ['fed', FD], ['freddie', FM], ['fhfa', FH], ['trepp', TR], ['kastle', KS], ['zillow', ZY], ['oecd', OE], ['treasury', TNX], ['ons', ON], ['landreg', LRU], ['landreg_ni', LRN], ['numbeo', NB], ['zillow_momentum', ZMO], ['hmrc', HM], ['cso_sales', CS]].forEach(([k, x]) => { if (x && x.error) errors[k] = x.error; });
+  [['bis', BS], ['bis_cre', BC], ['fed', FD], ['freddie', FM], ['fhfa', FH], ['trepp', TR], ['kastle', KS], ['zillow', ZY], ['oecd', OE], ['treasury', TNX], ['ons', ON], ['landreg', LRU], ['landreg_ni', LRN], ['numbeo', NB], ['zillow_momentum', ZMO], ['hmrc', HM], ['cso_sales', CS], ['cso_prices', CP]].forEach(([k, x]) => { if (x && x.error) errors[k] = x.error; });
   if (B.error) errors.boe = B.error;
   if (E.error) errors.ecb = E.error;
   const stocks = (k) => STOCKS[k].map((s) => Y[s]).filter(Boolean);
@@ -510,13 +526,16 @@ export default async (req) => {
     (() => { const m = metric('uk_rent', on ? yoy(on.UK.idx, 12) : null, { label: 'Rents, year on year', short: 'Rents', unit: '%', kind: 'growth', freq: 'M', good: 'up', noscore: true, tol: 0.5, src: 'ONS' }); return m && { ...m, extra: `Average rent £${lastRent('UK')?.toLocaleString('en-GB')}/month` }; })(),
     (() => { const y = ukYield('NI', LRN); const m = metric('ni_yield', y, { label: 'Northern Ireland: gross rental yield', short: 'NI rental yield', unit: '%', freq: 'M', good: 'up', noscore: true, tol: 0.1, src: 'ONS rents, Land Registry prices' }); return m && { ...m, extra: vsBond(m.value, g10, '10-year gilt') }; })(),
     (() => { const m = metric('ni_rent', on ? yoy(on.NI.idx, 12) : null, { label: 'Northern Ireland: rents, year on year', short: 'NI rents', unit: '%', kind: 'growth', freq: 'M', good: 'up', noscore: true, tol: 0.5, src: 'ONS' }); return m && { ...m, extra: `Average rent £${lastRent('NI')?.toLocaleString('en-GB')}/month` }; })(),
-    metric('uk_hpi', bisY('GB'), { label: 'House prices, year on year', short: 'Prices', unit: '%', kind: 'growth', freq: 'Q', good: 'up', tol: 0.5, src: 'BIS' }),
+    // HM Land Registry's monthly UK HPI (about two months behind); BIS's quarterly copy if it can't be reached
+    (() => { const lr = ok(LRU) ? yoyByDate(LRU) : []; return lr.length ? metric('uk_hpi', lr, { label: 'House prices, year on year', short: 'Prices', unit: '%', kind: 'growth', freq: 'M', good: 'up', tol: 0.5, src: 'HM Land Registry (UK HPI)' })
+      : metric('uk_hpi', bisY('GB'), { label: 'House prices, year on year', short: 'Prices', unit: '%', kind: 'growth', freq: 'Q', good: 'up', tol: 0.5, src: 'BIS' }); })(),
     ...ukMom,
   ];
   const ieH = [
     metric('ie_rate', E.IE, { label: 'Mortgage rate on new loans', short: 'Mortgage rates', unit: '%', freq: 'M', good: 'down', tol: 0.15, src: 'ECB' }),
     nbMetric('ie_yield', 'Ireland', null, ''), rentM('IE'),
-    metric('ie_hpi', bisY('IE'), { label: 'House prices, year on year', short: 'Prices', unit: '%', kind: 'growth', freq: 'Q', good: 'up', tol: 0.5, src: 'BIS' }),
+    ok(CP) ? metric('ie_hpi', CP, { label: 'House prices, year on year', short: 'Prices', unit: '%', kind: 'growth', freq: 'M', good: 'up', tol: 0.5, src: 'CSO (Residential Property Price Index)' })
+      : metric('ie_hpi', bisY('IE'), { label: 'House prices, year on year', short: 'Prices', unit: '%', kind: 'growth', freq: 'Q', good: 'up', tol: 0.5, src: 'BIS' }),
     ...ieMom,
   ];
   const medRows = [...MED, ...MED_EXTRA].map(([cc, flag, name]) => {
