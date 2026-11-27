@@ -84,11 +84,27 @@ async function channel([ch, pages, cat]) {
   return out;
 }
 
+// Google News throttles busy callers now and then. A blank answer is retried once with US settings, and if that
+// is blank too the publisher's stories from the week-long archive (saved by the scheduled refresh) are used
+let ARCH = null;
+const archive = async () => {
+  if (ARCH && Date.now() - ARCH.at < 10 * 60e3) return ARCH.items;
+  const j = await fetch('https://raw.githubusercontent.com/andrewbond24007/watch-dawg/data/news-archive.json', { signal: AbortSignal.timeout(8000) }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+  ARCH = { at: Date.now(), items: j?.items || ARCH?.items || [] }; return ARCH.items;
+};
+async function feed(s, u, cat) {
+  let r = await get(u).then((x) => parseRss(x, s, cat)).catch(() => []);
+  if (r.length || !u.includes('news.google.com')) return { r };
+  await new Promise((z) => setTimeout(z, 600));
+  r = await get(u.replace('hl=en-GB&gl=GB&ceid=GB:en', 'hl=en-US&gl=US&ceid=US:en')).then((x) => parseRss(x, s, cat)).catch(() => []);
+  if (r.length) return { r };
+  return { r: (await archive()).filter((p) => p.source === s), saved: true };
+}
 export default async () => {
-  const since = Date.now() - 48 * 3600e3, status = {};
+  const since = Date.now() - 48 * 3600e3, status = {}, saved = [];
   const jobs = [
     ...CHANNELS.map((c) => channel(c).then((r) => (status[c[0]] = r.length, r)).catch(() => (status[c[0]] = 0, []))),
-    ...FEEDS.map(([s, u, cat]) => get(u).then((x) => parseRss(x, s, cat)).then((r) => (status[s] = (status[s] || 0) + r.length, r)).catch(() => (status[s] = status[s] || 0, []))),
+    ...FEEDS.map(([s, u, cat]) => feed(s, u, cat).then(({ r, saved: sv }) => { if (sv) saved.push(s); else status[s] = (status[s] || 0) + r.length; status[s] ||= 0; return r; })),
   ];
   const all = (await Promise.all(jobs)).flat().filter((p) => Date.parse(p.time) >= since && Date.parse(p.time) <= Date.now() + 300e3);
   // newest first; squawk posts win ties so the fastest version of a story is kept
@@ -102,7 +118,7 @@ export default async () => {
     seen.set(k, p); items.push(p);
   }
   const out = items.slice(0, 500);
-  return new Response(JSON.stringify({ items: out, sources: status, fetched: new Date().toISOString() }), {
+  return new Response(JSON.stringify({ items: out, sources: status, fromArchive: saved, fetched: new Date().toISOString() }), {
     headers: { 'content-type': 'application/json', 'cache-control': 'public, max-age=60', 'netlify-cdn-cache-control': 'public, s-maxage=90, stale-while-revalidate=300', 'cdn-cache-control': 'public, s-maxage=90, stale-while-revalidate=300', 'access-control-allow-origin': '*' },
   });
 };

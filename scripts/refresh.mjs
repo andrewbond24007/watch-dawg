@@ -58,7 +58,9 @@ const BASE = process.env.APP_URL || 'https://watch-dawg-78h1.vercel.app';
 const call = async (fn, url, remotePath) => {
   if (remotePath) {
     try {
-      const r = await fetch(`${BASE}${remotePath}${remotePath.includes('?') ? '&' : '?'}t=${Date.now()}`, { signal: AbortSignal.timeout(60000) });
+      // news is shared through the edge cache (it calls Google, which throttles repeat callers); the rest are fetched fresh
+      const bust = /functions\/news/.test(remotePath) ? '' : `${remotePath.includes('?') ? '&' : '?'}t=${Date.now()}`;
+      const r = await fetch(`${BASE}${remotePath}${bust}`, { signal: AbortSignal.timeout(60000) });
       if (r.ok) return await r.json();
       console.warn(`remote ${remotePath} -> ${r.status}, building here instead`);
     } catch (e) { console.warn(`remote ${remotePath} failed (${e.message}), building here instead`); }
