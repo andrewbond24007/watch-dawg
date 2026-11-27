@@ -12,6 +12,13 @@ export default async (req) => {
     headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'cache-control': 'no-store',
       'netlify-cdn-cache-control': `public, s-maxage=${maxAge}`, 'netlify-vary': 'query' },
   });
+  // ?deep=NVDA: the stock deep-dive (company, key stats, analysts, earnings, company news) from Finnhub's free
+  // plan, six calls cached for an hour; shares this function to stay within Vercel's limit of 12
+  const deep = (u.searchParams.get('deep') || '').toUpperCase();
+  if (deep) {
+    if (!/^[A-Z.]{1,6}$/.test(deep) || !process.env.FINNHUB_KEY) return json({ error: 'not available' }, 300);
+    return json(await deepDive(deep, process.env.FINNHUB_KEY), 3600);
+  }
   if (!syms.length) return json({ error: 'no symbols' }, 60);
   // Finnhub (free key, FINNHUB_KEY on Vercel) answers US stocks without Twelve Data's daily cap; Twelve Data then
   // only gets what Finnhub can't do (metals, FX) or misses
@@ -40,3 +47,24 @@ export default async (req) => {
     return json({ quotes: out, at: Date.now(), bucket }, keep);
   } catch (e) { return Object.keys(fh).length ? json({ quotes: fh, at: Date.now(), bucket }, 120) : json({ error: 'Twelve Data unreachable' }, 30); }
 };
+
+const day = (n) => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10);
+export async function deepDive(sym, key) {
+  const get = (path) => fetch(`https://finnhub.io/api/v1/${path}${path.includes('?') ? '&' : '?'}token=${encodeURIComponent(key)}`, { signal: AbortSignal.timeout(9000) }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+  const [prof, met, rec, earn, cal, news] = await Promise.all([
+    get(`stock/profile2?symbol=${sym}`), get(`stock/metric?symbol=${sym}&metric=all`), get(`stock/recommendation?symbol=${sym}`),
+    get(`stock/earnings?symbol=${sym}`), get(`calendar/earnings?symbol=${sym}&from=${day(0)}&to=${day(150)}`), get(`company-news?symbol=${sym}&from=${day(-7)}&to=${day(0)}`),
+  ]);
+  const m = met?.metric || {}, pick = (...k) => { for (const x of k) if (m[x] != null && isFinite(m[x])) return +m[x]; return null; };
+  const nx = (cal?.earningsCalendar || []).filter((e) => e.date >= day(0)).sort((a, b) => a.date.localeCompare(b.date))[0];
+  return {
+    sym, at: Date.now(),
+    profile: prof && prof.name ? { name: prof.name, industry: prof.finnhubIndustry || '', country: prof.country || '', ipo: prof.ipo || '', web: prof.weburl || '', logo: prof.logo || '', cap: prof.marketCapitalization ?? null, cur: prof.currency || 'USD' } : null,
+    stats: { cap: pick('marketCapitalization'), pe: pick('peTTM', 'peBasicExclExtraTTM', 'peNormalizedAnnual'), eps: pick('epsTTM', 'epsBasicExclExtraItemsTTM'), hi52: pick('52WeekHigh'), lo52: pick('52WeekLow'),
+      beta: pick('beta'), div: pick('dividendYieldIndicatedAnnual', 'currentDividendYieldTTM'), revGrowth: pick('revenueGrowthTTMYoy', 'revenueGrowthQuarterlyYoy'), margin: pick('netProfitMarginTTM', 'netProfitMarginAnnual'), ret52: pick('52WeekPriceReturnDaily') },
+    recs: (rec || []).slice(0, 4).map((r) => ({ period: r.period, sb: r.strongBuy, b: r.buy, h: r.hold, s: r.sell, ss: r.strongSell })),
+    earnings: (earn || []).slice(0, 4).map((e) => ({ period: e.period, act: e.actual, est: e.estimate, surprise: e.surprisePercent })),
+    next: nx ? { date: nx.date, hour: nx.hour || '', est: nx.epsEstimate ?? null } : null,
+    news: (news || []).filter((n) => n.headline && n.url).sort((a, b) => b.datetime - a.datetime).slice(0, 8).map((n) => ({ t: n.headline, src: n.source, at: n.datetime * 1000, url: n.url })),
+  };
+}
