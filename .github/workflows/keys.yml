@@ -1,0 +1,19 @@
+name: Check API keys
+on: workflow_dispatch
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/checkkeys.mjs
+        env:
+          FINNHUB_KEY: ${{ secrets.FINNHUB_KEY }}
+          BLS_KEY: ${{ secrets.BLS_KEY }}
+          FRED_KEY: ${{ secrets.FRED_KEY }}
+          BEA_KEY: ${{ secrets.BEA_KEY }}
+          EIA_KEY: ${{ secrets.EIA_KEY }}

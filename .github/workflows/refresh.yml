@@ -33,6 +33,10 @@ jobs:
       - name: Refresh
         env:
           FINNHUB_KEY: ${{ secrets.FINNHUB_KEY }}
+          BLS_KEY: ${{ secrets.BLS_KEY }}
+          FRED_KEY: ${{ secrets.FRED_KEY }}
+          BEA_KEY: ${{ secrets.BEA_KEY }}
+          EIA_KEY: ${{ secrets.EIA_KEY }}
         run: |
           save() {
             (cd data-branch && git config user.name "watchdawg-bot" && git config user.email "41898282+github-actions[bot]@users.noreply.github.com" \
