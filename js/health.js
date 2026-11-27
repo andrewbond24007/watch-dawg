@@ -165,6 +165,35 @@ function cdsChart(rows){
 function cdsSpark(r){const p=r.p;if(p.length<2)return '';const t0=Date.parse(p[0].date),t1=Math.max(t0+864e5,Date.parse(p.at(-1).date)),mx=Math.max(...p.map(x=>x.bp))*1.05,mn=Math.min(...p.map(x=>x.bp))*0.9;
  const pts=p.map(x=>[(Date.parse(x.date)-t0)/(t1-t0)*100,24-(x.bp-mn)/((mx-mn)||1)*22]);const c=CDSC[r.id]||'var(--accent)';
  return `<svg class="cdssp" viewBox="0 0 100 26" preserveAspectRatio="none"><polyline points="${pts.map(q=>q.map(v=>v.toFixed(1)).join(',')).join(' ')}" fill="none" stroke="${c}" stroke-width="1.8" vector-effect="non-scaling-stroke"/></svg>`;}
+/* big tech's AI spending: quarterly capex (SEC filings via Finnhub), built by the scheduled refresh */
+let CAPEX={data:null,at:0};
+async function loadCapex(){if(CAPEX.data&&Date.now()-CAPEX.at<30*60e3)return;CAPEX.at=Date.now();try{const j=await fetch('/data/capex.json?t='+Math.floor(Date.now()/9e5)).then(r=>r.ok?r.json():null);if(j&&j.rows){CAPEX.data=j;if(activeTab==='health'&&hSec==='ai')renderHealth();}}catch(e){CAPEX.at=0;}}
+const CAPO=['microsoft','alphabet','amazon','meta','oracle'];
+const qLab=q=>`Q${q.slice(6)} ’${q.slice(2,4)}`;
+function capexCard(){
+ const C=CAPEX.data;if(!C)return '';
+ // the last 8 quarters from the first one every company has filed; a newer, partly filed quarter is shown faded
+ let rows=C.rows.slice(-9);const f=rows.findIndex(r=>r.complete);rows=rows.slice(Math.max(0,f));if(rows.length>8)rows=rows.slice(-8);
+ const cos=CAPO.filter(id=>C.companies[id]),mx=Math.max(...rows.map(r=>r.total))*1.08,W=320,H=170,P=4,bw=(W-2*P)/rows.length;
+ let g='';
+ rows.forEach((r,i)=>{let y=H-22;const x=P+i*bw+bw*.15,w=bw*.7;
+  cos.forEach(id=>{const v=r.by[id];if(v==null)return;const h=v/mx*(H-34);y-=h;g+=`<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${Math.max(0,h-.6).toFixed(1)}" rx="2" fill="${CDSC[id]}" opacity="${r.complete?1:.45}"/>`;});
+  g+=`<text x="${(x+w/2).toFixed(1)}" y="${(y-4).toFixed(1)}" text-anchor="middle" class="cxv">$${Math.round(r.total)}bn</text><text x="${(x+w/2).toFixed(1)}" y="${H-6}" text-anchor="middle">${qLab(r.q)}</text>`;});
+ const last=rows.filter(r=>r.complete).at(-1),part=rows.at(-1)&&!rows.at(-1).complete?rows.at(-1):null;
+ const missing=part?cos.filter(id=>part.by[id]==null).map(id=>C.companies[id].name):[];
+ const sig=C.yoy==null?'amber':C.yoy>=40?'red':C.yoy>=10?'amber':'green',word=C.yoy==null?'—':C.yoy>=40?'Surging':C.yoy>=10?'Growing':C.yoy>=0?'Flat':'Cutting';
+ const tiles=cos.map(id=>{const co=C.companies[id],v=last?.by[id],p=C.rows.find(r=>last&&r.q===`${+last.q.slice(0,4)-1}${last.q.slice(4)}`)?.by[id],g=v&&p?Math.round((v/p-1)*100):null;
+  return `<div><small><i style="background:${CDSC[id]}"></i>${esc(co.name)}</small><b class="num">$${v!=null?v.toFixed(1):'–'}bn</b>${g!=null?`<em class="${g>0?'dnt':'upt'}">${g>0?'+':''}${g}% on a year</em>`:''}</div>`;}).join('');
+ return `<div class="card hreg" id="capexCard"><div class="hh"><span class="fl">🏗️</span><h3>AI spending</h3><span class="sig ${sig}">${word}</span></div>
+  <div class="why">What Microsoft, Alphabet, Amazon, Meta and Oracle spend each quarter on data centres, chips and power (capital expenditure), from their SEC filings. Set it against the credit default swaps below: rising spending with widening CDS means the buildout is leaning on debt.</div>
+  <div class="radh"><div class="rads"><b class="num" style="color:var(--accent)">$${last?Math.round(last.total):'–'}bn</b><small>${last?`spent in ${qLab(last.q)}`:''}${C.yoy!=null?` · <b class="${C.yoy>0?'dnt':'upt'}">${C.yoy>0?'+':''}${C.yoy}%</b> on a year`:''}</small></div>
+   <div class="liqch"><span>Last 12 months <b class="num">$${C.ttm}bn</b></span></div></div>
+  <svg class="cxc" viewBox="0 0 ${W} ${H}" aria-label="Quarterly AI spending by company">${g}</svg>
+  <div class="liqk">${cos.map(id=>`<span><i style="background:${CDSC[id]}"></i>${esc(C.companies[id].name)}</span>`).join('')}</div>
+  ${part?`<div class="hnote">${qLab(part.q)} is still coming in (faded): ${esc(missing.join(', '))} ${missing.length===1?'hasn’t':'haven’t'} filed yet. Oracle’s quarters end a month earlier and are counted in the nearest calendar quarter.</div>`:''}
+  <div class="cxt">${tiles}</div>
+  <div class="hnote">Each company’s figure for ${last?qLab(last.q):'the latest quarter'} and its change from a year earlier. Filings arrive a few weeks after each quarter ends; checked every 6 hours.</div></div>`;
+}
 function cdsCard(){
  const d=CDS.data;if(!d)return '';
  // traded levels (DTCC swap tape) when the company has them, else the levels quoted in the news
@@ -194,7 +223,7 @@ function aiCard(r){
   <div class="hnote">The bar shows how far each share is below its 12-month high. Green under 12%, amber to 30%, red beyond. Signal is based on the average drop.</div></div>`;
 }
 function renderHealth(){
- if(activeTab!=='health')return;const d=HEALTH.data;if(hSec==='ai')loadCds();
+ if(activeTab!=='health')return;const d=HEALTH.data;if(hSec==='ai'){loadCds();loadCapex();}
  $('healthStatus').innerHTML=d?`<span>Updated <b>${timeAgo(d.fetched)}</b></span>${HEALTH.err?'<span class="bad">Couldn’t refresh; showing the last copy</span>':''}${HEALTH.busy?'<span>Refreshing…</span>':''}`:'';
  if(!d){$('healthBox').innerHTML=`<div class="empty" style="margin-top:12px">${HEALTH.err?'Market health can’t load in this viewer.':'Loading market health…'}</div>`;$('healthOv').innerHTML='';}
  else{
@@ -203,7 +232,7 @@ function renderHealth(){
   $('healthOv').innerHTML=d.sections.map(s=>{const g=overallSig(s);return `<button role="tab" aria-selected="${s.id===hSec}" class="${s.id===hSec?'on':''}" data-s="${s.id}">${unseen[s.id]?'<i class="ndot" aria-label="New updates"></i>':''}<span class="ic">${s.icon}</span><b>${esc(s.id==='cre'?'Commercial property':s.id==='ai'?'AI bubble':s.title)}</b><span class="sig ${g}">${SIG_WORD[g]}</span></button>`;}).join('');
   const sec=d.sections.find(s=>s.id===hSec);
   let grp='';
-  $('healthBox').innerHTML=sectionBrief(sec)+(sec.id==='ai'?sec.regions.map(aiCard).join('')+cdsCard():sec.regions.map(r=>{const h=r.group&&r.group!==grp?`<div class="hgroup">${esc(r.group)}</div>`:'';grp=r.group||grp;return h+regionCard(r);}).join(''));
+  $('healthBox').innerHTML=sectionBrief(sec)+(sec.id==='ai'?sec.regions.map(aiCard).join('')+capexCard()+cdsCard():sec.regions.map(r=>{const h=r.group&&r.group!==grp?`<div class="hgroup">${esc(r.group)}</div>`:'';grp=r.group||grp;return h+regionCard(r);}).join(''));
   const all=Object.fromEntries(sec.regions.flatMap(r=>r.metrics||[]).map(m=>[m.id,m]));
   $('healthBox').querySelectorAll('svg[data-sp]').forEach(s=>{const m=all[s.dataset.sp];spark(s,(m?.series||[]).map(p=>p[1]),s.dataset.v);});
  }
