@@ -262,7 +262,7 @@ if (!FAST) {
   catch (e) { errors.stablecoins = String(e.message || e); }
 }
 // big tech's AI spending (quarterly capex as filed with the SEC, via Finnhub) for Health → AI bubble; every 6 hours is plenty
-const capPrev = read('capex.json', null), capDue = !FAST && !!process.env.FINNHUB_KEY && (!capPrev || capPrev.v !== 2 || Date.now() - Date.parse(capPrev.updated) > 6 * 3600e3);
+const capPrev = read('capex.json', null), capDue = !FAST && !!process.env.FINNHUB_KEY && (!capPrev || capPrev.v !== 3 || Date.now() - Date.parse(capPrev.updated) > 6 * 3600e3);
 if (capDue) {
   try { const C = await fetchCapex(process.env.FINNHUB_KEY); write('capex.json', C); console.log(`capex: ${C.latest} $${C.latestTotal}bn, y/y ${C.yoy}%, 12m $${C.ttm}bn${C.missing ? ' (missing ' + C.missing.join(', ') + ')' : ''}`); }
   catch (e) { errors.capex = String(e.message || e); }
