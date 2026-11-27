@@ -119,11 +119,14 @@ const TIER={Reuters:2.2,Bloomberg:2.2,'Financial Times':2,CNBC:1.6,MarketWatch:1
 const IMP_MACRO=/\b(fed|fomc|powell|warsh|ecb|lagarde|bank of england|boe|bailey|boj|rate (cut|hike|decision)s?|interest rates?|cpi|inflation|payrolls|jobs report|unemployment rate|gdp|pce|recession|treasury yields?|bond (market|yields)|tariffs?|sanctions|opec|default|bailout)\b/i;
 const IMP_ASSET=/\b(bitcoin|btc|ether(eum)?|eth|solana|xrp|gold|silver|nvidia|nvda|tesla|tsla|apple|aapl|alphabet|google|tsmc|tsm|oracle|coreweave|broadcom|amd|microsoft|amazon|meta|s&p|s&p 500|nasdaq|dow|ftse|nikkei|oil|crude|brent|dollar|sterling|pound|euro|yen)\b/i;
 const IMP_EARN=/\b(earnings|results|revenue|guidance|profit warning|beats|misses|q[1-4] (sales|profit))\b/i;
-const IMP_MINOR=/\b(director|ceo|cfo|cto|officer|vp|chair(man)?) (buys|sells)\b|\b(sells|buys) \$[\d,.]+k?\b|takeaways|stocks? to buy|should you buy|prediction:|i think it'?s a buy|hand over fist|dividend stocks|motley|zacks rank|price target (raised|cut) to/i;
+const IMP_SMALL=/\b(norw(ay|egian)|swed(en|ish)|danish|denmark|finn(ish|land)|swiss|switzerland|czech|hungar(y|ian)|poland|polish|turk(ey|ish|iye)|thai(land)?|malaysia|indonesia|philippines|vietnam|chile|peru|colombia|argentin|south africa|nigeria|egypt|pakistan|bangladesh|sri lanka|new zealand|iceland|kenya|ghana|romania|bulgaria|croatia|serbia|ukraine's central bank)\b/i;
+const IMP_MAJOR=/\b(us|u\.s\.|united states|america|fed|uk|britain|bank of england|euro(pe|zone| area)|ecb|china|japan|boj|germany)\b/i;
+const IMP_MINOR=/\b(director|ceo|cfo|cto|officer|vp|chair(man)?) (buys|sells)\b|\b(sells|buys) \$[\d,.]+k?\b|takeaways|stocks? to buy|should you buy|prediction:|i think it'?s a buy|hand over fist|dividend stocks|motley|zacks rank|price target (raised|cut) to|declares \$?[\d.]+ (dividend|distribution)|declares .*dividend|earnings call transcript|price today \||per ounce \||etf declares/i;
 function importance(t){
  const txt=firstLine(hText(t.head));let s=0;
- t.srcs.forEach(x=>s+=TIER[x]||1);s=Math.min(s,9);
- s+=Math.min(t.n,12)*.35;
+ [...t.srcs].map(x=>TIER[x]||1).sort((a,b)=>b-a).slice(0,5).forEach(w=>s+=w);
+ s+=Math.min(t.n,10)*.2;
+ if(IMP_SMALL.test(txt)&&!IMP_MAJOR.test(txt))s-=3;
  if(IMP_MACRO.test(txt))s+=3;if(IMP_ASSET.test(txt))s+=2;if(IMP_EARN.test(txt))s+=1.2;
  const pc=(txt.match(/[-+−]?\d+(\.\d+)?%/g)||[]).map(x=>Math.abs(parseFloat(x.replace('−','-')))).filter(x=>x<90);if(pc.length)s+=Math.min(3,Math.max(...pc)/3);
  if(t.brk)s+=3;if(IMP_MINOR.test(txt))s-=5;
@@ -353,7 +356,7 @@ function renderNewsTab(){
   const threads=buildThreads(items),now=Date.now();
   // top stories: the most important of the last day (coverage + market relevance), fading over about 8 hours
   threads.forEach(t=>t.imp=importance(t));
-  const score=t=>t.imp*Math.exp(-(now-t.t1)/(8*3600e3));
+  const score=t=>t.imp-(now-t.t1)/3600e3*.3;
   const top=threads.filter(t=>now-t.t1<24*3600e3&&t.imp>=6&&(t.srcs.size>=2||t.imp>=9)).sort((a,b)=>score(b)-score(a)).slice(0,8),ts=new Set(top);
   // the timeline keeps everything else in time order, minus minor items unless asked for
   const all=threads.filter(t=>!ts.has(t)).sort((a,b)=>Date.parse(b.head.time)-Date.parse(a.head.time)),minor=all.filter(t=>t.imp<2.2);
