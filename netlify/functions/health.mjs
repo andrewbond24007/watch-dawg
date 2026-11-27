@@ -36,7 +36,10 @@ async function bis(flow, key, by = 'REF_AREA') {
   return out;
 }
 // Federal Reserve delinquency rates on bank loans (seasonally adjusted), quarterly.
-async function fedDelinq() { return orFred(fedDelinqPage, async () => ({ res: await fredSeries('DRSFRMACBS', START), com: await fredSeries('DRCRELEXFACBS', START) })); }
+// with a FRED key, FRED's copy of the same Fed and FHFA series comes first (an official API is steadier than reading
+// their web pages and files); without one, or if FRED fails, the pages are read as before
+const fredFirst = async (fred, page) => { if (process.env.FRED_KEY) { try { return await fred(); } catch (e) { /* fall through */ } } return page(); };
+async function fedDelinq() { return fredFirst(async () => ({ res: await fredSeries('DRSFRMACBS', START), com: await fredSeries('DRCRELEXFACBS', START) }), fedDelinqPage); }
 async function fedDelinqPage() {
   const r = await fetch('https://www.federalreserve.gov/releases/chargeoff/delallsa.htm', { headers: UA, signal: T(9000) });
   if (!r.ok) throw new Error('Fed ' + r.status);
@@ -56,7 +59,7 @@ async function fedDelinqPage() {
 // Freddie Mac weekly 30-year fixed mortgage rate.
 async function freddie() { return orFred(async () => (await freddieSeries(START, 9000)).map(([d, v]) => [d, v]), () => fredSeries('MORTGAGE30US', START)); }
 // FHFA purchase-only house price index for the whole US, monthly (seasonally adjusted).
-async function fhfa() { return orFred(fhfaFile, () => fredSeries('HPIPONM226S', START)); }
+async function fhfa() { return fredFirst(() => fredSeries('HPIPONM226S', START), fhfaFile); }
 async function fhfaFile() {
   const r = await fetch('https://www.fhfa.gov/hpi/download/monthly/hpi_master.csv', { headers: UA, signal: T(9000) });
   if (!r.ok) throw new Error('FHFA ' + r.status);

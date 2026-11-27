@@ -102,7 +102,7 @@ export default async (req) => {
   } : { error: res?.message?.[0] || res?.error || 'BLS unavailable' };
   // BEA figures ride along whether or not BLS answered
   const P = B.pio || {}, wrap = (v) => v != null && P.p ? { p: P.p, v } : null;
-  Object.assign(out, { pceMoM: wrap(P.pceMoM), corePceMoM: wrap(P.corePceMoM), pceYoY: wrap(P.pceYoY), corePceYoY: wrap(P.corePceYoY), gdp: B.home?.gdp || null, beaError: B.error || null });
+  Object.assign(out, { pceMoM: wrap(P.pceMoM), corePceMoM: wrap(P.corePceMoM), pceYoY: wrap(P.pceYoY), corePceYoY: wrap(P.corePceYoY), gdp: B.home?.gdp || null, beaError: B.error || null, beaSrc: B.api ? 'api' : 'web', blsApi: process.env.BLS_KEY ? 'v2' : 'v1' });
   // Cache for 6h once data is in; retry sooner if BLS failed.
   const ttl = ok ? 21600 : only ? 120 : 300;
   return new Response(JSON.stringify(out), { headers: { 'content-type': 'application/json', 'cache-control': 'public, max-age=300', 'netlify-cdn-cache-control': `public, s-maxage=${ttl}`, 'access-control-allow-origin': '*', 'netlify-vary': 'query' } });

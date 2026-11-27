@@ -95,16 +95,28 @@ function quoteBucket(){return usOpen()?'o'+Math.floor(Date.now()/300e3):'c'+last
 let qBucket=store.get('wd.qbucket','');
 // a Twelve Data price is stale when Wall Street is open and it's more than 12 minutes old; Yahoo stands in
 const tdStale=q=>{const v=quotes[q];return !v||(usOpen()&&Date.now()-(v.at||quotesAt)>12*60e3);};
+// when the site answers stocks from Finnhub (no daily cap), stocks refresh every 2 minutes in their own request and
+// Twelve Data is only asked for metals every 5
+let fhOn=store.get('wd.fh',false),fhBucket='';
+async function loadFinnhubStocks(){
+ const st=[...new Set(W.stocks.map(x=>x.q).filter(q=>q&&/^[A-Z.]{1,6}$/.test(q)))].sort();if(!st.length||!usOpen())return false;
+ const b='f'+Math.floor(Date.now()/120e3);if(b===fhBucket)return true;
+ try{const j=await fetch(`/.netlify/functions/td?s=${encodeURIComponent(st.join(','))}&b=${b}`).then(r=>r.json());
+  const got=st.filter(s=>j.quotes?.[s]?.src==='finnhub');if(!got.length){fhOn=false;store.set('wd.fh',false);return false;}
+  got.forEach(s=>quotes[s]={...j.quotes[s],at:j.at});fhBucket=b;quotesAt=Date.now();store.set('wd.quotes',quotes);store.set('wd.quotesAt',quotesAt);return true;}catch(e){return false;}
+}
 async function loadQuotes(force){
  const now=Date.now(),b=quoteBucket();
  if(qBusy||now<qRetryAt)return;
- const syms=[...new Set([...W.stocks,...W.metals].map(x=>x.q).filter(Boolean))].sort();
- if(!syms.length)return;
- if(b===qBucket&&syms.every(k=>quotes[k])){renderKeyStatus();return;}
+ const fhDone=fhOn&&await loadFinnhubStocks();
+ const syms=[...new Set([...W.stocks,...W.metals].map(x=>x.q).filter(Boolean))].filter(q=>!(fhDone&&/^[A-Z.]{1,6}$/.test(q))).sort();
+ if(!syms.length){renderKeyStatus();updateMetalsLive();renderRecap();if(activeTab==='park')syncPark();return;}
+ if(b===qBucket&&syms.every(k=>quotes[k])){if(fhDone){renderRecap();if(activeTab==='park')syncPark();}renderKeyStatus();return;}
  qBusy=true;
  try{
   const k=tdKey&&tdKey!==DEFAULT_TD_KEY?'&k='+encodeURIComponent(tdKey):'';
   const j=await fetch(`/.netlify/functions/td?s=${encodeURIComponent(syms.join(','))}&b=${b}${k}`).then(r=>r.json());
+  if(j.quotes&&Object.values(j.quotes).some(v=>v&&v.src==='finnhub')&&!fhOn){fhOn=true;store.set('wd.fh',true);}
   if(j.error){qRetryAt=j.retryAt||Date.now()+65e3;qStatus=j.daily?'Twelve Data’s daily allowance is used up until midnight UTC, so prices come from Yahoo until then':j.code===429?'Twelve Data’s per-minute limit was hit, using Yahoo prices for now':j.error;}
   else{let ok=0,miss=[],lim=false;
    syms.forEach(s=>{const v=j.quotes[s];if(v&&!v.error){quotes[s]={...v,at:j.at};ok++;}else{miss.push(s);if(v&&v.code===429)lim=true;}});
