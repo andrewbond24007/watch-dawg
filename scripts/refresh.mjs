@@ -232,10 +232,10 @@ if (earnDue) {
 // EIA weekly crude inventories for Big events (every pass: the release lands at 10:30 New York on Wednesdays)
 if (process.env.EIA_KEY) {
   try {
-    const u = `https://api.eia.gov/v2/petroleum/stoc/wstk/data/?api_key=${encodeURIComponent(process.env.EIA_KEY)}&frequency=weekly&data[0]=value&facets[series][]=WCESTUS1&sort[0][column]=period&sort[0][direction]=desc&length=3`;
+    const u = `https://api.eia.gov/v2/petroleum/stoc/wstk/data/?api_key=${encodeURIComponent(process.env.EIA_KEY)}&frequency=weekly&data[0]=value&facets[series][]=WCESTUS1&start=${new Date(Date.now() - 70 * 864e5).toISOString().slice(0, 10)}&sort[0][column]=period&sort[0][direction]=desc&length=20`;
     const j = await fetch(u, { signal: AbortSignal.timeout(10000) }).then((r) => r.json());
     if (!j?.response?.data?.length) throw new Error('no rows');
-    write('eia.json', { updated: new Date().toISOString(), rows: j.response.data.map((x) => ({ period: x.period, value: x.value })) });
+    write('eia.json', { updated: new Date().toISOString(), rows: j.response.data.map((x) => ({ period: x.period, value: x.value })).sort((a, b) => b.period.localeCompare(a.period)).slice(0, 4) });
   } catch (e) { errors.eia = String(e.message || e); }
 }
 if (!FAST) write('history.json', hist);

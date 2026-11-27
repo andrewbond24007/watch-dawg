@@ -106,7 +106,7 @@ export function eiaEvents(rows) {
   return [last, { date: nyAt(rel(nx), '10:30'), country: 'USD', title, hint, forecast: '', previous: `${chg > 0 ? '+' : ''}${chg}M`, key: false, official: true }];
 }
 async function eia(key) {
-  const u = `https://api.eia.gov/v2/petroleum/stoc/wstk/data/?api_key=${encodeURIComponent(key)}&frequency=weekly&data[0]=value&facets[series][]=WCESTUS1&sort[0][column]=period&sort[0][direction]=desc&length=3`;
+  const u = `https://api.eia.gov/v2/petroleum/stoc/wstk/data/?api_key=${encodeURIComponent(key)}&frequency=weekly&data[0]=value&facets[series][]=WCESTUS1&start=${new Date(Date.now() - 70 * 864e5).toISOString().slice(0, 10)}&sort[0][column]=period&sort[0][direction]=desc&length=20`;
   const j = await fetch(u, { signal: AbortSignal.timeout(8000) }).then((r) => r.json());
   return eiaEvents(j?.response?.data);
 }
