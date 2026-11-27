@@ -229,14 +229,16 @@ if (earnDue) {
     console.log('earnings:', list.map((p) => `${p.sym} next ${p.next || '?'}`).join(', '));
   } catch (e) { errors.earnings = String(e.message || e); console.warn('earnings:', e.message); }
 }
-// EIA weekly crude inventories for Big events (every pass: the release lands at 10:30 New York on Wednesdays)
-if (process.env.EIA_KEY) {
+// EIA weekly crude inventories for Big events. EIA's API answers repeat queries from a stale cache and fresh ones
+// slowly (up to a minute), so: full refreshes only, a generous timeout, and only a newer week replaces the saved one
+const eiaPrev = read('eia.json', null), eiaDue = !FAST && process.env.EIA_KEY;
+if (eiaDue) {
   try {
-    const u = `https://api.eia.gov/v2/petroleum/stoc/wstk/data/?api_key=${encodeURIComponent(process.env.EIA_KEY)}&frequency=weekly&data[0]=value&facets[series][]=WCESTUS1&start=${new Date(Date.now() - 70 * 864e5).toISOString().slice(0, 10)}&sort[0][column]=period&sort[0][direction]=desc&length=20`;
-    let j = null;
-    for (let i = 0; i < 2 && !j?.response?.data?.length; i++) j = await fetch(u, { signal: AbortSignal.timeout(25000) }).then((r) => r.json()).catch(() => null); // EIA's API can be slow
-    if (!j?.response?.data?.length) throw new Error('no rows');
-    write('eia.json', { updated: new Date().toISOString(), rows: j.response.data.map((x) => ({ period: x.period, value: x.value })).sort((a, b) => b.period.localeCompare(a.period)).slice(0, 4) });
+    const u = `https://api.eia.gov/v2/petroleum/stoc/wstk/data/?api_key=${encodeURIComponent(process.env.EIA_KEY)}&frequency=weekly&data[0]=value&facets[series][]=WCESTUS1&sort[0][column]=period&sort[0][direction]=desc&offset=0&length=5`;
+    const j = await fetch(u, { signal: AbortSignal.timeout(90000) }).then((r) => r.json());
+    const rows = (j?.response?.data || []).map((x) => ({ period: x.period, value: x.value })).sort((a, b) => b.period.localeCompare(a.period)).slice(0, 4);
+    if (!rows.length) throw new Error('no rows');
+    if (!eiaPrev?.rows?.length || rows[0].period >= eiaPrev.rows[0].period) write('eia.json', { updated: new Date().toISOString(), rows });
   } catch (e) { errors.eia = String(e.message || e); }
 }
 if (!FAST) write('history.json', hist);
@@ -250,7 +252,7 @@ for (const [k, list] of Object.entries({ 'schedule:us_releases': SCHEDULE.map((e
 // the data branch is only read through raw GitHub links: tell Vercel never to deploy it (each deploy counts
 // towards the free plan's 100 a day)
 fs.writeFileSync(path.join(dir, 'vercel.json'), JSON.stringify({ git: { deploymentEnabled: false } }));
-const status = updateStatus(read('status.json', {}), errors, [...Object.keys(SOURCE_NAMES), ...newsKeys, ...schedKeys].filter((k) => (!FAST || /^(rates:|cds)/.test(k)) && (k !== 'earnings' || earnDue)));
+const status = updateStatus(read('status.json', {}), errors, [...Object.keys(SOURCE_NAMES), ...newsKeys, ...schedKeys].filter((k) => (!FAST || /^(rates:|cds)/.test(k)) && (k !== 'earnings' || earnDue) && (k !== 'eia' || eiaDue)));
 status.seconds = Math.round((Date.now() - t0) / 1000);
 write('status.json', status);
 const down = Object.entries(status.sources).filter(([, v]) => !v.ok);
