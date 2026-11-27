@@ -12,3 +12,8 @@ test('calendar quarters, totals and growth', () => {
   const c = buildCapex({ microsoft: mk(20), alphabet: mk(15), amazon: mk(25) }, Date.parse('2026-11-27'));
   assert.equal(c.latest, '2026-Q3'); assert.equal(c.latestTotal, 78); assert.equal(c.yoy, 18);
 });
+import { factsFromFinnhub } from '../lib/capex.mjs';
+test('Finnhub as-reported filings give the capex facts', () => {
+  const j = { data: [{ startDate: '2025-07-01 00:00:00', endDate: '2025-12-31 00:00:00', form: '10-Q', filedDate: '2026-01-28 00:00:00', report: { cf: [{ concept: 'us-gaap_PaymentsToAcquirePropertyPlantAndEquipment', value: -45e9 }] } }] };
+  assert.deepEqual(factsFromFinnhub(j), [{ start: '2025-07-01', end: '2025-12-31', val: 45e9, form: '10-Q', filed: '2026-01-28' }]);
+});

@@ -261,10 +261,10 @@ if (!FAST) {
   try { const btc = await yahooDaily('BTC-USD').catch(() => []), S = await fetchStables(btc); write('stablecoins.json', S); console.log(`stablecoins: $${S.total}bn, 30d ${S.d30}, ${S.trend}`); }
   catch (e) { errors.stablecoins = String(e.message || e); }
 }
-// big tech's AI spending (quarterly capex from SEC filings, no key) for Health → AI bubble; every 6 hours is plenty
-const capPrev = read('capex.json', null), capDue = !FAST && (!capPrev || Date.now() - Date.parse(capPrev.updated) > 6 * 3600e3);
+// big tech's AI spending (quarterly capex as filed with the SEC, via Finnhub) for Health → AI bubble; every 6 hours is plenty
+const capPrev = read('capex.json', null), capDue = !FAST && !!process.env.FINNHUB_KEY && (!capPrev || Date.now() - Date.parse(capPrev.updated) > 6 * 3600e3);
 if (capDue) {
-  try { const C = await fetchCapex(); write('capex.json', C); console.log(`capex: ${C.latest} $${C.latestTotal}bn, y/y ${C.yoy}%, 12m $${C.ttm}bn${C.missing ? ' (missing ' + C.missing.join(', ') + ')' : ''}`); }
+  try { const C = await fetchCapex(process.env.FINNHUB_KEY); write('capex.json', C); console.log(`capex: ${C.latest} $${C.latestTotal}bn, y/y ${C.yoy}%, 12m $${C.ttm}bn${C.missing ? ' (missing ' + C.missing.join(', ') + ')' : ''}`); }
   catch (e) { errors.capex = String(e.message || e); }
 }
 if (!FAST) write('history.json', hist);
