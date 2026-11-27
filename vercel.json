@@ -12,9 +12,6 @@
   ],
   "functions": {
     "api/*.mjs": {
-      "maxDuration": 30
-    },
-    "api/health.mjs": {
       "maxDuration": 60
     }
   },
