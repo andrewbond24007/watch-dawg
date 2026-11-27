@@ -713,3 +713,12 @@ body.compact .list{gap:6px}
 
 .nr.hot .nh{font-weight:800}
 .nr.hot .nt{color:var(--accent);font-weight:800}
+
+.mcell i em{font-style:normal;font-size:8px;margin-left:2px}
+.mcell i em.up{color:var(--up)}.mcell i em.down{color:var(--down)}
+.mmk{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;margin-top:8px;font-size:13.5px}
+.mmk b.up{color:var(--up)}.mmk b.down{color:var(--down)}
+.mcall{font-size:12px;font-weight:700;border-radius:999px;padding:2px 9px}
+.mcall.ok{background:color-mix(in srgb,var(--up) 20%,transparent);color:var(--up)}
+.mcall.no{background:color-mix(in srgb,var(--down) 18%,transparent);color:var(--down)}
+.mrate{font-size:12.5px;margin:10px 0 0;color:var(--ink)}.mrate span{color:var(--muted)}

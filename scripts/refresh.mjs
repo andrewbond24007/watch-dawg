@@ -12,10 +12,21 @@ import news, { parseRss } from '../netlify/functions/news.mjs';
 import { CDS_NAMES, extractCds, mergeCds } from '../lib/cds.mjs';
 import { mergeArchive } from '../lib/newsarchive.mjs';
 import { updateMood, dayMood, londonDay } from '../lib/sentiment.mjs';
+// daily % change of the S&P 500 (by New York trading day) and bitcoin (by UTC day), keyed by date
+async function marketMoves() {
+  const out = {};
+  for (const [k, sym] of [['spx', '^GSPC'], ['btc', 'BTC-USD']]) {
+    const j = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=6mo&interval=1d`, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(12000) }).then((r) => r.json());
+    const r = j.chart.result[0], ts = r.timestamp, c = r.indicators.quote[0].close, tz = k === 'spx' ? 'America/New_York' : 'UTC';
+    let prev = null;
+    ts.forEach((t, i) => { if (c[i] == null) return; const d = new Date(t * 1000).toLocaleDateString('en-CA', { timeZone: tz }); if (prev != null) (out[d] ||= {})[k] = +((c[i] / prev - 1) * 100).toFixed(2); prev = c[i]; });
+  }
+  return out;
+}
 // days before the archive began: score each from that day's market headlines on Google News (a few days per run)
 async function backfillMood(mood) {
   const todo = [];
-  for (let i = 1; i <= 120 && todo.length < 25; i++) { const d = londonDay(new Date(Date.now() - i * 864e5).toISOString()); if (!mood.days[d]) todo.push(d); }
+  for (let i = 1; i <= 120 && todo.length < 40; i++) { const d = londonDay(new Date(Date.now() - i * 864e5).toISOString()); if (!mood.days[d]) todo.push(d); }
   for (const d of todo) {
     const next = new Date(Date.parse(d + 'T12:00:00Z') + 864e5).toISOString().slice(0, 10), items = [];
     for (const q of ['stocks OR "stock market" OR "Wall Street"', 'bitcoin OR crypto OR markets OR Fed']) {
@@ -135,6 +146,8 @@ try {
     // daily news mood (bullish/bearish, 0-100) for the News tab calendar
     const mood = updateMood(read('news-mood.json', null), a.items);
     if (!FAST) await backfillMood(mood);
+    // what markets actually did each day, to set beside the score
+    try { const mv = await marketMoves(); for (const [d, m] of Object.entries(mv)) if (mood.days[d]) mood.days[d].mkt = m; } catch (e) { console.warn('market moves:', e.message); }
     write('news-mood.json', mood);
     console.log(`news archive: ${a.items.length} stories; mood today ${mood.days[londonDay(new Date().toISOString())]?.s ?? '-'}, ${Object.keys(mood.days).length} days`);
   }
