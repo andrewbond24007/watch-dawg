@@ -218,10 +218,12 @@ try {
 // earnings dates and results for the tracked stocks (Twelve Data, the app's own key): about 100 of the
 // day's 800 credits, so only the first full refresh after 06:00 and 18:00 UTC
 const prevEarn = read('earnings.json', null);
-const earnDue = !FAST && (!prevEarn || (prevEarn.stocks || []).length < 5 || Date.now() - Date.parse(prevEarn.updated) > 11 * 3600e3);
+const earnDue = !FAST && (!prevEarn || ((prevEarn.stocks || []).length < 5 && !!process.env.FINNHUB_KEY) || Date.now() - Date.parse(prevEarn.updated) > 11 * 3600e3);
 if (earnDue) {
   try {
-    const list = await earnings(process.env.TD_KEY || TD_DEFAULT_KEY);
+    const list = await earnings(process.env.TD_KEY || TD_DEFAULT_KEY, process.env.FINNHUB_KEY);
+    // keep stocks a source couldn't answer for from the last good copy
+    for (const old of prevEarn?.stocks || []) if (!list.some((x) => x.sym === old.sym)) list.push(old);
     write('earnings.json', { updated: new Date().toISOString(), stocks: list });
     console.log('earnings:', list.map((p) => `${p.sym} next ${p.next || '?'}`).join(', '));
   } catch (e) { errors.earnings = String(e.message || e); console.warn('earnings:', e.message); }

@@ -31,6 +31,8 @@ jobs:
       # one full refresh, then quick passes (rates, odds, today's CDS trades) every 15 minutes until the next run
       # is due: GitHub often starts scheduled runs an hour or more apart, so this keeps the figures fresh anyway
       - name: Refresh
+        env:
+          FINNHUB_KEY: ${{ secrets.FINNHUB_KEY }}
         run: |
           save() {
             (cd data-branch && git config user.name "watchdawg-bot" && git config user.email "41898282+github-actions[bot]@users.noreply.github.com" \
