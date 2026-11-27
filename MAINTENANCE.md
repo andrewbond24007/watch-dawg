@@ -14,6 +14,10 @@
 
 All `/api/*` answers are edge-cached on Vercel (check with the Probe workflow: `head:/.netlify/functions/<name>`).
 
+## Earnings
+
+`earnings.json` (data branch) is refreshed twice a day. Twelve Data's free plan only answers for Apple; add a free Finnhub key as the GitHub secret `FINNHUB_KEY` to cover Nvidia, Tesla, Alphabet and TSMC. Yahoo refuses GitHub's machines, so it isn't used.
+
 ## Rate limits to respect
 
 - **BLS** keyless API: ~25 calls/day. The refresh only asks when US CPI is due or the copy is 8 h old (`?nobls=1` otherwise).
@@ -39,4 +43,6 @@ Official sources: bls.gov/schedule, bea.gov/news/schedule, federalreserve.gov FO
 - BLS has no October 2025 CPI (shutdown): the Oct 2026 yearly rate is estimated from Sep/Nov 2025 and shown with ≈.
 - Telegram marked @WalterBloomberg fake (no posts); it was removed.
 - DTCC public swap data: personal use only.
+- Google News feeds (Reuters, Bloomberg, Kitco) retry with US settings, then fall back to the saved archive when throttled.
+- News mood (v2) weights sources and relevance; changing the method (bump `MOOD_VERSION`) rescores and re-backfills.
 - Monthly sources now used instead of quarterly BIS where possible: UK (Land Registry UK HPI), Ireland (CSO RPPI).
