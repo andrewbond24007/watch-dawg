@@ -197,7 +197,7 @@ function stbCard(){
  const cor=S.corr,corTxt=cor==null?'':Math.abs(cor)<.2?'have barely moved together':cor>0?`have tended to move together (correlation ${cor.toFixed(2)})`:`have tended to move in opposite directions (correlation ${cor.toFixed(2)})`;
  return `<div class="card hreg" id="rstb"><div class="hh"><span class="fl">🪙</span><h3>Stablecoin supply</h3><span class="sig ${lt}">${S.trend[0].toUpperCase()+S.trend.slice(1)}</span></div>
   <div class="why">Dollars sitting inside crypto as stablecoins (USDT, USDC and others), ready to buy coins. New ones are created when money comes in and redeemed when it leaves, so it’s crypto’s own liquidity gauge.</div>
-  <div class="radh"><div class="rads"><b class="num" style="color:var(--accent)">$${(S.total/1000).toFixed(3)}tn</b><small>in circulation · ${rdate(S.date)}</small></div>
+  <div class="radh"><div class="rads"><b class="num" style="color:var(--accent)">${S.total>=1000?'$'+(S.total/1000).toFixed(2)+'tn':'$'+S.total.toFixed(1)+'bn'}</b><small>in circulation · ${rdate(S.date)}</small></div>
    <div class="liqch"><span>7 days <b class="num ${cls(S.d7)}">${bn(S.d7)}</b></span><span>30 days <b class="num ${cls(S.d30)}">${bn(S.d30)}</b></span><span>1 year <b class="num ${cls(S.d365)}">${bn(S.d365)}</b></span></div></div>
   <svg class="liqc" viewBox="0 0 ${W} ${H}" aria-label="Stablecoin supply and bitcoin, 3 years">${line(rows.map(r=>r[1]),'var(--accent)',2.2)}${line(S.btc,'#f2a900',1.6,true)}${yrs}</svg>
   <div class="liqk"><span><i style="background:var(--accent)"></i>Stablecoin supply</span><span><i style="background:#f2a900"></i>Bitcoin (dashed)</span><span>3 years, weekly</span></div>
@@ -221,7 +221,7 @@ function renderRates(){
  const bul=[`<li><b>Central banks</b> ${esc(moves.join(', '))}</li>`,(fodd||pmb.length)?`<li><b>Expectations</b> ${esc([fodd,pmb.length?'Polymarket: '+pmb.join(', '):''].filter(Boolean).join('. '))}</li>`:'',
   RADAR.data?.score!=null?`<li><b>Recession risk</b> ${RADAR.data.score}/100 on the radar below (${esc(RADAR.data.label.toLowerCase())}${RADAR.data.signals.filter(x=>x.light==='red').length?`; warning from ${esc(RADAR.data.signals.filter(x=>x.light==='red').map(x=>x.short.toLowerCase()).join(', '))}`:''})</li>`:'',
   LIQ.data?`<li><b>Liquidity</b> ${esc(LIQ.data.trend)}: ${tnbn(LIQ.data.net)} net, ${sbn(LIQ.data.w13)} over 3 months</li>`:'',
-  STB.data?`<li><b>Crypto liquidity</b> stablecoins ${esc(STB.data.trend)}, $${(STB.data.total/1000).toFixed(2)}tn (${STB.data.d30>0?'+':'−'}$${Math.abs(STB.data.d30).toFixed(1)}bn in 30 days)</li>`:'',
+  STB.data?`<li><b>Crypto liquidity</b> stablecoins ${esc(STB.data.trend)}, $${STB.data.total.toFixed(0)}bn (${STB.data.d30>0?'+':'−'}$${Math.abs(STB.data.d30).toFixed(1)}bn in 30 days)</li>`:'',
   us10?`<li><b>Borrowing costs</b> US 10-year at ${rp(us10.value)} (${bps(us10.value-us10.y1)} on a year)${m30?`, US mortgages ${rp(m30.value)}`:''}${uk2?`, UK 2-year fixes ${rp(uk2.value)}`:''}</li>`:''].join('');
  const ev=[];B.forEach(b=>b.next&&ev.push([b.next,`${b.flag} ${b.short} decision`,'#rb-'+b.id]));
  (d.inflation||[]).filter(i=>i.next&&i.id!=='uscore').forEach(i=>ev.push([i.next,`${i.flag} ${i.id==='uscpi'?'US':i.id==='eahicp'?'Euro':'UK'} inflation`,'#rinfl']));
