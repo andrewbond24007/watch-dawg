@@ -11,6 +11,7 @@ import { SCHEDULE, HEALTH } from '../netlify/functions/calendar.mjs';
 import news, { parseRss } from '../netlify/functions/news.mjs';
 import { CDS_NAMES, extractCds, mergeCds } from '../lib/cds.mjs';
 import { mergeArchive } from '../lib/newsarchive.mjs';
+import { earnings } from '../lib/earnings.mjs';
 import { updateMood, dayMood, londonDay } from '../lib/sentiment.mjs';
 // daily % change of the S&P 500 (by New York trading day) and bitcoin (by UTC day), keyed by date
 async function marketMoves() {
@@ -213,6 +214,21 @@ try {
   console.log(`CDS: ${found.length} quotes found, ${Object.keys(cds.names).length} companies tracked`);
 } catch (e) { errors['cds'] = String(e.message || e); }
 
+// earnings dates and results for the tracked stocks (Yahoo), once per full refresh
+if (!FAST) {
+  try {
+    const prev = read('earnings.json', { stocks: [], reports: {} }), now = Date.now(), list = await earnings(), reports = prev.reports || {};
+    for (const p of list) {
+      const was = (prev.stocks || []).find((x) => x.sym === p.sym), rs = (reports[p.sym] ||= []);
+      // a report date that has passed becomes a result, filled in once Yahoo has the quarter's actual EPS
+      for (const d of [was?.next, p.next]) if (d && Date.parse(d) < now && !rs.some((r) => Math.abs(Date.parse(r.date) - Date.parse(d)) < 5 * 864e5)) rs.push({ date: d, est: d === was?.next ? was.epsEst : p.epsEst });
+      for (const r of rs) if (r.act == null) { const h = p.past.filter((x) => Date.parse(x.q) < Date.parse(r.date) && Date.parse(r.date) - Date.parse(x.q) < 120 * 864e5).at(-1); if (h) Object.assign(r, { act: h.act, est: h.est ?? r.est, surprise: h.surprise, period: h.period }); }
+      reports[p.sym] = rs.filter((r) => now - Date.parse(r.date) < 400 * 864e5);
+    }
+    write('earnings.json', { updated: new Date().toISOString(), stocks: list, reports });
+    console.log('earnings:', list.map((p) => `${p.sym} ${p.next?.slice(0, 10) || '?'}`).join(', '));
+  } catch (e) { errors.earnings = String(e.message || e); console.warn('earnings:', e.message); }
+}
 if (!FAST) write('history.json', hist);
 // release dates that are typed in by hand: warn (through the source checks) when a list is about to run out
 const schedKeys = [];
