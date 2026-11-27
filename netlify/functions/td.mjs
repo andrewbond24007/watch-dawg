@@ -63,7 +63,7 @@ export async function deepDive(sym, key) {
     stats: { cap: pick('marketCapitalization'), pe: pick('peTTM', 'peBasicExclExtraTTM', 'peNormalizedAnnual'), eps: pick('epsTTM', 'epsBasicExclExtraItemsTTM'), hi52: pick('52WeekHigh'), lo52: pick('52WeekLow'),
       beta: pick('beta'), div: pick('dividendYieldIndicatedAnnual', 'currentDividendYieldTTM'), revGrowth: pick('revenueGrowthTTMYoy', 'revenueGrowthQuarterlyYoy'), margin: pick('netProfitMarginTTM', 'netProfitMarginAnnual'), ret52: pick('52WeekPriceReturnDaily') },
     recs: (rec || []).slice(0, 4).map((r) => ({ period: r.period, sb: r.strongBuy, b: r.buy, h: r.hold, s: r.sell, ss: r.strongSell })),
-    earnings: (earn || []).slice(0, 4).map((e) => ({ period: e.period, act: e.actual, est: e.estimate, surprise: e.surprisePercent })),
+    earnings: (earn || []).slice(0, 4).map((e) => ({ period: e.period, q: e.quarter, y: e.year, act: e.actual, est: e.estimate, surprise: e.surprisePercent })),
     next: nx ? { date: nx.date, hour: nx.hour || '', est: nx.epsEstimate ?? null } : null,
     news: (news || []).filter((n) => n.headline && n.url).sort((a, b) => b.datetime - a.datetime).slice(0, 8).map((n) => ({ t: n.headline, src: n.source, at: n.datetime * 1000, url: n.url })),
   };
