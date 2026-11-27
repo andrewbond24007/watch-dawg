@@ -33,7 +33,34 @@ export function parseBeaPio(html) {
   if (yy) { out.pceYoY = num(yy[1]); out.corePceYoY = num(yy[2]); }
   return out;
 }
+// BEA's own API (free key, BEA_KEY): GDP growth from table 1.1.1 and PCE price indexes from table 2.8.4, matched by
+// row name so renumbered lines don't matter. Used ahead of reading BEA's web pages when a key is set.
+export function beaRows(j) { return (j?.BEAAPI?.Results?.Data || []).map((d) => ({ line: d.LineDescription, t: d.TimePeriod, v: parseFloat(String(d.DataValue).replace(/,/g, '')) })).filter((d) => !isNaN(d.v)); }
+export function beaFromApi(gdpJ, pceJ) {
+  const g = beaRows(gdpJ).filter((d) => /^gross domestic product$/i.test(d.line)).sort((a, b) => a.t.localeCompare(b.t)).at(-1);
+  const series = (rx) => beaRows(pceJ).filter((d) => rx.test(d.line)).map((d) => [d.t.replace('M', '-'), d.v]).sort((a, b) => a[0].localeCompare(b[0]));
+  const all = series(/^personal consumption expenditures \(pce\)$/i), core = series(/^pce excluding food and energy$/i);
+  const last = (s) => s.at(-1), ago = (s, k) => s.find((x) => x[0] === k);
+  const yAgo = (k) => `${+k.slice(0, 4) - 1}${k.slice(4)}`;
+  const ch = (a, b) => (a && b ? Math.round((a[1] / b[1] - 1) * 10000) / 100 : null);
+  const out = {};
+  if (g) out.gdp = { p: g.t.replace('Q', '-Q'), v: g.v };
+  if (all.length > 12 && core.length > 12) {
+    const la = last(all), lc = last(core);
+    out.pio = { p: la[0], pceMoM: ch(la, all.at(-2)), corePceMoM: ch(lc, core.at(-2)), pceYoY: ch(la, ago(all, yAgo(la[0]))), corePceYoY: ch(lc, ago(core, yAgo(lc[0]))) };
+  }
+  return out;
+}
+async function beaApi(key) {
+  const y = new Date().getUTCFullYear(), yrs = `${y - 2},${y - 1},${y}`;
+  const get = (t, f) => fetch(`https://apps.bea.gov/api/data/?UserID=${encodeURIComponent(key)}&method=GetData&datasetname=NIPA&TableName=${t}&Frequency=${f}&Year=${yrs}&ResultFormat=JSON`, { signal: AbortSignal.timeout(15000) }).then((r) => r.json());
+  const [g, p] = await Promise.all([get('T10101', 'Q'), get('T20804', 'M')]);
+  const o = beaFromApi(g, p);
+  if (!o.gdp && !o.pio) throw new Error('BEA API: no rows');
+  return o;
+}
 async function bea() {
+  if (process.env.BEA_KEY) { try { const a = await beaApi(process.env.BEA_KEY); return { home: { gdp: a.gdp }, pio: a.pio || {} , api: true }; } catch (e) { /* fall back to the web pages */ } }
   const home = parseBeaHome(await fetch('https://www.bea.gov/', { headers: UA, signal: AbortSignal.timeout(12000) }).then((r) => r.text()));
   let pio = {};
   if (home.pioLink) pio = parseBeaPio(await fetch(home.pioLink, { headers: UA, signal: AbortSignal.timeout(12000) }).then((r) => r.text()));
@@ -47,9 +74,11 @@ export default async (req) => {
   const B = only === 'bls' ? {} : await bea().catch((e) => ({ error: String(e).slice(0, 100) }));
   let res, ok = false;
   if (only === 'bea') res = { error: 'skipped' }; else try {
-    const r = await fetch('https://api.bls.gov/publicAPI/v1/timeseries/data/', {
+    // with a free BLS key (BLS_KEY) the v2 API allows 500 calls a day instead of ~25
+    const bk = process.env.BLS_KEY;
+    const r = await fetch(`https://api.bls.gov/publicAPI/${bk ? 'v2' : 'v1'}/timeseries/data/`, {
       method: 'POST', headers: { 'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0 (compatible; WatchDawg/1.0)' },
-      body: JSON.stringify({ seriesid: Object.values(SERIES) }),
+      body: JSON.stringify({ seriesid: Object.values(SERIES), ...(bk ? { registrationkey: bk } : {}) }),
     });
     res = await r.json();
     ok = res && res.status === 'REQUEST_SUCCEEDED';

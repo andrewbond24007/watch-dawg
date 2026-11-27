@@ -18,6 +18,16 @@ All `/api/*` answers are edge-cached on Vercel (check with the Probe workflow: `
 
 `earnings.json` (data branch) is refreshed twice a day. Twelve Data's free plan only answers for Apple; add a free Finnhub key as the GitHub secret `FINNHUB_KEY` to cover Nvidia, Tesla, Alphabet and TSMC. Yahoo refuses GitHub's machines, so it isn't used.
 
+## Optional free keys (each switches a feature on when present)
+
+| Name | Where | What it does |
+|---|---|---|
+| `FINNHUB_KEY` | GitHub + Vercel | Earnings (GitHub); live US stock prices without Twelve Data's cap (Vercel) |
+| `BLS_KEY` | GitHub + Vercel | BLS v2 API: 500 calls/day instead of ~25 |
+| `FRED_KEY` | Vercel | Backup for Fed arrears, Freddie mortgage rate, FHFA prices |
+| `BEA_KEY` | Vercel | GDP and PCE from BEA's API instead of its web pages |
+| `EIA_KEY` | Vercel | Weekly US crude inventories in Big events, with the actual change |
+
 ## Rate limits to respect
 
 - **BLS** keyless API: ~25 calls/day. The refresh only asks when US CPI is due or the copy is 8 h old (`?nobls=1` otherwise).

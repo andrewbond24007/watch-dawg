@@ -1,6 +1,7 @@
 // WatchDawg market health: housing, commercial property (CRE) and the AI trade.
 // Official data from the Federal Reserve, Freddie Mac, FHFA, the BIS, the Bank of England
 // and the ECB (FRED blocks cloud servers, so it isn't used), plus share prices from Yahoo.
+import { fredSeries, orFred } from '../../lib/fred.mjs';
 import * as XLSX from 'xlsx';
 import { loadHistory, mergeHistory } from '../../lib/history.mjs';
 import { freddieSeries } from '../../lib/freddie.mjs';
@@ -35,7 +36,8 @@ async function bis(flow, key, by = 'REF_AREA') {
   return out;
 }
 // Federal Reserve delinquency rates on bank loans (seasonally adjusted), quarterly.
-async function fedDelinq() {
+async function fedDelinq() { return orFred(fedDelinqPage, async () => ({ res: await fredSeries('DRSFRMACBS', START), com: await fredSeries('DRCRELEXFACBS', START) })); }
+async function fedDelinqPage() {
   const r = await fetch('https://www.federalreserve.gov/releases/chargeoff/delallsa.htm', { headers: UA, signal: T(9000) });
   if (!r.ok) throw new Error('Fed ' + r.status);
   const h = await r.text(), res = [], com = [];
@@ -52,9 +54,10 @@ async function fedDelinq() {
   return { res: asc(res), com: asc(com) };
 }
 // Freddie Mac weekly 30-year fixed mortgage rate.
-async function freddie() { return (await freddieSeries(START, 9000)).map(([d, v]) => [d, v]); }
+async function freddie() { return orFred(async () => (await freddieSeries(START, 9000)).map(([d, v]) => [d, v]), () => fredSeries('MORTGAGE30US', START)); }
 // FHFA purchase-only house price index for the whole US, monthly (seasonally adjusted).
-async function fhfa() {
+async function fhfa() { return orFred(fhfaFile, () => fredSeries('HPIPONM226S', START)); }
+async function fhfaFile() {
   const r = await fetch('https://www.fhfa.gov/hpi/download/monthly/hpi_master.csv', { headers: UA, signal: T(9000) });
   if (!r.ok) throw new Error('FHFA ' + r.status);
   const out = [];

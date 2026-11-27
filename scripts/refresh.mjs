@@ -124,7 +124,7 @@ catch (e) { errors.nowcast = String(e.message || e); }
 try {
   // US CPI (BLS) only when a release is due or the copy is over 8 hours old: its keyless API allows ~25 calls a day
   const prevR = read('rates.json', null), pUs = (prevR?.inflation || []).filter((i) => i.id === 'uscpi' || i.id === 'uscore');
-  const blsDue = !pUs.length || !prevR.blsAt || Date.now() - Date.parse(prevR.blsAt) > 8 * 3600e3 || pUs.some((i) => i.next && Date.parse(i.next) < Date.now());
+  const blsDue = !!process.env.BLS_KEY || !pUs.length || !prevR.blsAt || Date.now() - Date.parse(prevR.blsAt) > 8 * 3600e3 || pUs.some((i) => i.next && Date.parse(i.next) < Date.now());
   const q = blsDue ? '' : '?nobls=1';
   const r = await call(rates, 'https://watchdawg.local/' + q, '/.netlify/functions/rates' + q);
   if (!r.inflation?.some((i) => i.id === 'uscpi') && pUs.length) {

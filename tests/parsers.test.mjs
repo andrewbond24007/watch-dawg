@@ -76,3 +76,19 @@ test('Freddie Mac: quoted and unquoted history rows, and the survey page', () =>
   const txt = ' The 30-year fixed-rate mortgage &nbsp;averaged 7.21% as of November 25, 2026, down from last week when it averaged 7.28%. The 15-year fixed-rate mortgage &nbsp;averaged 6.54%, down from last week when it averaged 6.66%.';
   assert.deepEqual(parsePmmsPage(page + txt), { date: '2026-11-25', v30: 7.21, v15: 6.54, prev30: 7.28, prev15: 6.66 });
 });
+import { beaFromApi } from '../netlify/functions/actuals.mjs';
+test('BEA API rows -> GDP and PCE changes', () => {
+  const row = (line, t, v) => ({ LineDescription: line, TimePeriod: t, DataValue: String(v) });
+  const g = { BEAAPI: { Results: { Data: [row('Gross domestic product', '2026Q2', 3.1), row('Gross domestic product', '2026Q3', 4.3), row('Personal consumption expenditures', '2026Q3', 2.0)] } } };
+  const months = Array.from({ length: 14 }, (_, i) => { const d = new Date(Date.UTC(2025, 8 + i, 1)); return `${d.getUTCFullYear()}M${String(d.getUTCMonth() + 1).padStart(2, '0')}`; });
+  const p = { BEAAPI: { Results: { Data: months.flatMap((t, i) => [row('Personal consumption expenditures (PCE)', t, 100 * 1.003 ** i), row('PCE excluding food and energy', t, 100 * 1.002 ** i)]) } } };
+  const o = beaFromApi(g, p);
+  assert.deepEqual(o.gdp, { p: '2026-Q3', v: 4.3 });
+  assert.equal(o.pio.p, '2026-10'); assert.equal(o.pio.pceMoM, 0.3); assert.equal(o.pio.corePceMoM, 0.2);
+  assert.ok(Math.abs(o.pio.pceYoY - 3.66) < 0.02);
+});
+import { eiaEvents } from '../netlify/functions/calendar.mjs';
+test('EIA weekly crude: last release with change, and the next date', () => {
+  const ev = eiaEvents([{ period: '2026-11-20', value: '421500' }, { period: '2026-11-13', value: '424300' }]);
+  assert.equal(ev[0].result, '-2.8M barrels'); assert.equal(ev[0].date.slice(0, 10), '2026-11-25'); assert.equal(ev[1].date.slice(0, 10), '2026-12-02');
+});

@@ -119,7 +119,8 @@ export function yoyPoint(idx, k) {
 // BLS CPI index -> 12-month change
 async function usCpi() {
   const y = new Date().getUTCFullYear();
-  const r = await fetch('https://api.bls.gov/publicAPI/v1/timeseries/data/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ seriesid: ['CUUR0000SA0', 'CUUR0000SA0L1E'], startyear: String(y - 3), endyear: String(y) }), signal: T(15000) });
+  const bk = process.env.BLS_KEY; // free key: v2 API, 500 calls a day
+  const r = await fetch(`https://api.bls.gov/publicAPI/${bk ? 'v2' : 'v1'}/timeseries/data/`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ seriesid: ['CUUR0000SA0', 'CUUR0000SA0L1E'], startyear: String(y - 3), endyear: String(y), ...(bk ? { registrationkey: bk } : {}) }), signal: T(15000) });
   const j = await r.json(), out = {};
   for (const s of j?.Results?.series || []) {
     const idx = {}; s.data.filter((p) => /^M(0\d|1[0-2])$/.test(p.period) && p.value !== '-').forEach((p) => (idx[`${p.year}-${p.period.slice(1)}`] = +p.value));

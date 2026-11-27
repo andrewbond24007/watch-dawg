@@ -244,6 +244,7 @@ async function loadReactions(){
  if(todo.length)renderNewsTab();
 }
 function resultRows(e){
+ if(e.result)return `<div class="evres"><span>Actual <b>${esc(e.result)}</b></span></div>`;
  if(e.earn){const x=e.earn;if(x.act==null)return '';const beat=x.est!=null?x.act>x.est?'Beat':x.act<x.est?'Miss':'In line':'';
   const c=x.cur||'$';return `<div class="evres"><span>EPS <b>${c}${x.act.toFixed(2)}</b>${x.est!=null?` vs ${c}${x.est.toFixed(2)} expected`:''}${beat?` <i class="tg">${beat}${x.surprise!=null&&beat!=='In line'?` ${x.surprise>0?'+':''}${x.surprise}%`:''}</i>`:''}</span></div>`;}
  const acts=actualsFor(e);const nw=ACTFRESH.has(evId(e));const r=REACT[Math.floor(new Date(e.date)/1000)];let h='';

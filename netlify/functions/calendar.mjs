@@ -93,6 +93,23 @@ async function week(name) {
     return Array.isArray(j) ? j : [];
   } catch (e) { return []; }
 }
+// EIA weekly US crude inventories (free key, EIA_KEY): the latest release with its actual change, and the next one.
+// Released Wednesdays 10:30am New York for the week ending the previous Friday (a day later in holiday weeks).
+const nyAt = (ymd, hm) => { const m = +ymd.slice(5, 7), off = m >= 4 && m <= 10 ? '-04:00' : '-05:00'; return new Date(`${ymd}T${hm}:00${off}`).toISOString(); };
+export function eiaEvents(rows) {
+  const r = (rows || []).map((x) => ({ p: x.period, v: +x.value })).filter((x) => x.p && !isNaN(x.v)).sort((a, b) => b.p.localeCompare(a.p));
+  if (r.length < 2) return [];
+  const rel = (p) => new Date(Date.parse(p + 'T12:00:00Z') + 5 * 864e5).toISOString().slice(0, 10);
+  const chg = ((r[0].v - r[1].v) / 1000).toFixed(1), title = 'US crude oil inventories (EIA)', hint = 'Weekly change in US commercial crude stocks; a fall (draw) tends to lift oil prices';
+  const last = { date: nyAt(rel(r[0].p), '10:30'), country: 'USD', title, hint, forecast: '', previous: '', key: false, official: true, result: `${chg > 0 ? '+' : ''}${chg}M barrels` };
+  const nx = new Date(Date.parse(r[0].p + 'T12:00:00Z') + 7 * 864e5).toISOString().slice(0, 10);
+  return [last, { date: nyAt(rel(nx), '10:30'), country: 'USD', title, hint, forecast: '', previous: `${chg > 0 ? '+' : ''}${chg}M`, key: false, official: true }];
+}
+async function eia(key) {
+  const u = `https://api.eia.gov/v2/petroleum/stoc/wstk/data/?api_key=${encodeURIComponent(key)}&frequency=weekly&data[0]=value&facets[series][]=WCESTUS1&sort[0][column]=period&sort[0][direction]=desc&length=3`;
+  const j = await fetch(u, { signal: AbortSignal.timeout(8000) }).then((r) => r.json());
+  return eiaEvents(j?.response?.data);
+}
 // report time of day: before the open is about 8am New York, after hours about 4:05pm
 const earnAt = (d, time) => { const pre = /before|pre/i.test(time || ''), m = +d.slice(5, 7), off = m >= 4 && m <= 10 ? '-04:00' : '-05:00'; return new Date(`${d}T${pre ? '08:00' : '16:05'}:00${off}`).toISOString(); };
 // TSMC reports earnings per share in Taiwan dollars
@@ -123,6 +140,7 @@ export default async () => {
     const ej = await fetch('https://raw.githubusercontent.com/andrewbond24007/watch-dawg/data/earnings.json', { signal: AbortSignal.timeout(6000) }).then((r) => (r.ok ? r.json() : null));
     for (const st of ej?.stocks || []) events.push(...earnEvents(st).filter((e) => new Date(e.date) < horizon && new Date(e.date) > Date.now() - 8 * 864e5));
   } catch (e) { /* calendar still works without them */ }
+  if (process.env.EIA_KEY) { try { for (const e of await eia(process.env.EIA_KEY)) if (new Date(e.date) > Date.now() - 8 * 864e5) events.push(e); } catch (e) { /* optional */ } }
   events.sort((a, b) => new Date(a.date) - new Date(b.date));
   return new Response(JSON.stringify({ events, fetched: new Date().toISOString() }), {
     headers: { 'content-type': 'application/json', 'cache-control': 'public, max-age=300', 'netlify-cdn-cache-control': 'public, s-maxage=900, stale-while-revalidate=1800', 'access-control-allow-origin': '*' },
