@@ -112,9 +112,26 @@ function storyCard(t){
   <button class="scf" aria-expanded="false">${avStack(t.all)}<span>${ns>1?`${ns} sources · ${t.n} reports`:esc(o.n)}</span><span class="ch">▾</span></button>
   ${coverage(t)}</div></article>`;
 }
+/* story importance: who covers it (wire services and fast squawks count more), whether it moves markets
+   (central banks, data, the assets tracked in the app, earnings), size of the move, and breaking news.
+   Clickbait (insider filings, "stocks to buy", listicles) is pushed down */
+const TIER={Reuters:2.2,Bloomberg:2.2,'Financial Times':2,CNBC:1.6,MarketWatch:1.4,BBC:1.4,financialjuice:1.6,marketfeed:1.4,WatcherGuru:1.3,CoinDesk:1.3,ForexLive:1.3};
+const IMP_MACRO=/\b(fed|fomc|powell|warsh|ecb|lagarde|bank of england|boe|bailey|boj|rate (cut|hike|decision)s?|interest rates?|cpi|inflation|payrolls|jobs report|unemployment rate|gdp|pce|recession|treasury yields?|bond (market|yields)|tariffs?|sanctions|opec|default|bailout)\b/i;
+const IMP_ASSET=/\b(bitcoin|btc|ether(eum)?|eth|solana|xrp|gold|silver|nvidia|nvda|tesla|tsla|apple|aapl|alphabet|google|tsmc|tsm|oracle|coreweave|broadcom|amd|microsoft|amazon|meta|s&p|s&p 500|nasdaq|dow|ftse|nikkei|oil|crude|brent|dollar|sterling|pound|euro|yen)\b/i;
+const IMP_EARN=/\b(earnings|results|revenue|guidance|profit warning|beats|misses|q[1-4] (sales|profit))\b/i;
+const IMP_MINOR=/\b(director|ceo|cfo|cto|officer|vp|chair(man)?) (buys|sells)\b|\b(sells|buys) \$[\d,.]+k?\b|takeaways|stocks? to buy|should you buy|prediction:|i think it'?s a buy|hand over fist|dividend stocks|motley|zacks rank|price target (raised|cut) to/i;
+function importance(t){
+ const txt=firstLine(hText(t.head));let s=0;
+ t.srcs.forEach(x=>s+=TIER[x]||1);s=Math.min(s,9);
+ s+=Math.min(t.n,12)*.35;
+ if(IMP_MACRO.test(txt))s+=3;if(IMP_ASSET.test(txt))s+=2;if(IMP_EARN.test(txt))s+=1.2;
+ const pc=(txt.match(/[-+−]?\d+(\.\d+)?%/g)||[]).map(x=>Math.abs(parseFloat(x.replace('−','-')))).filter(x=>x<90);if(pc.length)s+=Math.min(3,Math.max(...pc)/3);
+ if(t.brk)s+=3;if(IMP_MINOR.test(txt))s-=5;
+ return s;
+}
 function newsRow(t){
  const h=t.head,o=srcOf(h),full=hText(h),txt=t.title||firstLine(full),more=full.split('\n').filter(x=>x.trim()).slice(1).join(' ').slice(0,180),ns=t.srcs.size;
- return `<div class="nr"><a href="${esc(h.link)}" target="_blank" rel="noopener"><span class="nt">${hm(h.time)}</span><span class="nb"><span class="ns"><i style="background:${o.c}"></i>${esc(o.n)}${t.brk?' <em class="brk">Breaking</em>':''}</span><span class="nh">${richText(txt)}</span>${more?`<span class="nm">${esc(more)}</span>`:''}</span>${h.img?`<img src="${esc(h.img)}" alt="" loading="lazy" onerror="this.remove()">`:''}</a>
+ return `<div class="nr${t.imp>=7?' hot':''}"><a href="${esc(h.link)}" target="_blank" rel="noopener"><span class="nt">${hm(h.time)}</span><span class="nb"><span class="ns"><i style="background:${o.c}"></i>${esc(o.n)}${t.brk?' <em class="brk">Breaking</em>':''}</span><span class="nh">${richText(txt)}</span>${more?`<span class="nm">${esc(more)}</span>`:''}</span>${h.img?`<img src="${esc(h.img)}" alt="" loading="lazy" onerror="this.remove()">`:''}</a>
   ${t.n>1?`<button class="scf mini" aria-expanded="false">${avStack(t.all,3)}<span>${ns>1?`Also ${ns-1} other source${ns>2?'s':''}`:`${t.n} updates`}</span><span class="ch">▾</span></button>${coverage(t)}`:''}</div>`;
 }
 /* the scheduled refresh keeps a week of stories, so ones a source has since dropped stay in the list */
@@ -257,7 +274,7 @@ const NCAT_RX={crypto:CRYPTO_RX,
  property:/\b(housing|home ?sales|home prices|house prices|homebuilders?|mortgages?|real estate|property|properties|REITs?|rents?|landlords?|office (space|market|buildings?|loans?)|CMBS)\b/i};
 let newsCat=store.get('wd.newscat','all');
 const inCat=(p,c)=>c==='all'||(p.cats||[]).includes(c)||NCAT_RX[c].test(p.text);
-let newsShown=40;
+let newsShown=40,newsMinor=false;
 function renderNewsCats(){
  const el=$('newsCats');if(!el)return;el.hidden=newsMode!=='headlines';if(el.hidden)return;
  const day2=Date.now()-48*3600e3,recent=NEWS.items.filter(p=>new Date(p.time)>day2);
@@ -320,25 +337,30 @@ function renderNewsTab(){
   const eb=$('earlierBtn');if(eb)eb.onclick=()=>{showEarlier=!showEarlier;buzz();renderNewsTab();};
   loadActuals();loadReactions();
  }else{
-  $('newsHint').textContent='The last 48 hours from fast news accounts (Watcher Guru, FinancialJuice and others, via their public Telegram channels) and headlines from CNBC, Reuters, Bloomberg, the FT, MarketWatch, BBC, CoinDesk, HousingWire and more. Reports on the same story are grouped into one, with the most widely covered at the top; tap a story’s sources to see who reported what, and when. Updates every 2 minutes. Tap one to open it.';
+  $('newsHint').textContent='The last 48 hours from fast news accounts (Watcher Guru, FinancialJuice and others, via their public Telegram channels) and headlines from CNBC, Reuters, Bloomberg, the FT, MarketWatch, BBC, CoinDesk, HousingWire and more. Reports on the same story are grouped into one. Top stories are ranked by importance: how many outlets cover it (wire services count most) and whether it moves markets (central banks, data releases, the assets in this app, big moves). Bold rows are major stories; minor single-source items are tucked away at the bottom. tap a story’s sources to see who reported what, and when. Updates every 2 minutes. Tap one to open it.';
   loadNewsArchive();
   const pool=newsPool(),items=pool.filter(p=>inCat(p,newsCat)),label=NCATS.find(c=>c[0]===newsCat)?.[1]||'All';
   if(!NEWS.items.length){box.innerHTML=`<div class="empty">${NEWS.err?'News can’t load in this viewer.':'Loading news…'}</div>`;return;}
   if(!items.length){box.innerHTML=`<div class="empty">No ${esc(label.toLowerCase())} news in the latest posts.</div>`;return;}
   const day=Date.now()-24*3600e3;
   const threads=buildThreads(items),now=Date.now();
-  // top stories: most outlets covering it, weighted towards the last few hours
-  const score=t=>(t.srcs.size*2+Math.min(t.n,12)+(t.brk?3:0))*Math.exp(-(now-t.t1)/(10*3600e3));
-  const top=threads.filter(t=>now-t.t1<24*3600e3&&(t.srcs.size>=3||t.brk&&t.srcs.size>=2)).sort((a,b)=>score(b)-score(a)).slice(0,5),ts=new Set(top);
-  const rest=threads.filter(t=>!ts.has(t)).sort((a,b)=>Date.parse(b.head.time)-Date.parse(a.head.time)),shown=rest.slice(0,newsShown),more=rest.length-shown.length;
+  // top stories: the most important of the last day (coverage + market relevance), fading over about 8 hours
+  threads.forEach(t=>t.imp=importance(t));
+  const score=t=>t.imp*Math.exp(-(now-t.t1)/(8*3600e3));
+  const top=threads.filter(t=>now-t.t1<24*3600e3&&t.imp>=6&&(t.srcs.size>=2||t.imp>=9)).sort((a,b)=>score(b)-score(a)).slice(0,8),ts=new Set(top);
+  // the timeline keeps everything else in time order, minus minor items unless asked for
+  const all=threads.filter(t=>!ts.has(t)).sort((a,b)=>Date.parse(b.head.time)-Date.parse(a.head.time)),minor=all.filter(t=>t.imp<2.2);
+  const rest=newsMinor?all:all.filter(t=>t.imp>=2.2),shown=rest.slice(0,newsShown),more=rest.length-shown.length;
   const bucket=t=>{const a=now-Date.parse(t.head.time),d=new Date(t.head.time),td=new Date();return a<3600e3?'Last hour':d.toDateString()===td.toDateString()?'Earlier today':d.toDateString()===new Date(now-864e5).toDateString()?'Yesterday':d.toLocaleDateString('en-GB',{weekday:'long'});};
   let html=top.length?`<div class="day">Top stories${newsCat==='all'?'':' · '+esc(label)}</div><div class="scs">${top.map(storyCard).join('')}</div>`:'';
   let cur='';shown.forEach(t=>{const b=bucket(t);if(b!==cur){html+=(cur?'</div>':'')+`<div class="day">${b}</div><div class="nlist">`;cur=b;}html+=newsRow(t);});
   if(cur)html+='</div>';
   if(more>0)html+=`<button class="linkbtn earlier" id="newsMore">Show more (${more} left)</button>`;
+  if(minor.length&&!more)html+=`<button class="linkbtn earlier" id="newsMinor">${newsMinor?'Hide':'Show'} ${minor.length} minor stor${minor.length===1?'y':'ies'} (single-source filings, tips and listicles)</button>`;
   box.innerHTML=html;
   box.querySelectorAll('.scf').forEach(b=>b.onclick=()=>{const l=b.nextElementSibling,o=l.hidden;l.hidden=!o;b.setAttribute('aria-expanded',o);buzz();});
   const nm=$('newsMore');if(nm)nm.onclick=()=>{newsShown+=40;buzz();renderNewsTab();};
+  const mn=$('newsMinor');if(mn)mn.onclick=()=>{newsMinor=!newsMinor;buzz();renderNewsTab();};
  }
 }
 $('newsSeg').addEventListener('click',e=>{const b=e.target.closest('button');if(!b||b.dataset.n===newsMode)return;newsMode=b.dataset.n;clearNewsDot();[...$('newsSeg').children].forEach(x=>x.classList.toggle('on',x===b));buzz();renderNewsTab();window.scrollTo({top:0,behavior:'smooth'});});

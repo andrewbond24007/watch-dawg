@@ -710,3 +710,6 @@ body.compact .list{gap:6px}
 .mlist ul{margin:0;padding-left:18px}.mlist li{font-size:13.5px;line-height:1.4;margin:3px 0}
 .mlist a{color:inherit}
 .ncats[hidden]{display:none}
+
+.nr.hot .nh{font-weight:800}
+.nr.hot .nt{color:var(--accent);font-weight:800}
