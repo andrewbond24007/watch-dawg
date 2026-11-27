@@ -782,3 +782,4 @@ body.compact .list{gap:6px}
 .cxt div{background:var(--bg);border-radius:12px;padding:8px 9px}
 .cxt small{display:block;font-size:11.5px;color:var(--muted)}.cxt small i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:4px}
 .cxt b{display:block;font-size:15px}.cxt em{font-style:normal;font-size:11px}
+.cxy{font-weight:800}

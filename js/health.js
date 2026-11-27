@@ -186,7 +186,7 @@ function capexCard(){
   return `<div><small><i style="background:${CDSC[id]}"></i>${esc(co.name)}</small><b class="num">$${v!=null?v.toFixed(1):'–'}bn</b>${g!=null?`<em class="${g>0?'dnt':'upt'}">${g>0?'+':''}${g}% on a year</em>`:''}</div>`;}).join('');
  return `<div class="card hreg" id="capexCard"><div class="hh"><span class="fl">🏗️</span><h3>AI spending</h3><span class="sig ${sig}">${word}</span></div>
   <div class="why">What Microsoft, Alphabet, Amazon, Meta and Oracle spend each quarter on data centres, chips and power (capital expenditure), from their SEC filings. Set it against the credit default swaps below: rising spending with widening CDS means the buildout is leaning on debt.</div>
-  <div class="radh"><div class="rads"><b class="num" style="color:var(--accent)">$${last?Math.round(last.total):'–'}bn</b><small>${last?`spent in ${qLab(last.q)}`:''}${C.yoy!=null?` · <b class="${C.yoy>0?'dnt':'upt'}">${C.yoy>0?'+':''}${C.yoy}%</b> on a year`:''}</small></div>
+  <div class="radh"><div class="rads"><b class="num" style="color:var(--accent)">$${last?Math.round(last.total):'–'}bn</b><small>${last?`spent in ${qLab(last.q)}`:''}${C.yoy!=null?` · <span class="cxy ${C.yoy>0?'dnt':'upt'}">${C.yoy>0?'+':''}${C.yoy}%</span> on a year`:''}</small></div>
    <div class="liqch"><span>Last 12 months <b class="num">$${C.ttm}bn</b></span></div></div>
   <svg class="cxc" viewBox="0 0 ${W} ${H}" aria-label="Quarterly AI spending by company">${g}</svg>
   <div class="liqk">${cos.map(id=>`<span><i style="background:${CDSC[id]}"></i>${esc(C.companies[id].name)}</span>`).join('')}</div>
