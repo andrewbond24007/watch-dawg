@@ -765,3 +765,4 @@ body.compact .list{gap:6px}
 .liqc{width:100%;height:auto;display:block;margin-top:6px}
 .liqk{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:11.5px;color:var(--muted);margin-top:2px}
 .liqk i{display:inline-block;width:10px;height:3px;border-radius:2px;margin-right:4px;vertical-align:3px}
+.liqc text{font-size:10px;fill:var(--muted)}
