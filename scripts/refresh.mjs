@@ -12,6 +12,7 @@ import news, { parseRss } from '../netlify/functions/news.mjs';
 import { CDS_NAMES, extractCds, mergeCds } from '../lib/cds.mjs';
 import { mergeArchive } from '../lib/newsarchive.mjs';
 import { earnings } from '../lib/earnings.mjs';
+import { fetchRadar } from '../lib/radar.mjs';
 import { DEFAULT_KEY as TD_DEFAULT_KEY } from '../netlify/functions/td.mjs';
 import { updateMood, dayMood, londonDay } from '../lib/sentiment.mjs';
 // daily % change of the S&P 500 (by New York trading day) and bitcoin (by UTC day), keyed by date
@@ -241,6 +242,12 @@ if (eiaDue) {
     if (!eiaPrev?.rows?.length || rows[0].period >= eiaPrev.rows[0].period) write('eia.json', { updated: new Date().toISOString(), rows });
   } catch (e) { errors.eia = String(e.message || e); }
 }
+// recession radar for the Rates tab: six FRED warning signals (daily to monthly data, so full refreshes only)
+const radarDue = !FAST && !!process.env.FRED_KEY;
+if (radarDue) {
+  try { const r = await fetchRadar(process.env.FRED_KEY); write('radar.json', r); console.log(`radar: ${r.score} ${r.label}, ${r.signals.map((x) => `${x.id} ${x.score}`).join(', ')}`); }
+  catch (e) { errors.radar = String(e.message || e); }
+}
 if (!FAST) write('history.json', hist);
 // release dates that are typed in by hand: warn (through the source checks) when a list is about to run out
 const schedKeys = [];
@@ -252,7 +259,7 @@ for (const [k, list] of Object.entries({ 'schedule:us_releases': SCHEDULE.map((e
 // the data branch is only read through raw GitHub links: tell Vercel never to deploy it (each deploy counts
 // towards the free plan's 100 a day)
 fs.writeFileSync(path.join(dir, 'vercel.json'), JSON.stringify({ git: { deploymentEnabled: false } }));
-const status = updateStatus(read('status.json', {}), errors, [...Object.keys(SOURCE_NAMES), ...newsKeys, ...schedKeys].filter((k) => (!FAST || /^(rates:|cds)/.test(k)) && (k !== 'earnings' || earnDue) && (k !== 'eia' || eiaDue)));
+const status = updateStatus(read('status.json', {}), errors, [...Object.keys(SOURCE_NAMES), ...newsKeys, ...schedKeys].filter((k) => (!FAST || /^(rates:|cds)/.test(k)) && (k !== 'earnings' || earnDue) && (k !== 'eia' || eiaDue) && (k !== 'radar' || radarDue)));
 status.seconds = Math.round((Date.now() - t0) / 1000);
 write('status.json', status);
 const down = Object.entries(status.sources).filter(([, v]) => !v.ok);

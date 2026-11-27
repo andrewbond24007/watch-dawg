@@ -724,3 +724,15 @@ body.compact .list{gap:6px}
 .mrate{font-size:12.5px;margin:10px 0 0;color:var(--ink)}.mrate span{color:var(--muted)}
 
 .mm.earn{background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--accent)}
+
+/* recession radar */
+:root{--amber:#d99a00}
+.radh{display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:center;margin:10px 0 6px}
+.rads b{font-size:40px;font-weight:800;line-height:1;font-variation-settings:"wdth" 110}
+.rads span{font-size:15px;color:var(--muted);margin-left:2px}
+.rads small{display:block;font-size:12px;color:var(--muted);margin-top:4px}
+.radc svg{width:100%;height:44px;display:block}
+.radc small{font-size:11px;color:var(--muted)}
+.rdot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px;vertical-align:0}
+.rdot.green{background:var(--up)}.rdot.amber{background:var(--amber)}.rdot.red{background:var(--down)}
+.rl.green{color:var(--up)}.rl.amber{color:var(--amber)}.rl.red{color:var(--down)}

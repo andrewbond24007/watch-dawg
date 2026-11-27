@@ -129,7 +129,31 @@ function secCard(id,icon,title,why,items,rowsHtml,extra=''){
  return `<div class="card hreg" id="${id}"><div class="hh"><span class="fl">${icon}</span><h3>${esc(title)}</h3>${nw?'<span class="newtag">New</span>':''}${id==='rfx'?'<span class="rlive">Live</span>':''}</div>${why?`<div class="why">${why}</div>`:''}
   ${open?rowsHtml:tiles}${extra}${rowsHtml?`<button class="morebtn" data-rexp="${id}" aria-expanded="${open}">${open?'Show less':'Details · charts and sources'}<span class="ch">▾</span></button>`:''}</div>`;
 }
+/* recession radar: six FRED warning signals scored 0 (calm) to 100 (recession-like), built by the scheduled refresh */
+let RADAR={data:null,at:0};
+async function loadRadar(){if(Date.now()-RADAR.at<30*60e3)return;RADAR.at=Date.now();
+ try{const j=await fetch('/data/radar.json?t='+Math.floor(Date.now()/9e5)).then(r=>r.ok?r.json():null);if(j&&j.signals){RADAR.data=j;if(activeTab==='rates')renderRates();}}catch(e){RADAR.at=0;}}
+const RADC={green:'--up',amber:'--amber',red:'--down'};
+function radarVal(x){return x.unit==='%'?x.value.toFixed(2)+'%':x.unit==='k'?Math.round(x.value)+'k':x.unit==='pts'?(x.value>0?'+':'')+x.value.toFixed(2):x.value.toFixed(2);}
+function radarCard(){
+ const R=RADAR.data;if(!R||R.score==null)return '';
+ const lt=R.score<35?'green':R.score<65?'amber':'red',open=REXP.has('rrad'),dir=R.m3!=null?R.score-R.m3:0;
+ const items=R.signals.map(x=>{RSER['rad:'+x.id]=x.series;const ch=x.prev!=null?x.score-x.prev:0;
+  return {id:'rad:'+x.id,name:x.name,short:x.short,val:radarVal(x),light:x.light,
+   chg:`<b class="rl ${x.light}">${x.light==='green'?'Calm':x.light==='amber'?'Watch':'Warning'}</b>`,chgShort:`<i class="rdot ${x.light}"></i>${x.light==='green'?'Calm':x.light==='amber'?'Watch':'Warning'}`,
+   trend:ch>5?1:ch<-5?-1:0,sub:`score ${x.score}`,
+   detail:`${esc(x.what)}<br><b>Risk score ${x.score}/100</b>${x.prev!=null?` (${x.prev} three months ago)`:''} · latest ${esc(x.date)} · FRED ${esc(x.fred)}`};});
+ RSER['rad:all']=R.history;
+ const tiles=`<div class="rtiles">${items.map(o=>`<button class="rtile" data-rexp="rrad"><small>${esc(o.short)}</small><b class="num">${o.val}</b><span>${o.chgShort}</span></button>`).join('')}</div>`;
+ const rows=items.map(o=>rRow({...o,name:o.name})).join('');
+ return `<div class="card hreg" id="rrad"><div class="hh"><span class="fl">🧭</span><h3>Recession radar</h3><span class="sig ${lt}">${R.label} risk</span></div>
+  <div class="why">Six US warning signals that have flashed before past recessions, from the St. Louis Fed (FRED). Each is scored from 0 (calm) to 100 (recession-like).</div>
+  <div class="radh"><div class="rads"><b class="num" style="color:var(${RADC[lt]})">${R.score}</b><span>/100</span><small>${dir>3?'▲ rising':dir<-3?'▼ easing':'steady'} · 3 months ago ${R.m3??'–'} · a year ago ${R.y1??'–'}</small></div>
+  <div class="radc"><svg viewBox="0 0 100 26" preserveAspectRatio="none" aria-label="Radar score over five years" data-rsp="rad:all" data-v="${RADC[lt]}"></svg><small>Last 5 years</small></div></div>
+  ${open?rows:tiles}<button class="morebtn" data-rexp="rrad" aria-expanded="${open}">${open?'Show less':'Details · what each signal means'}<span class="ch">▾</span></button></div>`;
+}
 function renderRates(){
+ loadRadar();
  if(activeTab!=='rates')return;const d=RATES.data;
  $('ratesStatus').innerHTML=d?`<span>Updated <b>${timeAgo(d.fetched)}</b></span>${RATES.err?'<span class="bad">Couldn’t refresh; showing the last copy</span>':''}${RATES.busy?'<span>Refreshing…</span>':''}${(d.errors||[]).length?`<span class="bad">${d.errors.length} source${d.errors.length>1?'s':''} not answering</span>`:''}`:'';
  if(!d){$('ratesBox').innerHTML=`<div class="empty" style="margin-top:12px">${RATES.err?'Rates can’t load in this viewer.':'Loading rates…'}</div>`;return;}
@@ -142,6 +166,7 @@ function renderRates(){
  const pmb=B.filter(b=>b.id!=='fed'&&b.poly&&b.poly[0]).map(b=>`${b.short} ${pmLead(b.poly[0])[1]} on ${dshort(b.poly[0].date)}`);
  const us10=d.yields.find(y=>y.id==='us10'),m30=d.mortgages.find(m=>m.id==='us30m'),uk2=d.mortgages.find(m=>m.id==='IUMBV34');
  const bul=[`<li><b>Central banks</b> ${esc(moves.join(', '))}</li>`,(fodd||pmb.length)?`<li><b>Expectations</b> ${esc([fodd,pmb.length?'Polymarket: '+pmb.join(', '):''].filter(Boolean).join('. '))}</li>`:'',
+  RADAR.data?.score!=null?`<li><b>Recession risk</b> ${RADAR.data.score}/100 on the radar below (${esc(RADAR.data.label.toLowerCase())}${RADAR.data.signals.filter(x=>x.light==='red').length?`; warning from ${esc(RADAR.data.signals.filter(x=>x.light==='red').map(x=>x.short.toLowerCase()).join(', '))}`:''})</li>`:'',
   us10?`<li><b>Borrowing costs</b> US 10-year at ${rp(us10.value)} (${bps(us10.value-us10.y1)} on a year)${m30?`, US mortgages ${rp(m30.value)}`:''}${uk2?`, UK 2-year fixes ${rp(uk2.value)}`:''}</li>`:''].join('');
  const ev=[];B.forEach(b=>b.next&&ev.push([b.next,`${b.flag} ${b.short} decision`,'#rb-'+b.id]));
  (d.inflation||[]).filter(i=>i.next&&i.id!=='uscore').forEach(i=>ev.push([i.next,`${i.flag} ${i.id==='uscpi'?'US':i.id==='eahicp'?'Euro':'UK'} inflation`,'#rinfl']));
@@ -167,7 +192,7 @@ function renderRates(){
  const FX=[['gbpusd','🇬🇧🇺🇸 Pound in dollars','£ in $',4],['eurusd','🇪🇺🇺🇸 Euro in dollars','€ in $',4],['eurgbp','🇪🇺🇬🇧 Euro in pounds','€ in £',4],['dxy','🇺🇸 Dollar index','Dollar index',2]];
  const fI=FX.map(([k,n,sh,dp])=>{const v=RLIVE[k];if(!v)return null;const ch=v.prev?(v.price/v.prev-1)*100:null;return {n,short:sh,val:v.price.toFixed(dp),ch,chgShort:ch==null?'':`<b class="${ch>0?'upt':ch<0?'dnt':''}">${fmtPct(ch)}</b> today`};}).filter(Boolean);
  const fxRows=fI.map(o=>`<div class="rfx"><span>${o.n}</span><b class="num">${o.val}</b><em class="${o.ch>0?'upt':o.ch<0?'dnt':''}">${o.ch==null?'':fmtPct(o.ch)}</em></div>`).join('');
- $('ratesBox').innerHTML=brief+next+B.map(bankCard).join('')
+ $('ratesBox').innerHTML=brief+next+B.map(bankCard).join('')+radarCard()
   +secCard('ryld','📈','Bond yields','What governments pay to borrow. Mortgage rates follow these.',yI,yI.map(rRow).join('')+cv,REXP.has('ryld')?'':cv)
   +secCard('rmort','🏠','Mortgage rates','',mI,mI.map(rRow).join(''))
   +secCard('rinfl','🛒','Inflation','Central banks aim for 2%. Above that, rates tend to stay high.',iI,iI.map(rRow).join(''))
