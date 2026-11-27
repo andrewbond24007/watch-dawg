@@ -758,3 +758,10 @@ body.compact .list{gap:6px}
 .drh{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px}.drh b{font-size:16px}.drh span{font-size:12px;color:var(--muted)}
 .dabout{display:flex;gap:12px;align-items:center}.dabout img{width:40px;height:40px;border-radius:10px;background:#fff;object-fit:contain}
 .dabout b{display:block}.dabout span{display:block;font-size:12.5px;color:var(--muted)}.dabout a{font-size:13px;color:var(--accent)}
+
+/* liquidity */
+.liqch{display:grid;gap:3px;font-size:12.5px;color:var(--muted);text-align:right}.liqch b{font-size:13.5px}
+.liqseg{margin:8px 0 2px}
+.liqc{width:100%;height:auto;display:block;margin-top:6px}
+.liqk{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:11.5px;color:var(--muted);margin-top:2px}
+.liqk i{display:inline-block;width:10px;height:3px;border-radius:2px;margin-right:4px;vertical-align:3px}

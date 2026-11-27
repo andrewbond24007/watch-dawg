@@ -52,7 +52,7 @@ function rSeenCheck(){const d=RATES.data;if(!d)return;const k=rKeys(d);
 function rMarkSeen(){const d=RATES.data;if(!d)return;const k=rKeys(d);let ch=false;for(const x in k)if(k[x]>(RSEEN[x]||'')){RFRESH.add(x);RSEEN[x]=k[x];ch=true;}if(ch)store.set('wd.rseen',RSEEN);}
 function updateRatesDot(){const n=rUnseen().length,tab=document.querySelector('.tab[data-tab="rates"]');if(!tab)return;let dot=tab.querySelector('.ndot');
  if(n&&!dot){dot=document.createElement('i');dot.className='ndot';tab.appendChild(dot);}else if(!n&&dot)dot.remove();
- tab.setAttribute('aria-label','Rates'+(n?`, ${n} new update${n>1?'s':''}`:''));}
+ tab.setAttribute('aria-label','Macro'+(n?`, ${n} new update${n>1?'s':''}`:''));}
 
 /* formatting */
 const rp=(v,d=2)=>v==null||isNaN(v)?'—':(+v).toFixed(d)+'%';
@@ -152,8 +152,38 @@ function radarCard(){
   <div class="radc"><svg viewBox="0 0 100 26" preserveAspectRatio="none" aria-label="Radar score over five years" data-rsp="rad:all" data-v="${RADC[lt]}"></svg><small>Last 5 years</small></div></div>
   ${open?rows:tiles}<button class="morebtn" data-rexp="rrad" aria-expanded="${open}">${open?'Show less':'Details · what each signal means'}<span class="ch">▾</span></button></div>`;
 }
+/* liquidity tracker: Fed balance sheet minus the Treasury's account and reverse repo (FRED), against S&P and bitcoin */
+let LIQ={data:null,at:0},liqAsset=store.get('wd.liqa','spx');
+async function loadLiq(){if(Date.now()-LIQ.at<30*60e3)return;LIQ.at=Date.now();
+ try{const j=await fetch('/data/liquidity.json?t='+Math.floor(Date.now()/9e5)).then(r=>r.ok?r.json():null);if(j&&j.rows){LIQ.data=j;if(activeTab==='rates')renderRates();}}catch(e){LIQ.at=0;}}
+const tnbn=v=>v==null?'–':Math.abs(v)>=1000?'$'+(v/1000).toFixed(2)+'tn':'$'+Math.round(v)+'bn';
+const sbn=v=>v==null?'–':(v>0?'+':v<0?'−':'')+tnbn(Math.abs(v));
+function liqChart(L){
+ const rows=L.rows,a=L.assets[liqAsset],W=320,H=150,P=6,n=rows.length;
+ const line=(vals,col,w,dash)=>{const v=vals.filter(x=>x!=null);if(v.length<2)return '';const mn=Math.min(...v),mx=Math.max(...v),r=mx-mn||1;
+  let d='',pen=false;vals.forEach((x,i)=>{if(x==null){pen=false;return;}const X=P+i/(n-1)*(W-2*P),Y=P+(1-(x-mn)/r)*(H-2*P-14);d+=(pen?'L':'M')+X.toFixed(1)+' '+Y.toFixed(1);pen=true;});
+  return `<path d="${d}" fill="none" stroke="${col}" stroke-width="${w}" ${dash?'stroke-dasharray="4 3"':''} stroke-linejoin="round"/>`;};
+ const yrs=[...new Set(rows.map(r=>r[0].slice(0,4)))].map(y=>{const i=rows.findIndex(r=>r[0].startsWith(y));return i>0?`<text x="${(P+i/(n-1)*(W-2*P)).toFixed(1)}" y="${H-2}" class="gt" text-anchor="middle">${y}</text>`:'';}).join('');
+ return `<svg class="liqc" viewBox="0 0 ${W} ${H}" aria-label="Net liquidity against ${liqAsset==='btc'?'bitcoin':'the S&P 500'}">${line(rows.map(r=>r[1]),'var(--accent)',2.2)}${a?line(a.px,liqAsset==='btc'?'#f2a900':'var(--muted)',1.6,true):''}${yrs}</svg>`;
+}
+function liqCard(){
+ const L=LIQ.data;if(!L)return '';
+ const lt=L.trend==='rising'?'green':L.trend==='falling'?'red':'amber',a=L.assets[liqAsset],open=REXP.has('rliq');
+ const cor=a?.corr,corTxt=cor==null?'':Math.abs(cor)<.2?'have barely moved together':cor>0?`have tended to move together (correlation ${cor.toFixed(2)})`:`have tended to move in opposite directions (correlation ${cor.toFixed(2)})`;
+ return `<div class="card hreg" id="rliq"><div class="hh"><span class="fl">💧</span><h3>Liquidity</h3><span class="sig ${lt}">${L.trend[0].toUpperCase()+L.trend.slice(1)}</span></div>
+  <div class="why">Cash the Fed has put into the financial system and left there: its balance sheet, minus money parked in the Treasury’s account and the Fed’s reverse repo. When it rises, stocks and crypto have tended to do well.</div>
+  <div class="radh"><div class="rads"><b class="num" style="color:var(--accent)">${tnbn(L.net)}</b><small>net liquidity · ${rdate(L.date)}</small></div>
+   <div class="liqch"><span>4 weeks <b class="num ${L.w4>0?'up':L.w4<0?'down':''}">${sbn(L.w4)}</b></span><span>3 months <b class="num ${L.w13>0?'up':L.w13<0?'down':''}">${sbn(L.w13)}</b></span><span>1 year <b class="num ${L.w52>0?'up':L.w52<0?'down':''}">${sbn(L.w52)}</b></span></div></div>
+  <div class="seg liqseg" role="group" aria-label="Compare with"><button data-liqa="spx" class="${liqAsset==='spx'?'on':''}">vs S&amp;P 500</button><button data-liqa="btc" class="${liqAsset==='btc'?'on':''}">vs Bitcoin</button></div>
+  ${liqChart(L)}
+  <div class="liqk"><span><i style="background:var(--accent)"></i>Net liquidity</span><span><i style="background:${liqAsset==='btc'?'#f2a900':'var(--muted)'}"></i>${liqAsset==='btc'?'Bitcoin':'S&amp;P 500'} (dashed)</span><span>3 years, weekly</span></div>
+  ${corTxt?`<div class="hnote">Over three years, 3-month moves in liquidity and ${liqAsset==='btc'?'bitcoin':'the S&amp;P'} ${corTxt}.</div>`:''}
+  ${open?`<div class="rtiles" style="margin-top:10px"><div class="rtile"><small>Fed balance sheet</small><b class="num">${tnbn(L.fed)}</b><span>what the Fed holds</span></div><div class="rtile"><small>Treasury account</small><b class="num">${tnbn(L.tga)}</b><span>takes cash out</span></div><div class="rtile"><small>Reverse repo</small><b class="num">${tnbn(L.rrp)}</b><span>takes cash out</span></div></div>
+   <div class="hnote">The Fed's holdings shrink while it runs down its bond portfolio ("quantitative tightening"). The Treasury account swings with tax receipts and borrowing; the reverse repo is spare cash money-market funds park at the Fed. Source: FRED (WALCL, WTREGEN, RRPONTSYD), weekly on Wednesdays.</div>`:''}
+  <button class="morebtn" data-rexp="rliq" aria-expanded="${open}">${open?'Show less':'Details · what makes it up'}<span class="ch">▾</span></button></div>`;
+}
 function renderRates(){
- loadRadar();
+ loadRadar();loadLiq();
  if(activeTab!=='rates')return;const d=RATES.data;
  $('ratesStatus').innerHTML=d?`<span>Updated <b>${timeAgo(d.fetched)}</b></span>${RATES.err?'<span class="bad">Couldn’t refresh; showing the last copy</span>':''}${RATES.busy?'<span>Refreshing…</span>':''}${(d.errors||[]).length?`<span class="bad">${d.errors.length} source${d.errors.length>1?'s':''} not answering</span>`:''}`:'';
  if(!d){$('ratesBox').innerHTML=`<div class="empty" style="margin-top:12px">${RATES.err?'Rates can’t load in this viewer.':'Loading rates…'}</div>`;return;}
@@ -167,6 +197,7 @@ function renderRates(){
  const us10=d.yields.find(y=>y.id==='us10'),m30=d.mortgages.find(m=>m.id==='us30m'),uk2=d.mortgages.find(m=>m.id==='IUMBV34');
  const bul=[`<li><b>Central banks</b> ${esc(moves.join(', '))}</li>`,(fodd||pmb.length)?`<li><b>Expectations</b> ${esc([fodd,pmb.length?'Polymarket: '+pmb.join(', '):''].filter(Boolean).join('. '))}</li>`:'',
   RADAR.data?.score!=null?`<li><b>Recession risk</b> ${RADAR.data.score}/100 on the radar below (${esc(RADAR.data.label.toLowerCase())}${RADAR.data.signals.filter(x=>x.light==='red').length?`; warning from ${esc(RADAR.data.signals.filter(x=>x.light==='red').map(x=>x.short.toLowerCase()).join(', '))}`:''})</li>`:'',
+  LIQ.data?`<li><b>Liquidity</b> ${esc(LIQ.data.trend)}: ${tnbn(LIQ.data.net)} net, ${sbn(LIQ.data.w13)} over 3 months</li>`:'',
   us10?`<li><b>Borrowing costs</b> US 10-year at ${rp(us10.value)} (${bps(us10.value-us10.y1)} on a year)${m30?`, US mortgages ${rp(m30.value)}`:''}${uk2?`, UK 2-year fixes ${rp(uk2.value)}`:''}</li>`:''].join('');
  const ev=[];B.forEach(b=>b.next&&ev.push([b.next,`${b.flag} ${b.short} decision`,'#rb-'+b.id]));
  (d.inflation||[]).filter(i=>i.next&&i.id!=='uscore').forEach(i=>ev.push([i.next,`${i.flag} ${i.id==='uscpi'?'US':i.id==='eahicp'?'Euro':'UK'} inflation`,'#rinfl']));
@@ -192,7 +223,7 @@ function renderRates(){
  const FX=[['gbpusd','🇬🇧🇺🇸 Pound in dollars','£ in $',4],['eurusd','🇪🇺🇺🇸 Euro in dollars','€ in $',4],['eurgbp','🇪🇺🇬🇧 Euro in pounds','€ in £',4],['dxy','🇺🇸 Dollar index','Dollar index',2]];
  const fI=FX.map(([k,n,sh,dp])=>{const v=RLIVE[k];if(!v)return null;const ch=v.prev?(v.price/v.prev-1)*100:null;return {n,short:sh,val:v.price.toFixed(dp),ch,chgShort:ch==null?'':`<b class="${ch>0?'upt':ch<0?'dnt':''}">${fmtPct(ch)}</b> today`};}).filter(Boolean);
  const fxRows=fI.map(o=>`<div class="rfx"><span>${o.n}</span><b class="num">${o.val}</b><em class="${o.ch>0?'upt':o.ch<0?'dnt':''}">${o.ch==null?'':fmtPct(o.ch)}</em></div>`).join('');
- $('ratesBox').innerHTML=brief+next+B.map(bankCard).join('')+radarCard()
+ $('ratesBox').innerHTML=brief+next+B.map(bankCard).join('')+radarCard()+liqCard()
   +secCard('ryld','📈','Bond yields','What governments pay to borrow. Mortgage rates follow these.',yI,yI.map(rRow).join('')+cv,REXP.has('ryld')?'':cv)
   +secCard('rmort','🏠','Mortgage rates','',mI,mI.map(rRow).join(''))
   +secCard('rinfl','🛒','Inflation','Central banks aim for 2%. Above that, rates tend to stay high.',iI,iI.map(rRow).join(''))
@@ -201,8 +232,9 @@ function renderRates(){
  updateRatesDot();
 }
 $('ratesBox').addEventListener('click',e=>{
+ const la=e.target.closest('[data-liqa]');if(la){liqAsset=la.dataset.liqa;store.set('wd.liqa',liqAsset);buzz();renderRates();return;}
  const x=e.target.closest('[data-rexp]');if(x){const id=x.dataset.rexp;REXP.has(id)?REXP.delete(id):REXP.add(id);buzz();renderRates();return;}
  const j=e.target.closest('[data-jump]');if(j){const el=document.querySelector(j.dataset.jump);if(el){buzz();el.scrollIntoView({behavior:reduce?'auto':'smooth',block:'start'});el.classList.add('flash');setTimeout(()=>el.classList.remove('flash'),1200);}return;}
  const b=e.target.closest('.hmb');if(b){const r=b.parentElement,md=r.querySelector('.md'),o=md.hidden;md.hidden=!o;r.classList.toggle('open',o);b.setAttribute('aria-expanded',o);buzz();}
 });
-$('ratesRefresh').addEventListener('click',async e=>{const b=e.currentTarget;b.classList.remove('spin');void b.offsetWidth;b.classList.add('spin');buzz();rlAt=0;await loadRates(true);toast('Rates refreshed');});
+$('ratesRefresh').addEventListener('click',async e=>{const b=e.currentTarget;b.classList.remove('spin');void b.offsetWidth;b.classList.add('spin');buzz();rlAt=0;await loadRates(true);toast('Macro refreshed');});
