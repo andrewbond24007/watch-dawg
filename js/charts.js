@@ -25,19 +25,21 @@ async function loadDeep(it){
  let next=d.next;try{const ej=window.EARN_CACHE||(window.EARN_CACHE=await fetch('/data/earnings.json?t='+Math.floor(Date.now()/36e5)).then(r=>r.json()));const st=(ej.stocks||[]).find(x=>x.sym===tk);if(st&&st.next&&!next)next={date:st.next,hour:/before/i.test(st.time)?'bmo':'amc',est:st.epsEst,expected:st.estimated};}catch(e){}
  box.innerHTML=deepHtml(it,d,next);
 }
+// earnings per share in the company's reporting currency (TSMC reports in Taiwan dollars)
+const EPS_CUR={TSM:'NT$'};
 function deepHtml(it,d,next){
- const S=d.stats||{},P=d.profile,price=priceFor(it),f2=v=>v==null?'–':(+v).toFixed(2);
+ const S=d.stats||{},P=d.profile,price=priceFor(it),f2=v=>v==null?'–':(+v).toFixed(2),c=EPS_CUR[d.sym]||'$';
  const rng=S.hi52&&S.lo52&&price?Math.max(0,Math.min(100,(price-S.lo52)/(S.hi52-S.lo52)*100)):null;
- const tiles=[['Market value',bigMoney(S.cap??P?.cap)],['P/E',S.pe!=null?S.pe.toFixed(1):'–'],['EPS (12 months)',S.eps!=null?'$'+f2(S.eps):'–'],['Revenue growth',S.revGrowth!=null?fmtPct(S.revGrowth):'–'],['Profit margin',S.margin!=null?S.margin.toFixed(1)+'%':'–'],['Beta',S.beta!=null?f2(S.beta):'–'],['Dividend',S.div?S.div.toFixed(2)+'%':'None'],['1-year return',S.ret52!=null?fmtPct(S.ret52):'–']];
+ const tiles=[['Market value',bigMoney(S.cap??P?.cap)],['P/E',S.pe!=null?S.pe.toFixed(1):'–'],['EPS (12 months)',S.eps!=null?c+f2(S.eps):'–'],['Revenue growth',S.revGrowth!=null?fmtPct(S.revGrowth):'–'],['Profit margin',S.margin!=null?S.margin.toFixed(1)+'%':'–'],['Beta',S.beta!=null?f2(S.beta):'–'],['Dividend',S.div?S.div.toFixed(2)+'%':'None'],['1-year return',S.ret52!=null?fmtPct(S.ret52):'–']];
  let h=`<div class="deep">`;
  if(rng!=null)h+=`<div class="d52"><div class="d52l"><span>52-week low <b class="num">${money(S.lo52)}</b></span><span>high <b class="num">${money(S.hi52)}</b></span></div><div class="d52b"><i style="left:${rng.toFixed(1)}%"></i></div><small>${rng>=85?'Near its 52-week high':rng<=15?'Near its 52-week low':`${Math.round(rng)}% of the way from the year’s low to its high`}</small></div>`;
  h+=`<div class="dstats">${tiles.map(([l,v])=>`<div><small>${l}</small><b class="num">${v}</b></div>`).join('')}</div>`;
  // earnings
  const E=d.earnings||[];
  if(next||E.length){h+=`<h3>Earnings</h3>`;
-  if(next){const dt=new Date(next.date+'T12:00:00Z').toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'});h+=`<div class="dnext">Next report <b>${dt}</b>${next.hour==='bmo'?' · before the open':next.hour==='amc'?' · after the close':''}${next.expected?' (expected)':''}${next.est!=null?` · EPS forecast <b>$${f2(next.est)}</b>`:''}</div>`;}
+  if(next){const dt=new Date(next.date+'T12:00:00Z').toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'});h+=`<div class="dnext">Next report <b>${dt}</b>${next.hour==='bmo'?' · before the open':next.hour==='amc'?' · after the close':''}${next.expected?' (expected)':''}${next.est!=null?` · EPS forecast <b>${c}${f2(next.est)}</b>`:''}</div>`;}
   if(E.length){const mx=Math.max(...E.flatMap(e=>[Math.abs(e.act||0),Math.abs(e.est||0)]))||1;
-   h+=`<div class="dearn">${E.slice().reverse().map(e=>{const beat=e.act!=null&&e.est!=null?e.act>=e.est:null;return `<div><div class="deb"><i class="est" style="height:${(Math.abs(e.est||0)/mx*100).toFixed(0)}%"></i><i class="act ${beat?'up':'down'}" style="height:${(Math.abs(e.act||0)/mx*100).toFixed(0)}%"></i></div><b class="num ${beat?'up':'down'}">$${f2(e.act)}</b><small>${beat==null?'':beat?'Beat':'Miss'}${e.surprise!=null?` ${e.surprise>0?'+':''}${e.surprise.toFixed(0)}%`:''}</small><small>${e.q&&e.y?`FQ${e.q} ’${String(e.y).slice(2)}`:esc(quarterName(e.period))}</small></div>`;}).join('')}</div><div class="hnote">Bars: forecast (faint) vs actual earnings per share for the last four fiscal quarters (FQ = the company’s own financial year).</div>`;}}
+   h+=`<div class="dearn">${E.slice().reverse().map(e=>{const beat=e.act!=null&&e.est!=null?e.act>=e.est:null;return `<div><div class="deb"><i class="est" style="height:${(Math.abs(e.est||0)/mx*100).toFixed(0)}%"></i><i class="act ${beat?'up':'down'}" style="height:${(Math.abs(e.act||0)/mx*100).toFixed(0)}%"></i></div><b class="num ${beat?'up':'down'}">${c}${f2(e.act)}</b><small>${beat==null?'':beat?'Beat':'Miss'}${e.surprise!=null?` ${e.surprise>0?'+':''}${e.surprise.toFixed(0)}%`:''}</small><small>${e.q&&e.y?`FQ${e.q} ’${String(e.y).slice(2)}`:esc(quarterName(e.period))}</small></div>`;}).join('')}</div><div class="hnote">Bars: forecast (faint) vs actual earnings per share for the last four fiscal quarters (FQ = the company’s own financial year).</div>`;}}
  // analysts
  const R=d.recs||[];
  if(R.length){const r=R[0],tot=r.sb+r.b+r.h+r.s+r.ss||1,buy=r.sb+r.b,sell=r.s+r.ss,o=R[R.length-1],ob=(o.sb+o.b)/((o.sb+o.b+o.h+o.s+o.ss)||1);
