@@ -245,7 +245,7 @@ async function loadReactions(){
 }
 function resultRows(e){
  if(e.earn){const x=e.earn;if(x.act==null)return '';const beat=x.est!=null?x.act>x.est?'Beat':x.act<x.est?'Miss':'In line':'';
-  return `<div class="evres"><span>EPS <b>$${x.act.toFixed(2)}</b>${x.est!=null?` vs $${x.est.toFixed(2)} expected`:''}${beat?` <i class="tg">${beat}${x.surprise!=null&&beat!=='In line'?` ${x.surprise>0?'+':''}${x.surprise}%`:''}</i>`:''}</span></div>`;}
+  const c=x.cur||'$';return `<div class="evres"><span>EPS <b>${c}${x.act.toFixed(2)}</b>${x.est!=null?` vs ${c}${x.est.toFixed(2)} expected`:''}${beat?` <i class="tg">${beat}${x.surprise!=null&&beat!=='In line'?` ${x.surprise>0?'+':''}${x.surprise}%`:''}</i>`:''}</span></div>`;}
  const acts=actualsFor(e);const nw=ACTFRESH.has(evId(e));const r=REACT[Math.floor(new Date(e.date)/1000)];let h='';
  if(acts.length)h+=`<div class="evres${nw?' isnew':''}">${nw?'<span class="newtag">Just out</span>':''}${acts.map(a=>`<span>${a.multi?esc(a.label)+' ':'Actual '}<b>${esc(a.val)}</b>${a.tag?` <i class="tg">${a.tag}</i>`:''}</span>`).join('')}</div>`;
  if(r&&r.done){const parts=[['S&P fut.',r.spx],['Gold',r.gold],['BTC',r.btc]].filter(x=>x[1]!=null);
