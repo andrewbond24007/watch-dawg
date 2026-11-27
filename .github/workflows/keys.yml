@@ -10,7 +10,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: node scripts/checkkeys.mjs
+      - run: node scripts/checkkeys.mjs && node scripts/eiadbg.mjs
         env:
           FINNHUB_KEY: ${{ secrets.FINNHUB_KEY }}
           BLS_KEY: ${{ secrets.BLS_KEY }}
