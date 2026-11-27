@@ -39,7 +39,7 @@ async function bis(flow, key, by = 'REF_AREA') {
 // with a FRED key, FRED's copy of the same Fed and FHFA series comes first (an official API is steadier than reading
 // their web pages and files); without one, or if FRED fails, the pages are read as before
 const fredFirst = async (fred, page) => { if (process.env.FRED_KEY) { try { return await fred(); } catch (e) { /* fall through */ } } return page(); };
-async function fedDelinq() { return fredFirst(async () => ({ res: await fredSeries('DRSFRMACBS', START), com: await fredSeries('DRCRELEXFACBS', START) }), fedDelinqPage); }
+async function fedDelinq() { return fredFirst(async () => { const [res, com] = await Promise.all([fredSeries('DRSFRMACBS', START), fredSeries('DRCRELEXFACBS', START)]); return { res, com }; }, fedDelinqPage); }
 async function fedDelinqPage() {
   const r = await fetch('https://www.federalreserve.gov/releases/chargeoff/delallsa.htm', { headers: UA, signal: T(9000) });
   if (!r.ok) throw new Error('Fed ' + r.status);
