@@ -15,6 +15,7 @@ import { earnings } from '../lib/earnings.mjs';
 import { fetchRadar } from '../lib/radar.mjs';
 import { fetchLiquidity, yahooDaily } from '../lib/liquidity.mjs';
 import { fetchStables } from '../lib/stables.mjs';
+import { fetchCapex } from '../lib/capex.mjs';
 import { DEFAULT_KEY as TD_DEFAULT_KEY } from '../netlify/functions/td.mjs';
 import { updateMood, dayMood, londonDay } from '../lib/sentiment.mjs';
 // daily % change of the S&P 500 (by New York trading day) and bitcoin (by UTC day), keyed by date
@@ -260,6 +261,12 @@ if (!FAST) {
   try { const btc = await yahooDaily('BTC-USD').catch(() => []), S = await fetchStables(btc); write('stablecoins.json', S); console.log(`stablecoins: $${S.total}bn, 30d ${S.d30}, ${S.trend}`); }
   catch (e) { errors.stablecoins = String(e.message || e); }
 }
+// big tech's AI spending (quarterly capex from SEC filings, no key) for Health → AI bubble; every 6 hours is plenty
+const capPrev = read('capex.json', null), capDue = !FAST && (!capPrev || Date.now() - Date.parse(capPrev.updated) > 6 * 3600e3);
+if (capDue) {
+  try { const C = await fetchCapex(); write('capex.json', C); console.log(`capex: ${C.latest} $${C.latestTotal}bn, y/y ${C.yoy}%, 12m $${C.ttm}bn${C.missing ? ' (missing ' + C.missing.join(', ') + ')' : ''}`); }
+  catch (e) { errors.capex = String(e.message || e); }
+}
 if (!FAST) write('history.json', hist);
 // release dates that are typed in by hand: warn (through the source checks) when a list is about to run out
 const schedKeys = [];
@@ -271,7 +278,7 @@ for (const [k, list] of Object.entries({ 'schedule:us_releases': SCHEDULE.map((e
 // the data branch is only read through raw GitHub links: tell Vercel never to deploy it (each deploy counts
 // towards the free plan's 100 a day)
 fs.writeFileSync(path.join(dir, 'vercel.json'), JSON.stringify({ git: { deploymentEnabled: false } }));
-const status = updateStatus(read('status.json', {}), errors, [...Object.keys(SOURCE_NAMES), ...newsKeys, ...schedKeys].filter((k) => (!FAST || /^(rates:|cds)/.test(k)) && (k !== 'earnings' || earnDue) && (k !== 'eia' || eiaDue) && (!['radar', 'liquidity'].includes(k) || radarDue) && (k !== 'stablecoins' || !FAST)));
+const status = updateStatus(read('status.json', {}), errors, [...Object.keys(SOURCE_NAMES), ...newsKeys, ...schedKeys].filter((k) => (!FAST || /^(rates:|cds)/.test(k)) && (k !== 'earnings' || earnDue) && (k !== 'eia' || eiaDue) && (!['radar', 'liquidity'].includes(k) || radarDue) && (k !== 'stablecoins' || !FAST) && (k !== 'capex' || capDue)));
 status.seconds = Math.round((Date.now() - t0) / 1000);
 write('status.json', status);
 const down = Object.entries(status.sources).filter(([, v]) => !v.ok);
