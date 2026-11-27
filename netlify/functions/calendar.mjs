@@ -76,12 +76,13 @@ export const HEALTH = [
   ['2027-03-30T09:00:00-04:00', 'USD', 'Case-Shiller home prices (January)', 'US house prices, 20 cities and national', 'housing', true],
 ].map(([date, country, title, hint, cat, expected]) => ({ date: new Date(date).toISOString(), country, title, hint, cat, expected, forecast: '', previous: '', key: false, official: true }));
 // rate decisions and US CPI dates are kept in one place (rates.mjs) and added here beyond the hand-written list
-import { FOMC, MPC, ECBM, US_CPI } from './rates.mjs';
+import { FOMC, MPC, ECBM, US_CPI, EA_HICP } from './rates.mjs';
 const monthName = (d) => new Date(new Date(d).getTime() - 20 * 864e5).toLocaleString('en-GB', { month: 'long', timeZone: 'UTC' });
 const DERIVED = [
   ...FOMC.map((d) => [d, 'USD', 'Fed interest-rate decision (FOMC)', 'Rate decision, then the Fed Chair press conference at 2:30pm ET']),
   ...MPC.map((d) => [d, 'GBP', 'Bank of England rate decision', 'MPC decision and minutes']),
   ...ECBM.map((d) => [d, 'EUR', 'ECB rate decision', 'Press conference follows at 14:45 CET']),
+  ...EA_HICP.map((d) => [d, 'EUR', `Euro-area inflation, flash (${monthName(d)})`, 'Eurostat’s first estimate of euro-area inflation']),
   ...US_CPI.map((d) => [d, 'USD', `CPI and Core CPI (${monthName(d)})`, 'US inflation, headline and excluding food and energy']),
 ].map(([date, country, title, hint]) => ({ date: new Date(date).toISOString(), country, title, hint, forecast: '', previous: '', key: true, official: true }));
 async function week(name) {

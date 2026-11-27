@@ -19,6 +19,10 @@ export const ECBM = ['2026-12-17T14:15:00+01:00', '2027-02-04T14:15:00+01:00', '
 export const US_CPI = ['2026-12-10T08:30:00-05:00', '2027-01-13T08:30:00-05:00', '2027-02-11T08:30:00-05:00', '2027-03-10T08:30:00-05:00', '2027-04-13T08:30:00-04:00',
   '2027-05-12T08:30:00-04:00', '2027-06-10T08:30:00-04:00', '2027-07-14T08:30:00-04:00', '2027-08-11T08:30:00-04:00', '2027-09-14T08:30:00-04:00',
   '2027-10-14T08:30:00-04:00', '2027-11-10T08:30:00-05:00', '2027-12-10T08:30:00-05:00'];
+// Eurostat flash estimates of euro-area inflation, 11:00 CET (ECB statistical calendar, Dec 2026 to Dec 2027)
+export const EA_HICP = ['2026-12-01T11:00:00+01:00', '2027-01-06T11:00:00+01:00', '2027-02-02T11:00:00+01:00', '2027-03-02T11:00:00+01:00', '2027-04-01T11:00:00+02:00',
+  '2027-05-03T11:00:00+02:00', '2027-06-01T11:00:00+02:00', '2027-07-01T11:00:00+02:00', '2027-08-03T11:00:00+02:00', '2027-09-01T11:00:00+02:00', '2027-10-01T11:00:00+02:00',
+  '2027-11-04T11:00:00+01:00', '2027-12-01T11:00:00+01:00'];
 const nextOf = (list, now = Date.now()) => list.find((d) => Date.parse(d) > now) || null;
 // Freddie Mac's weekly survey: Thursdays at noon ET, a day early in holiday weeks
 const FREDDIE_MOVED = { '2026-11-26': '2026-11-25', '2026-12-24': '2026-12-23', '2026-12-31': '2026-12-30', '2027-11-25': '2027-11-24' };
@@ -273,7 +277,7 @@ export default async (req) => {
   if (USC) { infl.push({ id: 'uscpi', name: 'US inflation (CPI)', flag: '🇺🇸', value: lastOf(USC.all)[1], date: lastOf(USC.all)[0], prev: USC.all.at(-2)?.[1], series: USC.all.slice(-36), next: nextOf(US_CPI), src: 'BLS', target: 2, est: !!lastOf(USC.all)[2] });
     if (USC.core.length) infl.push({ id: 'uscore', name: 'US core inflation', flag: '🇺🇸', value: lastOf(USC.core)[1], date: lastOf(USC.core)[0], prev: USC.core.at(-2)?.[1], series: USC.core.slice(-36), next: nextOf(US_CPI), src: 'BLS', target: 2, est: !!lastOf(USC.core)[2] }); }
   if (UKC?.series?.length) infl.push({ id: 'ukcpi', name: 'UK inflation (CPI)', flag: '🇬🇧', value: lastOf(UKC.series)[1], date: lastOf(UKC.series)[0], prev: UKC.series.at(-2)?.[1], series: UKC.series.slice(-36), next: UKC.next && Date.parse(UKC.next) > now ? UKC.next : null, src: 'ONS', target: 2 });
-  if (EAC?.length) infl.push({ id: 'eahicp', name: 'Euro-area inflation', flag: '🇪🇺', value: lastOf(EAC)[1], date: lastOf(EAC)[0], prev: EAC.at(-2)?.[1], series: EAC.slice(-36), next: null, freq: 'Monthly, flash estimate at the start of the month', src: 'Eurostat via ECB', target: 2 });
+  if (EAC?.length) infl.push({ id: 'eahicp', name: 'Euro-area inflation', flag: '🇪🇺', value: lastOf(EAC)[1], date: lastOf(EAC)[0], prev: EAC.at(-2)?.[1], series: EAC.slice(-36), next: nextOf(EA_HICP), freq: 'Monthly, flash estimate at the start of the month', src: 'Eurostat via ECB', target: 2 });
   banks.forEach((b) => { if (PM[b.id]) b.poly = PM[b.id]; });
   // real rate: policy rate minus inflation
   const realOf = { fed: 'uscpi', boe: 'ukcpi', ecb: 'eahicp' };

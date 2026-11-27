@@ -6,7 +6,7 @@ import path from 'node:path';
 import health from '../netlify/functions/health.mjs';
 import housemap from '../netlify/functions/housemap.mjs';
 import nowcast from '../netlify/functions/nowcast.mjs';
-import rates, { FOMC, MPC, ECBM, US_CPI } from '../netlify/functions/rates.mjs';
+import rates, { FOMC, MPC, ECBM, US_CPI, EA_HICP } from '../netlify/functions/rates.mjs';
 import { SCHEDULE, HEALTH } from '../netlify/functions/calendar.mjs';
 import news, { parseRss } from '../netlify/functions/news.mjs';
 import { CDS_NAMES, extractCds, mergeCds } from '../lib/cds.mjs';
@@ -201,7 +201,7 @@ try {
 if (!FAST) write('history.json', hist);
 // release dates that are typed in by hand: warn (through the source checks) when a list is about to run out
 const schedKeys = [];
-for (const [k, list] of Object.entries({ 'schedule:us_releases': SCHEDULE.map((e) => e.date), 'schedule:health': HEALTH.map((e) => e.date), 'schedule:fomc': FOMC, 'schedule:mpc': MPC, 'schedule:ecb': ECBM, 'schedule:us_cpi': US_CPI })) {
+for (const [k, list] of Object.entries({ 'schedule:us_releases': SCHEDULE.map((e) => e.date), 'schedule:health': HEALTH.map((e) => e.date), 'schedule:fomc': FOMC, 'schedule:mpc': MPC, 'schedule:ecb': ECBM, 'schedule:us_cpi': US_CPI, 'schedule:ea_hicp': EA_HICP })) {
   schedKeys.push(k);
   const last = Math.max(...list.map((d) => Date.parse(d)));
   if (last - Date.now() < 40 * 864e5) errors[k] = `dates run out on ${new Date(last).toISOString().slice(0, 10)}: add the next ones`;

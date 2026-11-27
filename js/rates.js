@@ -144,7 +144,7 @@ function renderRates(){
  const bul=[`<li><b>Central banks</b> ${esc(moves.join(', '))}</li>`,(fodd||pmb.length)?`<li><b>Expectations</b> ${esc([fodd,pmb.length?'Polymarket: '+pmb.join(', '):''].filter(Boolean).join('. '))}</li>`:'',
   us10?`<li><b>Borrowing costs</b> US 10-year at ${rp(us10.value)} (${bps(us10.value-us10.y1)} on a year)${m30?`, US mortgages ${rp(m30.value)}`:''}${uk2?`, UK 2-year fixes ${rp(uk2.value)}`:''}</li>`:''].join('');
  const ev=[];B.forEach(b=>b.next&&ev.push([b.next,`${b.flag} ${b.short} decision`,'#rb-'+b.id]));
- (d.inflation||[]).filter(i=>i.next&&i.id!=='uscore').forEach(i=>ev.push([i.next,`${i.flag} ${i.id==='uscpi'?'US':'UK'} inflation`,'#rinfl']));
+ (d.inflation||[]).filter(i=>i.next&&i.id!=='uscore').forEach(i=>ev.push([i.next,`${i.flag} ${i.id==='uscpi'?'US':i.id==='eahicp'?'Euro':'UK'} inflation`,'#rinfl']));
  const mn=d.mortgages.find(m=>m.next);if(mn)ev.push([mn.next,'🇺🇸 Mortgage rates','#rmort']);
  ev.sort((a,b)=>Date.parse(a[0])-Date.parse(b[0]));
  const brief=`<div class="brief"><div class="bh"><span>🏦 In brief</span><span class="sig ${ups>downs?'red':downs>ups?'green':'amber'}">${ups>downs?'Rising':downs>ups?'Falling':'Holding'}</span></div><p>${esc(head)}</p><ul>${bul}</ul></div>`;
