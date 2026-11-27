@@ -24,7 +24,7 @@ All `/api/*` answers are edge-cached on Vercel (check with the Probe workflow: `
 |---|---|---|
 | `FINNHUB_KEY` | GitHub + Vercel | Earnings (GitHub); live US stock prices without Twelve Data's cap (Vercel) |
 | `BLS_KEY` | GitHub + Vercel | BLS v2 API: 500 calls/day instead of ~25 |
-| `FRED_KEY` | Vercel | Backup for Fed arrears, Freddie mortgage rate, FHFA prices |
+| `FRED_KEY` | Vercel | First choice for Fed arrears and FHFA prices; backup for the Freddie mortgage rate |
 | `BEA_KEY` | Vercel | GDP and PCE from BEA's API instead of its web pages |
 | `EIA_KEY` | Vercel | Weekly US crude inventories in Big events, with the actual change |
 
