@@ -12,6 +12,7 @@ import news, { parseRss } from '../netlify/functions/news.mjs';
 import { CDS_NAMES, extractCds, mergeCds } from '../lib/cds.mjs';
 import { mergeArchive } from '../lib/newsarchive.mjs';
 import { earnings } from '../lib/earnings.mjs';
+import { DEFAULT_KEY as TD_DEFAULT_KEY } from '../netlify/functions/td.mjs';
 import { updateMood, dayMood, londonDay } from '../lib/sentiment.mjs';
 // daily % change of the S&P 500 (by New York trading day) and bitcoin (by UTC day), keyed by date
 async function marketMoves() {
@@ -214,19 +215,15 @@ try {
   console.log(`CDS: ${found.length} quotes found, ${Object.keys(cds.names).length} companies tracked`);
 } catch (e) { errors['cds'] = String(e.message || e); }
 
-// earnings dates and results for the tracked stocks (Yahoo), once per full refresh
-if (!FAST) {
+// earnings dates and results for the tracked stocks (Twelve Data, the app's own key): about 100 of the
+// day's 800 credits, so only the first full refresh after 06:00 and 18:00 UTC
+const prevEarn = read('earnings.json', null);
+const earnDue = !FAST && (!prevEarn || Date.now() - Date.parse(prevEarn.updated) > 11 * 3600e3);
+if (earnDue) {
   try {
-    const prev = read('earnings.json', { stocks: [], reports: {} }), now = Date.now(), list = await earnings(), reports = prev.reports || {};
-    for (const p of list) {
-      const was = (prev.stocks || []).find((x) => x.sym === p.sym), rs = (reports[p.sym] ||= []);
-      // a report date that has passed becomes a result, filled in once Yahoo has the quarter's actual EPS
-      for (const d of [was?.next, p.next]) if (d && Date.parse(d) < now && !rs.some((r) => Math.abs(Date.parse(r.date) - Date.parse(d)) < 5 * 864e5)) rs.push({ date: d, est: d === was?.next ? was.epsEst : p.epsEst });
-      for (const r of rs) if (r.act == null) { const h = p.past.filter((x) => Date.parse(x.q) < Date.parse(r.date) && Date.parse(r.date) - Date.parse(x.q) < 120 * 864e5).at(-1); if (h) Object.assign(r, { act: h.act, est: h.est ?? r.est, surprise: h.surprise, period: h.period }); }
-      reports[p.sym] = rs.filter((r) => now - Date.parse(r.date) < 400 * 864e5);
-    }
-    write('earnings.json', { updated: new Date().toISOString(), stocks: list, reports });
-    console.log('earnings:', list.map((p) => `${p.sym} ${p.next?.slice(0, 10) || '?'}`).join(', '));
+    const list = await earnings(process.env.TD_KEY || TD_DEFAULT_KEY);
+    write('earnings.json', { updated: new Date().toISOString(), stocks: list });
+    console.log('earnings:', list.map((p) => `${p.sym} next ${p.next || '?'}`).join(', '));
   } catch (e) { errors.earnings = String(e.message || e); console.warn('earnings:', e.message); }
 }
 if (!FAST) write('history.json', hist);
@@ -240,7 +237,7 @@ for (const [k, list] of Object.entries({ 'schedule:us_releases': SCHEDULE.map((e
 // the data branch is only read through raw GitHub links: tell Vercel never to deploy it (each deploy counts
 // towards the free plan's 100 a day)
 fs.writeFileSync(path.join(dir, 'vercel.json'), JSON.stringify({ git: { deploymentEnabled: false } }));
-const status = updateStatus(read('status.json', {}), errors, [...Object.keys(SOURCE_NAMES), ...newsKeys, ...schedKeys].filter((k) => !FAST || /^(rates:|cds)/.test(k)));
+const status = updateStatus(read('status.json', {}), errors, [...Object.keys(SOURCE_NAMES), ...newsKeys, ...schedKeys].filter((k) => (!FAST || /^(rates:|cds)/.test(k)) && (k !== 'earnings' || earnDue)));
 status.seconds = Math.round((Date.now() - t0) / 1000);
 write('status.json', status);
 const down = Object.entries(status.sources).filter(([, v]) => !v.ok);

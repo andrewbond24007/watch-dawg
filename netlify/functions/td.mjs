@@ -2,7 +2,7 @@
 // The app asks for a time "bucket" (a 5-minute slot while Wall Street is open, or the
 // last session's close when it's shut). The CDN keeps each bucket's answer, so however
 // many phones or tabs are open, Twelve Data is called at most once per bucket.
-const DEFAULT_KEY = '8832a67956484780a1b390aa395a0eeb';
+export const DEFAULT_KEY = '8832a67956484780a1b390aa395a0eeb';
 export default async (req) => {
   const u = new URL(req.url);
   const syms = [...new Set((u.searchParams.get('s') || '').split(',').map((s) => s.trim()).filter(Boolean))].sort().slice(0, 20);
