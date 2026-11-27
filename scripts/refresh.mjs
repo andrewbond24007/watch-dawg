@@ -233,7 +233,8 @@ if (earnDue) {
 if (process.env.EIA_KEY) {
   try {
     const u = `https://api.eia.gov/v2/petroleum/stoc/wstk/data/?api_key=${encodeURIComponent(process.env.EIA_KEY)}&frequency=weekly&data[0]=value&facets[series][]=WCESTUS1&start=${new Date(Date.now() - 70 * 864e5).toISOString().slice(0, 10)}&sort[0][column]=period&sort[0][direction]=desc&length=20`;
-    const j = await fetch(u, { signal: AbortSignal.timeout(10000) }).then((r) => r.json());
+    let j = null;
+    for (let i = 0; i < 2 && !j?.response?.data?.length; i++) j = await fetch(u, { signal: AbortSignal.timeout(25000) }).then((r) => r.json()).catch(() => null); // EIA's API can be slow
     if (!j?.response?.data?.length) throw new Error('no rows');
     write('eia.json', { updated: new Date().toISOString(), rows: j.response.data.map((x) => ({ period: x.period, value: x.value })).sort((a, b) => b.period.localeCompare(a.period)).slice(0, 4) });
   } catch (e) { errors.eia = String(e.message || e); }
