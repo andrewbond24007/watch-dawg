@@ -130,7 +130,7 @@ function secCard(id,icon,title,why,items,rowsHtml,extra=''){
   ${open?rowsHtml:tiles}${extra}${rowsHtml?`<button class="morebtn" data-rexp="${id}" aria-expanded="${open}">${open?'Show less':'Details · charts and sources'}<span class="ch">▾</span></button>`:''}</div>`;
 }
 /* recession radar: six FRED warning signals scored 0 (calm) to 100 (recession-like), built by the scheduled refresh */
-let RADAR={data:null,at:0};
+let RADAR={data:null,at:0},rSec=store.get('wd.rsec','banks');
 async function loadRadar(){if(Date.now()-RADAR.at<30*60e3)return;RADAR.at=Date.now();
  try{const j=await fetch('/data/radar.json?t='+Math.floor(Date.now()/9e5)).then(r=>r.ok?r.json():null);if(j&&j.signals){RADAR.data=j;if(activeTab==='rates')renderRates();}}catch(e){RADAR.at=0;}}
 const RADC={green:'--up',amber:'--amber',red:'--down'};
@@ -223,18 +223,33 @@ function renderRates(){
  const FX=[['gbpusd','🇬🇧🇺🇸 Pound in dollars','£ in $',4],['eurusd','🇪🇺🇺🇸 Euro in dollars','€ in $',4],['eurgbp','🇪🇺🇬🇧 Euro in pounds','€ in £',4],['dxy','🇺🇸 Dollar index','Dollar index',2]];
  const fI=FX.map(([k,n,sh,dp])=>{const v=RLIVE[k];if(!v)return null;const ch=v.prev?(v.price/v.prev-1)*100:null;return {n,short:sh,val:v.price.toFixed(dp),ch,chgShort:ch==null?'':`<b class="${ch>0?'upt':ch<0?'dnt':''}">${fmtPct(ch)}</b> today`};}).filter(Boolean);
  const fxRows=fI.map(o=>`<div class="rfx"><span>${o.n}</span><b class="num">${o.val}</b><em class="${o.ch>0?'upt':o.ch<0?'dnt':''}">${o.ch==null?'':fmtPct(o.ch)}</em></div>`).join('');
- $('ratesBox').innerHTML=brief+next+B.map(bankCard).join('')+radarCard()+liqCard()
-  +secCard('ryld','📈','Bond yields','What governments pay to borrow. Mortgage rates follow these.',yI,yI.map(rRow).join('')+cv,REXP.has('ryld')?'':cv)
-  +secCard('rmort','🏠','Mortgage rates','',mI,mI.map(rRow).join(''))
-  +secCard('rinfl','🛒','Inflation','Central banks aim for 2%. Above that, rates tend to stay high.',iI,iI.map(rRow).join(''))
-  +(fI.length?`<div class="card hreg" id="rfx"><div class="hh"><span class="fl">💱</span><h3>Currencies</h3><span class="rlive">Live</span></div><div class="rtiles">${fI.map(o=>`<div class="rtile"><small>${esc(o.short)}</small><b class="num">${o.val}</b><span>${o.chgShort}</span></div>`).join('')}</div></div>`:'');
+ // sections, like Health: central banks / risk / borrowing / inflation & currencies
+ const us10v=d.yields.find(y=>y.id==='us10'),yd=us10v&&us10v.w1!=null?us10v.value-us10v.w1:0,ucpi=(d.inflation||[]).find(i=>i.id==='uscpi');
+ const R=RADAR.data,LQ=LIQ.data;
+ const SECS=[
+  ['banks','🏦','Central banks',ups>downs?['red','Raising']:downs>ups?['green','Cutting']:['amber','Holding']],
+  ['risk','🧭','Risk',R?.score!=null?[R.score<35?'green':R.score<65?'amber':'red',R.label+' risk']:['', '…']],
+  ['borrow','📈','Borrowing',Math.abs(yd)<.05?['amber','Steady']:yd>0?['red','Costlier']:['green','Cheaper']],
+  ['prices','🛒','Inflation & FX',ucpi?ucpi.value>3?['red','Hot']:ucpi.value>2.2?['amber','Above target']:['green','On target']:['','…']]];
+ if(!SECS.some(x=>x[0]===rSec))rSec='banks';
+ $('ratesOv').innerHTML=SECS.map(([id,ic,name,[c,w]])=>`<button role="tab" aria-selected="${id===rSec}" class="${id===rSec?'on':''}" data-rs="${id}"><span class="ic">${ic}</span><b>${name}</b>${w?`<span class="sig ${c}">${esc(w)}</span>`:''}</button>`).join('');
+ const body={
+  banks:()=>brief+next+B.map(bankCard).join(''),
+  risk:()=>(radarCard()+liqCard())||'<div class="empty">Loading the recession radar and liquidity…</div>',
+  borrow:()=>secCard('ryld','📈','Bond yields','What governments pay to borrow. Mortgage rates follow these.',yI,yI.map(rRow).join('')+cv,REXP.has('ryld')?'':cv)+secCard('rmort','🏠','Mortgage rates','',mI,mI.map(rRow).join('')),
+  prices:()=>secCard('rinfl','🛒','Inflation','Central banks aim for 2%. Above that, rates tend to stay high.',iI,iI.map(rRow).join(''))
+   +(fI.length?`<div class="card hreg" id="rfx"><div class="hh"><span class="fl">💱</span><h3>Currencies</h3><span class="rlive">Live</span></div><div class="rtiles">${fI.map(o=>`<div class="rtile"><small>${esc(o.short)}</small><b class="num">${o.val}</b><span>${o.chgShort}</span></div>`).join('')}</div></div>`:'')};
+ $('ratesKey').hidden=rSec!=='banks';
+ $('ratesBox').innerHTML=body[rSec]();
  $('ratesBox').querySelectorAll('svg[data-rsp]').forEach(s=>spark(s,(RSER[s.dataset.rsp]||[]).map(p=>p[1]),s.dataset.v));
  updateRatesDot();
 }
 $('ratesBox').addEventListener('click',e=>{
  const la=e.target.closest('[data-liqa]');if(la){liqAsset=la.dataset.liqa;store.set('wd.liqa',liqAsset);buzz();renderRates();return;}
  const x=e.target.closest('[data-rexp]');if(x){const id=x.dataset.rexp;REXP.has(id)?REXP.delete(id):REXP.add(id);buzz();renderRates();return;}
- const j=e.target.closest('[data-jump]');if(j){const el=document.querySelector(j.dataset.jump);if(el){buzz();el.scrollIntoView({behavior:reduce?'auto':'smooth',block:'start'});el.classList.add('flash');setTimeout(()=>el.classList.remove('flash'),1200);}return;}
+ const j=e.target.closest('[data-jump]');if(j){const want={'#rinfl':'prices','#rmort':'borrow','#ryld':'borrow','#rrad':'risk','#rliq':'risk'}[j.dataset.jump]||'banks';if(want!==rSec){rSec=want;store.set('wd.rsec',rSec);renderRates();}const el=document.querySelector(j.dataset.jump);if(el){buzz();el.scrollIntoView({behavior:reduce?'auto':'smooth',block:'start'});el.classList.add('flash');setTimeout(()=>el.classList.remove('flash'),1200);}return;}
  const b=e.target.closest('.hmb');if(b){const r=b.parentElement,md=r.querySelector('.md'),o=md.hidden;md.hidden=!o;r.classList.toggle('open',o);b.setAttribute('aria-expanded',o);buzz();}
 });
 $('ratesRefresh').addEventListener('click',async e=>{const b=e.currentTarget;b.classList.remove('spin');void b.offsetWidth;b.classList.add('spin');buzz();rlAt=0;await loadRates(true);toast('Macro refreshed');});
+
+$('ratesOv').addEventListener('click',e=>{const b=e.target.closest('button[data-rs]');if(!b||b.dataset.rs===rSec)return;rSec=b.dataset.rs;store.set('wd.rsec',rSec);buzz();renderRates();});

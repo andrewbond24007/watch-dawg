@@ -154,7 +154,8 @@
     <section style="margin-top:16px">
       <div class="sh"><h2>Macro</h2><button class="iconbtn" id="ratesRefresh" aria-label="Refresh macro"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v5h-5"/></svg></button></div>
       <div class="pstatus" id="ratesStatus"></div>
-      <div class="hkey"><span class="green">Falling</span><span class="amber">On hold</span><span class="red">Rising</span><em>Green means cheaper borrowing</em></div>
+      <div class="hov rov" id="ratesOv" role="tablist" aria-label="Macro section"></div>
+      <div class="hkey" id="ratesKey"><span class="green">Falling</span><span class="amber">On hold</span><span class="red">Rising</span><em>Green means cheaper borrowing</em></div>
       <div id="ratesBox"><div class="empty" style="margin-top:12px">Loading rates…</div></div>
       <details class="how"><summary>Where these figures come from</summary><p class="hint" style="line-height:1.5">Policy rates: New York Fed (Fed funds target and effective rate), Bank of England (Bank Rate), ECB (deposit facility rate). Market expectations: CME fed funds futures. Yields: US Treasury par yield curve, Bank of England (10-year gilt), ECB (AAA euro-area curve); the US 10- and 30-year also update live from market prices. Mortgages: Freddie Mac weekly survey; Bank of England quoted rates. Inflation: BLS, ONS and Eurostat. Currencies: live market prices. Meeting and release dates are the official published schedules. Tap any figure for its date and source.</p></details>
     </section>
