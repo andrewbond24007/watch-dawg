@@ -218,7 +218,7 @@ try {
 // earnings dates and results for the tracked stocks (Twelve Data, the app's own key): about 100 of the
 // day's 800 credits, so only the first full refresh after 06:00 and 18:00 UTC
 const prevEarn = read('earnings.json', null);
-const earnDue = !FAST && (!prevEarn || Date.now() - Date.parse(prevEarn.updated) > 11 * 3600e3);
+const earnDue = !FAST && (!prevEarn || (prevEarn.stocks || []).length < 5 || Date.now() - Date.parse(prevEarn.updated) > 11 * 3600e3);
 if (earnDue) {
   try {
     const list = await earnings(process.env.TD_KEY || TD_DEFAULT_KEY);
