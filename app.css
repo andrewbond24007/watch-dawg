@@ -722,3 +722,5 @@ body.compact .list{gap:6px}
 .mcall.ok{background:color-mix(in srgb,var(--up) 20%,transparent);color:var(--up)}
 .mcall.no{background:color-mix(in srgb,var(--down) 18%,transparent);color:var(--down)}
 .mrate{font-size:12.5px;margin:10px 0 0;color:var(--ink)}.mrate span{color:var(--muted)}
+
+.mm.earn{background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--accent)}

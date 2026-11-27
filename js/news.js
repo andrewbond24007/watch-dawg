@@ -241,6 +241,8 @@ async function loadReactions(){
  if(todo.length)renderNewsTab();
 }
 function resultRows(e){
+ if(e.earn){const x=e.earn;if(x.act==null)return '';const beat=x.est!=null?x.act>x.est?'Beat':x.act<x.est?'Miss':'In line':'';
+  return `<div class="evres"><span>EPS <b>$${x.act.toFixed(2)}</b>${x.est!=null?` vs $${x.est.toFixed(2)} expected`:''}${beat?` <i class="tg">${beat}${x.surprise!=null&&beat!=='In line'?` ${x.surprise>0?'+':''}${x.surprise}%`:''}</i>`:''}</span></div>`;}
  const acts=actualsFor(e);const nw=ACTFRESH.has(evId(e));const r=REACT[Math.floor(new Date(e.date)/1000)];let h='';
  if(acts.length)h+=`<div class="evres${nw?' isnew':''}">${nw?'<span class="newtag">Just out</span>':''}${acts.map(a=>`<span>${a.multi?esc(a.label)+' ':'Actual '}<b>${esc(a.val)}</b>${a.tag?` <i class="tg">${a.tag}</i>`:''}</span>`).join('')}</div>`;
  if(r&&r.done){const parts=[['S&P fut.',r.spx],['Gold',r.gold],['BTC',r.btc]].filter(x=>x[1]!=null);
@@ -257,13 +259,13 @@ function evCard(e){
  const res=past?resultRows(e):'';
  return `<div class="ev${e.key?' key':''}${past?' past':''}${res?' res':''}">
   <div class="evt"><b class="num">${tm}</b>${when}</div>
-  <div><div class="evh"><span class="fl">${FLAGS[e.country]||''}</span>${esc(e.country)}${e.key?'<span class="mm">Market mover</span>':''}</div>
+  <div><div class="evh"><span class="fl">${FLAGS[e.country]||''}</span>${esc(e.country)}${e.key?'<span class="mm">Market mover</span>':''}${e.earn?'<span class="mm earn">Earnings</span>':''}</div>
   <div class="evn">${esc(e.title)}</div>${hint?`<div class="evhint">${hint}</div>`:''}
   ${(()=>{const nc=past?null:nowcastFor(e),one=nc&&nc.length===1?nc[0]:null;
    const ncTxt=nc?nc.filter(x=>x.exp!=null).map(x=>`<span>${x.lab?esc(x.lab)+' nowcast':'Nowcast'} <b>${x.exp.toFixed(2)}%</b></span>`).join(''):'';
    const prevTxt=one&&one.prev!=null?`<span>Previous <b>${one.prev.toFixed(2)}%</b></span>`:e.previous?`<span>Previous <b>${esc(e.previous)}</b></span>`:'';
    const fc=e.forecast?`<span>Consensus <b>${esc(e.forecast)}</b></span>`:'';
-   return ncTxt||fc||prevTxt?`<div class="evx">${ncTxt}${fc}${prevTxt}</div>${ncTxt?'<div class="evsrc">Nowcast: Cleveland Fed model, updated daily</div>':''}`:e.official?'<div class="evx"><span>Official date · forecasts appear in the week of release</span></div>':'';})()}${res}</div></div>`;
+   return ncTxt||fc||prevTxt?`<div class="evx">${ncTxt}${fc}${prevTxt}</div>${ncTxt?'<div class="evsrc">Nowcast: Cleveland Fed model, updated daily</div>':''}`:e.earn?'':e.official?'<div class="evx"><span>Official date · forecasts appear in the week of release</span></div>':'';})()}${res}</div></div>`;
 }
 /* news categories: a post can belong to more than one */
 const NCATS=[['all','All'],['crypto','Crypto'],['stocks','Stocks'],['economy','Economy'],['metals','Metals'],['property','Property']];

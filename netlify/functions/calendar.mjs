@@ -93,6 +93,13 @@ async function week(name) {
     return Array.isArray(j) ? j : [];
   } catch (e) { return []; }
 }
+// report time of day: before the open is about 8am New York, after hours about 4:05pm
+const earnAt = (d, time) => { const pre = /before|pre/i.test(time || ''), m = +d.slice(5, 7), off = m >= 4 && m <= 10 ? '-04:00' : '-05:00'; return new Date(`${d}T${pre ? '08:00' : '16:05'}:00${off}`).toISOString(); };
+export function earnEvents(st) {
+  const out = (st.past || []).map((p) => ({ date: earnAt(p.date, p.time), country: 'USD', title: `${st.name} earnings`, hint: `${st.sym} quarterly results`, forecast: p.est != null ? `EPS $${p.est.toFixed(2)}` : '', previous: '', key: false, official: true, earn: { sym: st.sym, act: p.act, est: p.est, surprise: p.surprise } }));
+  if (st.next) out.push({ date: earnAt(st.next, st.time), country: 'USD', title: `${st.name} earnings${st.estimated ? ' (date expected)' : ''}`, hint: `${st.sym} quarterly results${st.estimated ? '; the company hasn’t confirmed the date yet' : ''}`, forecast: st.epsEst != null ? `EPS $${st.epsEst.toFixed(2)}` : '', previous: '', key: false, official: true, expected: !!st.estimated, earn: { sym: st.sym } });
+  return out;
+}
 export default async () => {
   const all = await week('thisweek');
   const seen = new Set();
@@ -108,6 +115,11 @@ export default async () => {
   SCHEDULE.forEach((e) => { if (new Date(e.date) < horizon && !ff.some((f) => near(f, e))) events.push(e); });
   DERIVED.forEach((e) => { if (new Date(e.date) < horizon && new Date(e.date) > Date.now() - 8 * 864e5 && !events.some((f) => near(f, e))) events.push(e); });
   HEALTH.forEach((e) => { if (new Date(e.date) < horizon && new Date(e.date) > Date.now() - 8 * 864e5 && !ff.some((f) => f.title.toLowerCase() === e.title.toLowerCase())) events.push(e); });
+  // earnings for the tracked stocks (saved by the scheduled refresh): next report, and results from the past week
+  try {
+    const ej = await fetch('https://raw.githubusercontent.com/andrewbond24007/watch-dawg/data/earnings.json', { signal: AbortSignal.timeout(6000) }).then((r) => (r.ok ? r.json() : null));
+    for (const st of ej?.stocks || []) events.push(...earnEvents(st).filter((e) => new Date(e.date) < horizon && new Date(e.date) > Date.now() - 8 * 864e5));
+  } catch (e) { /* calendar still works without them */ }
   events.sort((a, b) => new Date(a.date) - new Date(b.date));
   return new Response(JSON.stringify({ events, fetched: new Date().toISOString() }), {
     headers: { 'content-type': 'application/json', 'cache-control': 'public, max-age=300', 'netlify-cdn-cache-control': 'public, s-maxage=900, stale-while-revalidate=1800', 'access-control-allow-origin': '*' },
