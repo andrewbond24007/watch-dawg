@@ -770,3 +770,7 @@ body.compact .list{gap:6px}
 .rov{grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:10px}
 .rov button{padding:10px 4px 8px}.rov b{font-size:12px}.rov .ic{font-size:21px}.rov .sig{font-size:10.5px;padding:2px 6px}
 .hkey[hidden]{display:none}
+
+.stbl{display:grid;gap:6px;margin-top:10px}
+.stbl div{display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:baseline;font-size:13.5px}
+.stbl span{color:var(--muted)}.stbl span b{color:var(--ink)}.stbl em{font-style:normal;font-size:12px;min-width:84px;text-align:right}

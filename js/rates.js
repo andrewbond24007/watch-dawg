@@ -182,8 +182,31 @@ function liqCard(){
    <div class="hnote">The Fed's holdings shrink while it runs down its bond portfolio ("quantitative tightening"). The Treasury account swings with tax receipts and borrowing; the reverse repo is spare cash money-market funds park at the Fed. Source: FRED (WALCL, WTREGEN, RRPONTSYD), weekly on Wednesdays.</div>`:''}
   <button class="morebtn" data-rexp="rliq" aria-expanded="${open}">${open?'Show less':'Details · what makes it up'}<span class="ch">▾</span></button></div>`;
 }
+/* stablecoin supply (DefiLlama): dollars waiting inside crypto; crypto's own liquidity gauge */
+let STB={data:null,at:0};
+async function loadStb(){if(Date.now()-STB.at<30*60e3)return;STB.at=Date.now();
+ try{const j=await fetch('/data/stablecoins.json?t='+Math.floor(Date.now()/9e5)).then(r=>r.ok?r.json():null);if(j&&j.rows){STB.data=j;if(activeTab==='rates')renderRates();}}catch(e){STB.at=0;}}
+function stbCard(){
+ const S=STB.data;if(!S)return '';
+ const lt=S.trend==='rising'?'green':S.trend==='falling'?'red':'amber',open=REXP.has('rstb'),rows=S.rows,n=rows.length,W=320,H=150,P=6;
+ const line=(vals,col,w,dash)=>{const v=vals.filter(x=>x!=null);if(v.length<2)return '';const mn=Math.min(...v),mx=Math.max(...v),r=mx-mn||1;let d='',pen=false;
+  vals.forEach((x,i)=>{if(x==null){pen=false;return;}d+=(pen?'L':'M')+(P+i/(n-1)*(W-2*P)).toFixed(1)+' '+(P+(1-(x-mn)/r)*(H-2*P-14)).toFixed(1);pen=true;});
+  return `<path d="${d}" fill="none" stroke="${col}" stroke-width="${w}" ${dash?'stroke-dasharray="4 3"':''} stroke-linejoin="round"/>`;};
+ const yrs=[...new Set(rows.map(r=>r[0].slice(0,4)))].map(y=>{const i=rows.findIndex(r=>r[0].startsWith(y));return i>0?`<text x="${(P+i/(n-1)*(W-2*P)).toFixed(1)}" y="${H-2}" text-anchor="middle">${y}</text>`:'';}).join('');
+ const bn=v=>v==null?'–':(v>0?'+':v<0?'−':'')+'$'+Math.abs(v).toFixed(1)+'bn',cls=v=>v>0?'up':v<0?'down':'';
+ const cor=S.corr,corTxt=cor==null?'':Math.abs(cor)<.2?'have barely moved together':cor>0?`have tended to move together (correlation ${cor.toFixed(2)})`:`have tended to move in opposite directions (correlation ${cor.toFixed(2)})`;
+ return `<div class="card hreg" id="rstb"><div class="hh"><span class="fl">🪙</span><h3>Stablecoin supply</h3><span class="sig ${lt}">${S.trend[0].toUpperCase()+S.trend.slice(1)}</span></div>
+  <div class="why">Dollars sitting inside crypto as stablecoins (USDT, USDC and others), ready to buy coins. New ones are created when money comes in and redeemed when it leaves, so it’s crypto’s own liquidity gauge.</div>
+  <div class="radh"><div class="rads"><b class="num" style="color:var(--accent)">$${(S.total/1000).toFixed(3)}tn</b><small>in circulation · ${rdate(S.date)}</small></div>
+   <div class="liqch"><span>7 days <b class="num ${cls(S.d7)}">${bn(S.d7)}</b></span><span>30 days <b class="num ${cls(S.d30)}">${bn(S.d30)}</b></span><span>1 year <b class="num ${cls(S.d365)}">${bn(S.d365)}</b></span></div></div>
+  <svg class="liqc" viewBox="0 0 ${W} ${H}" aria-label="Stablecoin supply and bitcoin, 3 years">${line(rows.map(r=>r[1]),'var(--accent)',2.2)}${line(S.btc,'#f2a900',1.6,true)}${yrs}</svg>
+  <div class="liqk"><span><i style="background:var(--accent)"></i>Stablecoin supply</span><span><i style="background:#f2a900"></i>Bitcoin (dashed)</span><span>3 years, weekly</span></div>
+  ${corTxt?`<div class="hnote">Over three years, monthly changes in stablecoin supply and bitcoin’s price ${corTxt}.</div>`:''}
+  ${open?`<div class="stbl">${S.coins.map(c=>`<div><span><b>${esc(c.sym)}</b> ${esc(c.name)}</span><b class="num">$${c.bn.toFixed(1)}bn</b><em class="num ${cls(c.d30)}">${c.d30==null?'':bn(c.d30)+' 30d'}</em></div>`).join('')}</div><div class="hnote">Dollar-pegged stablecoins over $1bn. Source: DefiLlama, daily.</div>`:''}
+  <button class="morebtn" data-rexp="rstb" aria-expanded="${open}">${open?'Show less':'Details · the biggest stablecoins'}<span class="ch">▾</span></button></div>`;
+}
 function renderRates(){
- loadRadar();loadLiq();
+ loadRadar();loadLiq();loadStb();
  if(activeTab!=='rates')return;const d=RATES.data;
  $('ratesStatus').innerHTML=d?`<span>Updated <b>${timeAgo(d.fetched)}</b></span>${RATES.err?'<span class="bad">Couldn’t refresh; showing the last copy</span>':''}${RATES.busy?'<span>Refreshing…</span>':''}${(d.errors||[]).length?`<span class="bad">${d.errors.length} source${d.errors.length>1?'s':''} not answering</span>`:''}`:'';
  if(!d){$('ratesBox').innerHTML=`<div class="empty" style="margin-top:12px">${RATES.err?'Rates can’t load in this viewer.':'Loading rates…'}</div>`;return;}
@@ -198,6 +221,7 @@ function renderRates(){
  const bul=[`<li><b>Central banks</b> ${esc(moves.join(', '))}</li>`,(fodd||pmb.length)?`<li><b>Expectations</b> ${esc([fodd,pmb.length?'Polymarket: '+pmb.join(', '):''].filter(Boolean).join('. '))}</li>`:'',
   RADAR.data?.score!=null?`<li><b>Recession risk</b> ${RADAR.data.score}/100 on the radar below (${esc(RADAR.data.label.toLowerCase())}${RADAR.data.signals.filter(x=>x.light==='red').length?`; warning from ${esc(RADAR.data.signals.filter(x=>x.light==='red').map(x=>x.short.toLowerCase()).join(', '))}`:''})</li>`:'',
   LIQ.data?`<li><b>Liquidity</b> ${esc(LIQ.data.trend)}: ${tnbn(LIQ.data.net)} net, ${sbn(LIQ.data.w13)} over 3 months</li>`:'',
+  STB.data?`<li><b>Crypto liquidity</b> stablecoins ${esc(STB.data.trend)}, $${(STB.data.total/1000).toFixed(2)}tn (${STB.data.d30>0?'+':'−'}$${Math.abs(STB.data.d30).toFixed(1)}bn in 30 days)</li>`:'',
   us10?`<li><b>Borrowing costs</b> US 10-year at ${rp(us10.value)} (${bps(us10.value-us10.y1)} on a year)${m30?`, US mortgages ${rp(m30.value)}`:''}${uk2?`, UK 2-year fixes ${rp(uk2.value)}`:''}</li>`:''].join('');
  const ev=[];B.forEach(b=>b.next&&ev.push([b.next,`${b.flag} ${b.short} decision`,'#rb-'+b.id]));
  (d.inflation||[]).filter(i=>i.next&&i.id!=='uscore').forEach(i=>ev.push([i.next,`${i.flag} ${i.id==='uscpi'?'US':i.id==='eahicp'?'Euro':'UK'} inflation`,'#rinfl']));
@@ -235,7 +259,7 @@ function renderRates(){
  $('ratesOv').innerHTML=SECS.map(([id,ic,name,[c,w]])=>`<button role="tab" aria-selected="${id===rSec}" class="${id===rSec?'on':''}" data-rs="${id}"><span class="ic">${ic}</span><b>${name}</b>${w?`<span class="sig ${c}">${esc(w)}</span>`:''}</button>`).join('');
  const body={
   banks:()=>brief+next+B.map(bankCard).join(''),
-  risk:()=>(radarCard()+liqCard())||'<div class="empty">Loading the recession radar and liquidity…</div>',
+  risk:()=>(radarCard()+liqCard()+stbCard())||'<div class="empty">Loading the recession radar and liquidity…</div>',
   borrow:()=>secCard('ryld','📈','Bond yields','What governments pay to borrow. Mortgage rates follow these.',yI,yI.map(rRow).join('')+cv,REXP.has('ryld')?'':cv)+secCard('rmort','🏠','Mortgage rates','',mI,mI.map(rRow).join('')),
   prices:()=>secCard('rinfl','🛒','Inflation','Central banks aim for 2%. Above that, rates tend to stay high.',iI,iI.map(rRow).join(''))
    +(fI.length?`<div class="card hreg" id="rfx"><div class="hh"><span class="fl">💱</span><h3>Currencies</h3><span class="rlive">Live</span></div><div class="rtiles">${fI.map(o=>`<div class="rtile"><small>${esc(o.short)}</small><b class="num">${o.val}</b><span>${o.chgShort}</span></div>`).join('')}</div></div>`:'')};
@@ -247,7 +271,7 @@ function renderRates(){
 $('ratesBox').addEventListener('click',e=>{
  const la=e.target.closest('[data-liqa]');if(la){liqAsset=la.dataset.liqa;store.set('wd.liqa',liqAsset);buzz();renderRates();return;}
  const x=e.target.closest('[data-rexp]');if(x){const id=x.dataset.rexp;REXP.has(id)?REXP.delete(id):REXP.add(id);buzz();renderRates();return;}
- const j=e.target.closest('[data-jump]');if(j){const want={'#rinfl':'prices','#rmort':'borrow','#ryld':'borrow','#rrad':'risk','#rliq':'risk'}[j.dataset.jump]||'banks';if(want!==rSec){rSec=want;store.set('wd.rsec',rSec);renderRates();}const el=document.querySelector(j.dataset.jump);if(el){buzz();el.scrollIntoView({behavior:reduce?'auto':'smooth',block:'start'});el.classList.add('flash');setTimeout(()=>el.classList.remove('flash'),1200);}return;}
+ const j=e.target.closest('[data-jump]');if(j){const want={'#rinfl':'prices','#rmort':'borrow','#ryld':'borrow','#rrad':'risk','#rliq':'risk','#rstb':'risk'}[j.dataset.jump]||'banks';if(want!==rSec){rSec=want;store.set('wd.rsec',rSec);renderRates();}const el=document.querySelector(j.dataset.jump);if(el){buzz();el.scrollIntoView({behavior:reduce?'auto':'smooth',block:'start'});el.classList.add('flash');setTimeout(()=>el.classList.remove('flash'),1200);}return;}
  const b=e.target.closest('.hmb');if(b){const r=b.parentElement,md=r.querySelector('.md'),o=md.hidden;md.hidden=!o;r.classList.toggle('open',o);b.setAttribute('aria-expanded',o);buzz();}
 });
 $('ratesRefresh').addEventListener('click',async e=>{const b=e.currentTarget;b.classList.remove('spin');void b.offsetWidth;b.classList.add('spin');buzz();rlAt=0;await loadRates(true);toast('Macro refreshed');});
