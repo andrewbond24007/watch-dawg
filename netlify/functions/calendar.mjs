@@ -140,7 +140,13 @@ export default async () => {
     const ej = await fetch('https://raw.githubusercontent.com/andrewbond24007/watch-dawg/data/earnings.json', { signal: AbortSignal.timeout(6000) }).then((r) => (r.ok ? r.json() : null));
     for (const st of ej?.stocks || []) events.push(...earnEvents(st).filter((e) => new Date(e.date) < horizon && new Date(e.date) > Date.now() - 8 * 864e5));
   } catch (e) { /* calendar still works without them */ }
-  if (process.env.EIA_KEY) { try { for (const e of await eia(process.env.EIA_KEY)) if (new Date(e.date) > Date.now() - 8 * 864e5) events.push(e); } catch (e) { /* optional */ } }
+  // crude inventories: saved by the scheduled refresh (GitHub has the EIA key), or asked directly if this site has one
+  try {
+    let ev = [];
+    const sj = await fetch('https://raw.githubusercontent.com/andrewbond24007/watch-dawg/data/eia.json', { signal: AbortSignal.timeout(6000) }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    if (sj?.rows) ev = eiaEvents(sj.rows); else if (process.env.EIA_KEY) ev = await eia(process.env.EIA_KEY);
+    for (const e of ev) if (new Date(e.date) > Date.now() - 8 * 864e5) events.push(e);
+  } catch (e) { /* optional */ }
   events.sort((a, b) => new Date(a.date) - new Date(b.date));
   return new Response(JSON.stringify({ events, fetched: new Date().toISOString() }), {
     headers: { 'content-type': 'application/json', 'cache-control': 'public, max-age=300', 'netlify-cdn-cache-control': 'public, s-maxage=900, stale-while-revalidate=1800', 'access-control-allow-origin': '*' },

@@ -126,7 +126,8 @@ try {
   const prevR = read('rates.json', null), pUs = (prevR?.inflation || []).filter((i) => i.id === 'uscpi' || i.id === 'uscore');
   const blsDue = !pUs.length || !prevR.blsAt || Date.now() - Date.parse(prevR.blsAt) > (process.env.BLS_KEY ? 2 : 8) * 3600e3 || pUs.some((i) => i.next && Date.parse(i.next) < Date.now());
   const q = blsDue ? '' : '?nobls=1';
-  const r = await call(rates, 'https://watchdawg.local/' + q, '/.netlify/functions/rates' + q);
+  // with a BLS key here, rates are built on this machine so the key is used (the live site may not have it)
+  const r = await call(rates, 'https://watchdawg.local/' + q, process.env.BLS_KEY ? null : '/.netlify/functions/rates' + q);
   if (!r.inflation?.some((i) => i.id === 'uscpi') && pUs.length) {
     r.inflation = [...pUs, ...(r.inflation || [])]; r.blsAt = prevR.blsAt;
     const fed = r.banks?.find((b) => b.id === 'fed'), c = pUs.find((i) => i.id === 'uscpi');
@@ -227,6 +228,15 @@ if (earnDue) {
     write('earnings.json', { updated: new Date().toISOString(), stocks: list });
     console.log('earnings:', list.map((p) => `${p.sym} next ${p.next || '?'}`).join(', '));
   } catch (e) { errors.earnings = String(e.message || e); console.warn('earnings:', e.message); }
+}
+// EIA weekly crude inventories for Big events (every pass: the release lands at 10:30 New York on Wednesdays)
+if (process.env.EIA_KEY) {
+  try {
+    const u = `https://api.eia.gov/v2/petroleum/stoc/wstk/data/?api_key=${encodeURIComponent(process.env.EIA_KEY)}&frequency=weekly&data[0]=value&facets[series][]=WCESTUS1&sort[0][column]=period&sort[0][direction]=desc&length=3`;
+    const j = await fetch(u, { signal: AbortSignal.timeout(10000) }).then((r) => r.json());
+    if (!j?.response?.data?.length) throw new Error('no rows');
+    write('eia.json', { updated: new Date().toISOString(), rows: j.response.data.map((x) => ({ period: x.period, value: x.value })) });
+  } catch (e) { errors.eia = String(e.message || e); }
 }
 if (!FAST) write('history.json', hist);
 // release dates that are typed in by hand: warn (through the source checks) when a list is about to run out
